@@ -1,28 +1,22 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { 
-  Plus, Square, Circle, Triangle, Type, Image, Play, Pause, RotateCw, 
+  Plus, Square, Circle, Triangle, Type, Image, Play, Pause, 
   Copy, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline,
   Download, Save, FolderOpen, Undo, Redo, Group, Ungroup, Move, Minus, 
   Maximize, MinusCircle, PlusCircle, Layers, Grid, MousePointer, ZoomIn,
-  ZoomOut, Crop, Filter, Lock, Unlock, Share, Users, MessageCircle, Star,
-  Hexagon, Octagon, PenTool, ArrowRight, LineChart, Sliders, Palette,
-  Instagram, Facebook, Twitter, Youtube, Linkedin, Music,
-  Film, FileText, BookOpen, Camera, Video, Printer, Mail, Heart, Smile,
-  Sticker, Zap, Cloud, Moon, Sun, CloudRain, CloudSnow, CloudLightning,
-  Flower, Leaf, Mountain, Coffee, Pizza, Cake, Crown, Gem, Bell,
-  Gift, Key, LockKeyhole, HeartHandshake, Trophy, Flag, Rocket, Plane,
-  Ship, Car, Bike, Train, Bus, Wallet, ShoppingCart, CreditCard, Banknote,
-  Bitcoin, Music2, Mic, Headphones, Radio, Tv, Smartphone, Laptop, Monitor,
-  Keyboard, Mouse, HardDrive, Database, Server, Cpu, Battery, BatteryCharging, 
-  BatteryFull, BatteryLow, BatteryMedium, BatteryWarning, Volume, Volume2, 
-  VolumeX, BellOff, BellRing, Megaphone, AlertCircle, AlertTriangle, 
-  CheckCircle, XCircle, Info, HelpCircle, Ban, User, LogOut, Settings,
-  Languages, Sparkles, Droplets, Flame, Snowflake, CloudDrizzle,
-  Cloudy, Tornado, Wind, Sunset, Sunrise, Thermometer, Umbrella
+  ZoomOut, Lock, Unlock, Share, Users, MessageCircle, Star,
+  Hexagon, PenTool, ArrowRight, 
+  Facebook, Twitter, Linkedin, Music,
+  Film, FileText, BookOpen, Printer, Mail, Heart,
+  Sticker, Zap, 
+  CreditCard, 
+  Tv, Smartphone, Monitor,
+  Megaphone, 
+  User, LogOut, Settings,
+  Languages, Sparkles, HelpCircle
 } from 'lucide-react';
 
 const Sowntra = () => {
-  const [elements, setElements] = useState([]);
   const [selectedElement, setSelectedElement] = useState(null);
   const [selectedElements, setSelectedElements] = useState(new Set());
   const [isDragging, setIsDragging] = useState(false);
@@ -49,15 +43,12 @@ const Sowntra = () => {
   const [textEditing, setTextEditing] = useState(null);
   const [pages, setPages] = useState([{ id: 'page-1', name: 'Page 1', elements: [] }]);
   const [currentPage, setCurrentPage] = useState('page-1');
-  const [canvasHighlighted, setCanvasHighlighted] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
-  const [filters, setFilters] = useState({});
   const [lockedElements, setLockedElements] = useState(new Set());
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [textDirection, setTextDirection] = useState('ltr');
-  const [fontsLoaded, setFontsLoaded] = useState(true);
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const [transliterationEnabled, setTransliterationEnabled] = useState(false);
   const [transliterationMap, setTransliterationMap] = useState({});
@@ -66,9 +57,10 @@ const Sowntra = () => {
   const [videoQuality, setVideoQuality] = useState('high');
   const [recordingDuration, setRecordingDuration] = useState(10);
   const [recordingTimeLeft, setRecordingTimeLeft] = useState(0);
-  const [resizeDirection, setResizeDirection] = useState('');
   const [gradientPickerKey, setGradientPickerKey] = useState(0);
   const [showEffectsPanel, setShowEffectsPanel] = useState(false);
+  const [resizeDirection, setResizeDirection] = useState('');
+  const [canvasHighlighted, setCanvasHighlighted] = useState(false);
   
   // New state for custom template
   const [showCustomTemplateModal, setShowCustomTemplateModal] = useState(false);
@@ -80,13 +72,8 @@ const Sowntra = () => {
 
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
-  const videoRef = useRef(null);
   const floatingToolbarRef = useRef(null);
-  const exportCanvasRef = useRef(null);
-  const videoExportCanvasRef = useRef(null);
-  const videoStreamRef = useRef(null);
   const recordingIntervalRef = useRef(null);
-  const textElementRef = useRef(null);
   const canvasContainerRef = useRef(null);
 
   // Get current page elements
