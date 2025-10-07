@@ -324,84 +324,84 @@ const Sowntra = () => {
       width: 1080, 
       height: 1080, 
       name: 'Instagram Post', 
-      icon: <Instagram size={16} />,
+      icon: <Square size={16} />,
       aspectRatio: 1 
     },
     instagramStory: { 
       width: 1080, 
       height: 1920, 
       name: 'Instagram Story', 
-      icon: <Instagram size={16} />,
+      icon: <Smartphone size={16} />,
       aspectRatio: 9/16 
     },
     facebookPost: { 
       width: 940, 
       height: 788, 
       name: 'Facebook Post', 
-      icon: <Facebook size={16} />,
+      icon: <MessageCircle size={16} />,
       aspectRatio: 940/788 
     },
     facebookCover: { 
       width: 820, 
       height: 312, 
       name: 'Facebook Cover', 
-      icon: <Facebook size={16} />,
+      icon: <Image size={16} />,
       aspectRatio: 820/312 
     },
     twitterPost: { 
       width: 1024, 
       height: 512, 
       name: 'Twitter Post', 
-      icon: <Twitter size={16} />,
+      icon: <Type size={16} />,
       aspectRatio: 2 
     },
     twitterHeader: { 
       width: 1500, 
       height: 500, 
       name: 'Twitter Header', 
-      icon: <Twitter size={16} />,
+      icon: <Maximize size={16} />,
       aspectRatio: 3 
     },
     linkedinPost: { 
       width: 1200, 
       height: 1200, 
       name: 'LinkedIn Post', 
-      icon: <Linkedin size={16} />,
+      icon: <Users size={16} />,
       aspectRatio: 1 
     },
     linkedinBanner: { 
       width: 1584, 
       height: 396, 
       name: 'LinkedIn Banner', 
-      icon: <Linkedin size={16} />,
+      icon: <Monitor size={16} />,
       aspectRatio: 4 
     },
     youtubeThumbnail: { 
       width: 1280, 
       height: 720, 
       name: 'YouTube Thumbnail', 
-      icon: <Youtube size={16} />,
+      icon: <Film size={16} />,
       aspectRatio: 16/9 
     },
     youtubeChannelArt: { 
       width: 2560, 
       height: 1440, 
       name: 'YouTube Channel Art', 
-      icon: <Youtube size={16} />,
+      icon: <Tv size={16} />,
       aspectRatio: 16/9 
     },
     tiktok: { 
       width: 1080, 
       height: 1920, 
       name: 'TikTok Video', 
-      icon: <Video size={16} />,
+      icon: <Music size={16} />,
       aspectRatio: 9/16 
     },
     snapchat: { 
       width: 1080, 
       height: 1920, 
       name: 'Snapchat', 
-      icon: <Camera size={16} />,
+      icon: <Zap size={16} />,
       aspectRatio: 9/16 
     },
     a4Poster: { 
@@ -415,14 +415,14 @@ const Sowntra = () => {
       width: 3508, 
       height: 4961, 
       name: 'A3 Poster', 
-      icon: <FileText size={16} />,
+      icon: <Printer size={16} />,
       aspectRatio: 3508/4961 
     },
     a5Flyer: { 
       width: 1748, 
       height: 2480, 
       name: 'A5 Flyer', 
-      icon: <FileText size={16} />,
+      icon: <Megaphone size={16} />,
       aspectRatio: 1748/2480 
     },
     businessCard: { 
@@ -436,7 +436,7 @@ const Sowntra = () => {
       width: 1200, 
       height: 1800, 
       name: 'Invitation Card', 
-      icon: <Mail size={16} />,
+      icon: <Heart size={16} />,
       aspectRatio: 2/3 
     },
     brochure: { 
