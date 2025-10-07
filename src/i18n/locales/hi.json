@@ -1,0 +1,189 @@
+{
+  "app": {
+    "title": "सौंत्रा - डिज़ाइन स्टूडियो",
+    "tagline": "अद्भुत डिज़ाइन बनाएं"
+  },
+  "toolbar": {
+    "undo": "पूर्ववत करें",
+    "redo": "फिर से करें",
+    "templates": "टेम्प्लेट",
+    "effects": "प्रभाव",
+    "play": "चलाएं",
+    "reset": "रीसेट",
+    "record": "वीडियो रिकॉर्ड करें",
+    "save": "सहेजें",
+    "download": "डाउनलोड करें",
+    "language": "भाषा",
+    "account": "खाता",
+    "share": "साझा करें"
+  },
+  "tools": {
+    "title": "उपकरण",
+    "select": "चुनें",
+    "pan": "पैन",
+    "text": "टेक्स्ट",
+    "shape": "आकार",
+    "image": "छवि",
+    "draw": "ड्रा",
+    "sticker": "स्टिकर"
+  },
+  "shapes": {
+    "rectangle": "आयत",
+    "circle": "वृत्त",
+    "triangle": "त्रिकोण",
+    "hexagon": "षट्कोण"
+  },
+  "text": {
+    "doubleClickToEdit": "संपादित करने के लिए डबल क्लिक करें",
+    "fontFamily": "फ़ॉन्ट परिवार",
+    "fontSize": "फ़ॉन्ट आकार",
+    "fontWeight": "फ़ॉन्ट वजन",
+    "textAlign": "टेक्स्ट संरेखण",
+    "left": "बाएं",
+    "center": "केंद्र",
+    "right": "दाएं",
+    "bold": "बोल्ड",
+    "italic": "इटैलिक",
+    "underline": "रेखांकित",
+    "color": "रंग"
+  },
+  "effects": {
+    "title": "प्रभाव",
+    "none": "कोई नहीं",
+    "shadow": "छाया",
+    "glow": "चमक",
+    "blur": "धुंधला",
+    "neon": "नियॉन",
+    "gradient": "ग्रेडिएंट",
+    "vintage": "विंटेज",
+    "comic": "कॉमिक",
+    "glitch": "ग्लिच"
+  },
+  "templates": {
+    "title": "टेम्प्लेट",
+    "socialMedia": "सोशल मीडिया",
+    "presentation": "प्रस्तुति",
+    "print": "प्रिंट",
+    "custom": "कस्टम आकार",
+    "instagram": "इंस्टाग्राम पोस्ट",
+    "story": "इंस्टाग्राम स्टोरी",
+    "facebook": "फेसबुक पोस्ट",
+    "twitter": "ट्विटर पोस्ट",
+    "youtube": "यूट्यूब थंबनेल",
+    "linkedin": "लिंक्डइन पोस्ट",
+    "businessCard": "व्यवसाय कार्ड",
+    "flyer": "फ्लायर",
+    "poster": "पोस्टर",
+    "banner": "बैनर"
+  },
+  "customTemplate": {
+    "title": "कस्टम टेम्पलेट बनाएं",
+    "width": "चौड़ाई",
+    "height": "ऊंचाई",
+    "unit": "इकाई",
+    "create": "बनाएं",
+    "cancel": "रद्द करें"
+  },
+  "pages": {
+    "title": "पृष्ठ",
+    "addPage": "पृष्ठ जोड़ें",
+    "page": "पृष्ठ"
+  },
+  "layers": {
+    "title": "परतें",
+    "lock": "लॉक करें",
+    "unlock": "अनलॉक करें",
+    "visible": "दृश्यमान",
+    "hidden": "छुपा हुआ",
+    "duplicate": "डुप्लिकेट",
+    "delete": "हटाएं"
+  },
+  "actions": {
+    "copy": "कॉपी करें",
+    "paste": "पेस्ट करें",
+    "delete": "हटाएं",
+    "duplicate": "डुप्लिकेट",
+    "group": "ग्रुप",
+    "ungroup": "अनग्रुप",
+    "bringToFront": "आगे लाएं",
+    "sendToBack": "पीछे भेजें",
+    "lock": "लॉक करें",
+    "unlock": "अनलॉक करें"
+  },
+  "canvas": {
+    "zoomIn": "ज़ूम इन",
+    "zoomOut": "ज़ूम आउट",
+    "fitToScreen": "स्क्रीन में फिट करें",
+    "actualSize": "वास्तविक आकार",
+    "showGrid": "ग्रिड दिखाएं",
+    "snapToGrid": "ग्रिड में स्नैप करें"
+  },
+  "recording": {
+    "start": "रिकॉर्डिंग शुरू करें",
+    "stop": "रिकॉर्डिंग रोकें",
+    "recording": "रिकॉर्डिंग...",
+    "duration": "अवधि",
+    "format": "प्रारूप",
+    "quality": "गुणवत्ता",
+    "timeLeft": "समय शेष"
+  },
+  "language": {
+    "title": "भाषा चुनें",
+    "english": "अंग्रेजी",
+    "hindi": "हिंदी",
+    "tamil": "तमिल",
+    "telugu": "तेलुगु",
+    "bengali": "बंगाली",
+    "marathi": "मराठी",
+    "gujarati": "गुजराती",
+    "kannada": "कन्नड़",
+    "malayalam": "मलयालम",
+    "punjabi": "पंजाबी",
+    "odia": "ओडिया",
+    "urdu": "उर्दू",
+    "arabic": "अरबी",
+    "hebrew": "हिब्रू",
+    "transliteration": "लिप्यंतरण सक्षम करें",
+    "transliterationDesc": "अंग्रेजी में टाइप करें",
+    "typingHelp": "टाइपिंग सहायता"
+  },
+  "account": {
+    "profile": "प्रोफ़ाइल",
+    "settings": "सेटिंग्स",
+    "logout": "लॉग आउट",
+    "signIn": "साइन इन",
+    "signUp": "साइन अप"
+  },
+  "messages": {
+    "saved": "सफलतापूर्वक सहेजा गया!",
+    "downloaded": "सफलतापूर्वक डाउनलोड किया गया!",
+    "copied": "क्लिपबोर्ड पर कॉपी किया गया!",
+    "error": "एक त्रुटि हुई",
+    "loading": "लोड हो रहा है...",
+    "noElements": "कैनवास पर कोई तत्व नहीं",
+    "selectElement": "संपादित करने के लिए एक तत्व चुनें"
+  },
+  "buttons": {
+    "ok": "ठीक है",
+    "cancel": "रद्द करें",
+    "apply": "लागू करें",
+    "close": "बंद करें",
+    "save": "सहेजें",
+    "delete": "हटाएं",
+    "edit": "संपादित करें",
+    "add": "जोड़ें",
+    "remove": "हटाएं",
+    "create": "बनाएं",
+    "upload": "अपलोड करें"
+  },
+  "filters": {
+    "none": "कोई नहीं",
+    "grayscale": "ग्रेस्केल",
+    "sepia": "सेपिया",
+    "blur": "धुंधला",
+    "brightness": "चमक",
+    "contrast": "कंट्रास्ट",
+    "saturate": "संतृप्त",
+    "invert": "उल्टा"
+  }
+}

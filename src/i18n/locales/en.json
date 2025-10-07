@@ -1,0 +1,189 @@
+{
+  "app": {
+    "title": "Sowntra - Design Studio",
+    "tagline": "Create Amazing Designs"
+  },
+  "toolbar": {
+    "undo": "Undo",
+    "redo": "Redo",
+    "templates": "Templates",
+    "effects": "Effects",
+    "play": "Play",
+    "reset": "Reset",
+    "record": "Record Video",
+    "save": "Save",
+    "download": "Download",
+    "language": "Language",
+    "account": "Account",
+    "share": "Share"
+  },
+  "tools": {
+    "title": "Tools",
+    "select": "Select",
+    "pan": "Pan",
+    "text": "Text",
+    "shape": "Shape",
+    "image": "Image",
+    "draw": "Draw",
+    "sticker": "Sticker"
+  },
+  "shapes": {
+    "rectangle": "Rectangle",
+    "circle": "Circle",
+    "triangle": "Triangle",
+    "hexagon": "Hexagon"
+  },
+  "text": {
+    "doubleClickToEdit": "Double click to edit",
+    "fontFamily": "Font Family",
+    "fontSize": "Font Size",
+    "fontWeight": "Font Weight",
+    "textAlign": "Text Align",
+    "left": "Left",
+    "center": "Center",
+    "right": "Right",
+    "bold": "Bold",
+    "italic": "Italic",
+    "underline": "Underline",
+    "color": "Color"
+  },
+  "effects": {
+    "title": "Effects",
+    "none": "None",
+    "shadow": "Shadow",
+    "glow": "Glow",
+    "blur": "Blur",
+    "neon": "Neon",
+    "gradient": "Gradient",
+    "vintage": "Vintage",
+    "comic": "Comic",
+    "glitch": "Glitch"
+  },
+  "templates": {
+    "title": "Templates",
+    "socialMedia": "Social Media",
+    "presentation": "Presentation",
+    "print": "Print",
+    "custom": "Custom Size",
+    "instagram": "Instagram Post",
+    "story": "Instagram Story",
+    "facebook": "Facebook Post",
+    "twitter": "Twitter Post",
+    "youtube": "YouTube Thumbnail",
+    "linkedin": "LinkedIn Post",
+    "businessCard": "Business Card",
+    "flyer": "Flyer",
+    "poster": "Poster",
+    "banner": "Banner"
+  },
+  "customTemplate": {
+    "title": "Create Custom Template",
+    "width": "Width",
+    "height": "Height",
+    "unit": "Unit",
+    "create": "Create",
+    "cancel": "Cancel"
+  },
+  "pages": {
+    "title": "Pages",
+    "addPage": "Add Page",
+    "page": "Page"
+  },
+  "layers": {
+    "title": "Layers",
+    "lock": "Lock",
+    "unlock": "Unlock",
+    "visible": "Visible",
+    "hidden": "Hidden",
+    "duplicate": "Duplicate",
+    "delete": "Delete"
+  },
+  "actions": {
+    "copy": "Copy",
+    "paste": "Paste",
+    "delete": "Delete",
+    "duplicate": "Duplicate",
+    "group": "Group",
+    "ungroup": "Ungroup",
+    "bringToFront": "Bring to Front",
+    "sendToBack": "Send to Back",
+    "lock": "Lock",
+    "unlock": "Unlock"
+  },
+  "canvas": {
+    "zoomIn": "Zoom In",
+    "zoomOut": "Zoom Out",
+    "fitToScreen": "Fit to Screen",
+    "actualSize": "Actual Size",
+    "showGrid": "Show Grid",
+    "snapToGrid": "Snap to Grid"
+  },
+  "recording": {
+    "start": "Start Recording",
+    "stop": "Stop Recording",
+    "recording": "Recording...",
+    "duration": "Duration",
+    "format": "Format",
+    "quality": "Quality",
+    "timeLeft": "Time Left"
+  },
+  "language": {
+    "title": "Select Language",
+    "english": "English",
+    "hindi": "Hindi",
+    "tamil": "Tamil",
+    "telugu": "Telugu",
+    "bengali": "Bengali",
+    "marathi": "Marathi",
+    "gujarati": "Gujarati",
+    "kannada": "Kannada",
+    "malayalam": "Malayalam",
+    "punjabi": "Punjabi",
+    "odia": "Odia",
+    "urdu": "Urdu",
+    "arabic": "Arabic",
+    "hebrew": "Hebrew",
+    "transliteration": "Enable Transliteration",
+    "transliterationDesc": "Type in English",
+    "typingHelp": "Typing Help"
+  },
+  "account": {
+    "profile": "Profile",
+    "settings": "Settings",
+    "logout": "Logout",
+    "signIn": "Sign In",
+    "signUp": "Sign Up"
+  },
+  "messages": {
+    "saved": "Saved successfully!",
+    "downloaded": "Downloaded successfully!",
+    "copied": "Copied to clipboard!",
+    "error": "An error occurred",
+    "loading": "Loading...",
+    "noElements": "No elements on canvas",
+    "selectElement": "Select an element to edit"
+  },
+  "buttons": {
+    "ok": "OK",
+    "cancel": "Cancel",
+    "apply": "Apply",
+    "close": "Close",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "remove": "Remove",
+    "create": "Create",
+    "upload": "Upload"
+  },
+  "filters": {
+    "none": "None",
+    "grayscale": "Grayscale",
+    "sepia": "Sepia",
+    "blur": "Blur",
+    "brightness": "Brightness",
+    "contrast": "Contrast",
+    "saturate": "Saturate",
+    "invert": "Invert"
+  }
+}

@@ -15,9 +15,11 @@ import {
   User, LogOut, Settings,
   Languages, Sparkles, HelpCircle
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import ShareButton from '../components/ShareButton';
 
 const Sowntra = () => {
+  const { t, i18n } = useTranslation();
   const [selectedElement, setSelectedElement] = useState(null);
   const [selectedElements, setSelectedElements] = useState(new Set());
   const [isDragging, setIsDragging] = useState(false);
@@ -115,9 +117,7 @@ const Sowntra = () => {
     ml: { name: 'Malayalam', direction: 'ltr', font: 'Noto Sans Malayalam' },
     pa: { name: 'Punjabi', direction: 'ltr', font: 'Noto Sans Gurmukhi' },
     or: { name: 'Odia', direction: 'ltr', font: 'Noto Sans Oriya' },
-    ur: { name: 'Urdu', direction: 'rtl', font: 'Noto Sans Arabic' },
-    ar: { name: 'Arabic', direction: 'rtl', font: 'Noto Sans Arabic' },
-    he: { name: 'Hebrew', direction: 'rtl', font: 'Noto Sans Hebrew' }
+
   };
 
   // Enhanced Text Effects
@@ -230,6 +230,11 @@ const Sowntra = () => {
     // Reset canvas offset to center
     setCanvasOffset({ x: 0, y: 0 });
   }, [canvasSize]);
+
+  // Sync i18n with currentLanguage on mount
+  useEffect(() => {
+    i18n.changeLanguage(currentLanguage);
+  }, []);
 
   // Update text direction when language changes
   useEffect(() => {
@@ -577,7 +582,7 @@ const Sowntra = () => {
     };
 
     if (type === 'text') {
-      newElement.content = 'Double click to edit';
+      newElement.content = t('text.doubleClickToEdit');
       newElement.fontSize = 24;
       newElement.fontFamily = supportedLanguages[currentLanguage]?.font || 'Arial';
       newElement.fontWeight = 'normal';
@@ -4222,14 +4227,14 @@ const Sowntra = () => {
               className={`px-3 py-2 rounded flex items-center ${showTemplates ? 'bg-white text-purple-600' : 'bg-white/20 hover:bg-white/30'}`}
             >
               <Layers size={16} className="mr-1" />
-              Templates
+              {t('toolbar.templates')}
             </button>
             <button
               onClick={() => setShowEffectsPanel(!showEffectsPanel)}
               className={`px-3 py-2 rounded flex items-center ${showEffectsPanel ? 'bg-white text-purple-600' : 'bg-white/20 hover:bg-white/30'}`}
             >
               <Sparkles size={16} className="mr-1" />
-              Effects
+              {t('toolbar.effects')}
             </button>
             <button
               onClick={playAnimations}
@@ -4237,14 +4242,14 @@ const Sowntra = () => {
               className="px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50 flex items-center"
             >
               <Play size={16} className="mr-1" />
-              Play
+              {t('toolbar.play')}
             </button>
             <button
               onClick={resetAnimations}
               className="px-3 py-2 bg-white/20 text-white rounded hover:bg-white/30 flex items-center"
             >
               <Pause size={16} className="mr-1" />
-              Reset
+              {t('toolbar.reset')}
             </button>
             {recording ? (
               <button
@@ -4260,7 +4265,7 @@ const Sowntra = () => {
                 className="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center"
               >
                 <Film size={16} className="mr-1" />
-                Record Video
+                {t('toolbar.record')}
               </button>
             )}
           </div>
@@ -4276,13 +4281,14 @@ const Sowntra = () => {
               </button>
               {showLanguageMenu && (
                 <div className="dropdown-menu" style={{ width: '200px' }}>
-                  <div className="font-semibold px-3 py-2 border-b text-gray-700">Select Language</div>
+                  <div className="font-semibold px-3 py-2 border-b text-gray-700">{t('language.title')}</div>
                   {Object.entries(supportedLanguages).map(([code, lang]) => (
                     <div
                       key={code}
                       className={`dropdown-item ${currentLanguage === code ? 'bg-blue-100 text-blue-800' : ''}`}
                       onClick={() => {
                         setCurrentLanguage(code);
+                        i18n.changeLanguage(code);
                         setShowLanguageMenu(false);
                         setGradientPickerKey(prev => prev + 1);
                       }}
@@ -4376,7 +4382,7 @@ const Sowntra = () => {
 
         {/* Pages Navigation */}
         <div className="bg-white shadow-sm p-2 border-b flex items-center space-x-2">
-          <span className="text-sm font-medium">Pages:</span>
+          <span className="text-sm font-medium">{t('pages.title')}:</span>
           {pages.map(page => (
             <button
               key={page.id}
@@ -4414,7 +4420,7 @@ const Sowntra = () => {
         <div className="main-content">
           {/* Left Tools Panel */}
           <div className="tools-panel">
-            <h2 className="text-sm font-bold mb-4 text-center">Tools</h2>
+            <h2 className="text-sm font-bold mb-4 text-center">{t('tools.title')}</h2>
             
             <div className="space-y-2">
               <button

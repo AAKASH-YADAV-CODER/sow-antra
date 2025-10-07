@@ -1,0 +1,189 @@
+{
+  "app": {
+    "title": "ସୌଂତ୍ରା - ଡିଜାଇନ୍ ଷ୍ଟୁଡିଓ",
+    "tagline": "ଚମତ୍କାର ଡିଜାଇନ୍ ସୃଷ୍ଟି କରନ୍ତୁ"
+  },
+  "toolbar": {
+    "undo": "ପୂର୍ବବତ୍ କରନ୍ତୁ",
+    "redo": "ପୁନଃକରନ୍ତୁ",
+    "templates": "ଟେମ୍ପଲେଟ୍",
+    "save": "ସେଭ୍ କରନ୍ତୁ",
+    "download": "ଡାଉନଲୋଡ୍ କରନ୍ତୁ",
+    "language": "ଭାଷା",
+    "account": "ଆକାଉଣ୍ଟ",
+    "share": "ସେୟାର୍ କରନ୍ତୁ",
+    "effects": "Effects",
+    "play": "Play",
+    "reset": "Reset",
+    "record": "Record Video"
+  },
+  "tools": {
+    "select": "ବାଛନ୍ତୁ",
+    "pan": "ପ୍ୟାନ୍",
+    "text": "ଟେକ୍ସଟ୍",
+    "shape": "ଆକୃତି",
+    "image": "ଚିତ୍ର",
+    "draw": "ଅଙ୍କନ କରନ୍ତୁ",
+    "sticker": "ଷ୍ଟିକର୍",
+    "title": "Tools"
+  },
+  "shapes": {
+    "rectangle": "ଆୟତାକାର",
+    "circle": "ବୃତ୍ତ",
+    "triangle": "ତ୍ରିଭୁଜ",
+    "hexagon": "ଷଡ଼ଭୁଜ"
+  },
+  "text": {
+    "doubleClickToEdit": "ସମ୍ପାଦନ କରିବାକୁ ଡବଲ୍ କ୍ଲିକ୍ କରନ୍ତୁ",
+    "fontFamily": "ଫଣ୍ଟ ପରିବାର",
+    "fontSize": "ଫଣ୍ଟ ଆକାର",
+    "fontWeight": "ଫଣ୍ଟ ଓଜନ",
+    "textAlign": "ଟେକ୍ସଟ୍ ଆଲାଇନମେଣ୍ଟ",
+    "left": "ବାମ",
+    "center": "ମଧ୍ୟ",
+    "right": "ଡାହାଣ",
+    "bold": "ବୋଲ୍ଡ",
+    "italic": "ଇଟାଲିକ୍",
+    "underline": "ଅଣ୍ଡରଲାଇନ୍",
+    "color": "ରଙ୍ଗ"
+  },
+  "effects": {
+    "title": "ପ୍ରଭାବ",
+    "none": "କିଛି ନାହିଁ",
+    "shadow": "ଛାୟା",
+    "glow": "ଉଜ୍ଜ୍ୱଳତା",
+    "blur": "ଅସ୍ପଷ୍ଟ",
+    "neon": "ନିଅନ୍",
+    "gradient": "ଗ୍ରେଡିଏଣ୍ଟ",
+    "vintage": "ଭିଣ୍ଟେଜ୍",
+    "comic": "କମିକ୍",
+    "glitch": "ତ୍ରୁଟି"
+  },
+  "templates": {
+    "title": "ଟେମ୍ପଲେଟ୍",
+    "socialMedia": "ସୋସିଆଲ୍ ମିଡିଆ",
+    "presentation": "ଉପସ୍ଥାପନା",
+    "print": "ପ୍ରିଣ୍ଟ",
+    "custom": "କଷ୍ଟମ୍ ଆକାର",
+    "instagram": "ଇନଷ୍ଟାଗ୍ରାମ୍ ପୋଷ୍ଟ",
+    "story": "ଇନଷ୍ଟାଗ୍ରାମ୍ ଷ୍ଟୋରୀ",
+    "facebook": "ଫେସବୁକ୍ ପୋଷ୍ଟ",
+    "twitter": "ଟ୍ୱିଟର୍ ପୋଷ୍ଟ",
+    "youtube": "ୟୁଟ୍ୟୁବ୍ ଥମ୍ବନେଲ୍",
+    "linkedin": "ଲିଙ୍କଡଇନ୍ ପୋଷ୍ଟ",
+    "businessCard": "ବ୍ୟବସାୟ କାର୍ଡ",
+    "flyer": "ଫ୍ଲାୟର୍",
+    "poster": "ପୋଷ୍ଟର୍",
+    "banner": "ବ୍ୟାନର୍"
+  },
+  "customTemplate": {
+    "title": "କଷ୍ଟମ୍ ଟେମ୍ପଲେଟ୍ ସୃଷ୍ଟି କରନ୍ତୁ",
+    "width": "ଓସାର",
+    "height": "ଉଚ୍ଚତା",
+    "unit": "ଏକକ",
+    "create": "ସୃଷ୍ଟି କରନ୍ତୁ",
+    "cancel": "ବାତିଲ୍ କରନ୍ତୁ"
+  },
+  "pages": {
+    "title": "ପୃଷ୍ଠା",
+    "addPage": "ପୃଷ୍ଠା ଯୋଡନ୍ତୁ",
+    "page": "ପୃଷ୍ଠା"
+  },
+  "layers": {
+    "title": "ସ୍ତର",
+    "lock": "ଲକ୍ କରନ୍ତୁ",
+    "unlock": "ଅନଲକ୍ କରନ୍ତୁ",
+    "visible": "ଦୃଶ୍ୟମାନ",
+    "hidden": "ଲୁଚିଛି",
+    "duplicate": "ନକଲ",
+    "delete": "ବିଲୋପ କରନ୍ତୁ"
+  },
+  "actions": {
+    "copy": "କପି କରନ୍ତୁ",
+    "paste": "ପେଷ୍ଟ କରନ୍ତୁ",
+    "delete": "ବିଲୋପ କରନ୍ତୁ",
+    "duplicate": "ନକଲ",
+    "group": "ଗ୍ରୁପ୍",
+    "ungroup": "ଅନଗ୍ରୁପ୍",
+    "bringToFront": "ଆଗକୁ ଆଣନ୍ତୁ",
+    "sendToBack": "ପଛକୁ ପଠାନ୍ତୁ",
+    "lock": "ଲକ୍ କରନ୍ତୁ",
+    "unlock": "ଅନଲକ୍ କରନ୍ତୁ"
+  },
+  "canvas": {
+    "zoomIn": "ଜୁମ୍ ଇନ୍",
+    "zoomOut": "ଜୁମ୍ ଆଉଟ୍",
+    "fitToScreen": "ସ୍କ୍ରିନରେ ଫିଟ୍ କରନ୍ତୁ",
+    "actualSize": "ପ୍ରକୃତ ଆକାର",
+    "showGrid": "ଗ୍ରିଡ୍ ଦେଖାନ୍ତୁ",
+    "snapToGrid": "ଗ୍ରିଡରେ ସ୍ନ୍ୟାପ୍ କରନ୍ତୁ"
+  },
+  "recording": {
+    "start": "ରେକର୍ଡିଂ ଆରମ୍ଭ କରନ୍ତୁ",
+    "stop": "ରେକର୍ଡିଂ ବନ୍ଦ କରନ୍ତୁ",
+    "recording": "ରେକର୍ଡିଂ...",
+    "duration": "ଅବଧି",
+    "format": "ଫର୍ମାଟ",
+    "quality": "ଗୁଣବତ୍ତା",
+    "timeLeft": "ଅବଶିଷ୍ଟ ସମୟ"
+  },
+  "language": {
+    "title": "ଭାଷା ବାଛନ୍ତୁ",
+    "english": "ଇଂରାଜୀ",
+    "hindi": "ହିନ୍ଦୀ",
+    "tamil": "ତାମିଲ୍",
+    "telugu": "ତେଲୁଗୁ",
+    "bengali": "ବଙ୍ଗଳା",
+    "marathi": "ମରାଠୀ",
+    "gujarati": "ଗୁଜୁରାଟୀ",
+    "kannada": "କନ୍ନଡ",
+    "malayalam": "ମଲୟାଲମ୍",
+    "punjabi": "ପଞ୍ଜାବୀ",
+    "odia": "ଓଡିଆ",
+    "urdu": "ଉର୍ଦ୍ଦୁ",
+    "arabic": "ଆରବୀ",
+    "hebrew": "ହିବ୍ରୁ",
+    "transliteration": "ଲିପ୍ୟନ୍ତରଣ ସକ୍ଷମ କରନ୍ତୁ",
+    "transliterationDesc": "ଇଂରାଜୀରେ ଟାଇପ୍ କରନ୍ତୁ",
+    "typingHelp": "ଟାଇପିଂ ସହାୟତା"
+  },
+  "account": {
+    "profile": "ପ୍ରୋଫାଇଲ୍",
+    "settings": "ସେଟିଂ",
+    "logout": "ଲଗ୍ ଆଉଟ୍",
+    "signIn": "ସାଇନ୍ ଇନ୍",
+    "signUp": "ସାଇନ୍ ଅପ୍"
+  },
+  "messages": {
+    "saved": "ସଫଳତାର ସହିତ ସେଭ୍ ହୋଇଛି!",
+    "downloaded": "ସଫଳତାର ସହିତ ଡାଉନଲୋଡ୍ ହୋଇଛି!",
+    "copied": "କ୍ଲିପବୋର୍ଡରେ କପି ହୋଇଛି!",
+    "error": "ଏକ ତ୍ରୁଟି ଘଟିଛି",
+    "loading": "ଲୋଡ୍ ହେଉଛି...",
+    "noElements": "କାନଭାସରେ କୌଣସି ଉପାଦାନ ନାହିଁ",
+    "selectElement": "ସମ୍ପାଦନ କରିବାକୁ ଗୋଟିଏ ଉପାଦାନ ବାଛନ୍ତୁ"
+  },
+  "buttons": {
+    "ok": "ଠିକ୍ ଅଛି",
+    "cancel": "ବାତିଲ୍",
+    "apply": "ପ୍ରୟୋଗ କରନ୍ତୁ",
+    "close": "ବନ୍ଦ କରନ୍ତୁ",
+    "save": "ସେଭ୍",
+    "delete": "ବିଲୋପ",
+    "edit": "ସମ୍ପାଦନ",
+    "add": "ଯୋଡନ୍ତୁ",
+    "remove": "ହଟାନ୍ତୁ",
+    "create": "ସୃଷ୍ଟି କରନ୍ତୁ",
+    "upload": "ଅପଲୋଡ୍ କରନ୍ତୁ"
+  },
+  "filters": {
+    "none": "କିଛି ନାହିଁ",
+    "grayscale": "ଗ୍ରେସ୍କେଲ୍",
+    "sepia": "ସେପିଆ",
+    "blur": "ଅସ୍ପଷ୍ଟ",
+    "brightness": "ଉଜ୍ଜ୍ୱଳତା",
+    "contrast": "କଣ୍ଟ୍ରାଷ୍ଟ",
+    "saturate": "ସାଚୁରେଟ୍",
+    "invert": "ଓଲଟା"
+  }
+}

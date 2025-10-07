@@ -1,0 +1,189 @@
+{
+  "app": {
+    "title": "ਸੌਂਤਰਾ - ਡਿਜ਼ਾਈਨ ਸਟੂਡੀਓ",
+    "tagline": "ਸ਼ਾਨਦਾਰ ਡਿਜ਼ਾਈਨ ਬਣਾਓ"
+  },
+  "toolbar": {
+    "undo": "ਵਾਪਸ ਕਰੋ",
+    "redo": "ਦੁਬਾਰਾ ਕਰੋ",
+    "templates": "ਟੈਂਪਲੇਟ",
+    "save": "ਸੇਵ ਕਰੋ",
+    "download": "ਡਾਊਨਲੋਡ ਕਰੋ",
+    "language": "ਭਾਸ਼ਾ",
+    "account": "ਖਾਤਾ",
+    "share": "ਸਾਂਝਾ ਕਰੋ",
+    "effects": "Effects",
+    "play": "Play",
+    "reset": "Reset",
+    "record": "Record Video"
+  },
+  "tools": {
+    "select": "ਚੁਣੋ",
+    "pan": "ਪੈਨ",
+    "text": "ਟੈਕਸਟ",
+    "shape": "ਆਕਾਰ",
+    "image": "ਚਿੱਤਰ",
+    "draw": "ਖਿੱਚੋ",
+    "sticker": "ਸਟਿੱਕਰ",
+    "title": "Tools"
+  },
+  "shapes": {
+    "rectangle": "ਆਇਤ",
+    "circle": "ਚੱਕਰ",
+    "triangle": "ਤ੍ਰਿਕੋਣ",
+    "hexagon": "ਸ਼ੱਟਕੋਣ"
+  },
+  "text": {
+    "doubleClickToEdit": "ਸੰਪਾਦਿਤ ਕਰਨ ਲਈ ਡਬਲ ਕਲਿੱਕ ਕਰੋ",
+    "fontFamily": "ਫੌਂਟ ਪਰਿਵਾਰ",
+    "fontSize": "ਫੌਂਟ ਆਕਾਰ",
+    "fontWeight": "ਫੌਂਟ ਭਾਰ",
+    "textAlign": "ਟੈਕਸਟ ਅਲਾਈਨਮੈਂਟ",
+    "left": "ਖੱਬੇ",
+    "center": "ਕੇਂਦਰ",
+    "right": "ਸੱਜੇ",
+    "bold": "ਗੂੜ੍ਹਾ",
+    "italic": "ਤਿਰਛਾ",
+    "underline": "ਅੰਡਰਲਾਈਨ",
+    "color": "ਰੰਗ"
+  },
+  "effects": {
+    "title": "ਪ੍ਰਭਾਵ",
+    "none": "ਕੋਈ ਨਹੀਂ",
+    "shadow": "ਪਰਛਾਵਾਂ",
+    "glow": "ਚਮਕ",
+    "blur": "ਧੁੰਦਲਾ",
+    "neon": "ਨੀਓਨ",
+    "gradient": "ਗ੍ਰੇਡੀਐਂਟ",
+    "vintage": "ਵਿੰਟੇਜ",
+    "comic": "ਕਾਮਿਕ",
+    "glitch": "ਨੁਕਸ"
+  },
+  "templates": {
+    "title": "ਟੈਂਪਲੇਟ",
+    "socialMedia": "ਸੋਸ਼ਲ ਮੀਡੀਆ",
+    "presentation": "ਪੇਸ਼ਕਾਰੀ",
+    "print": "ਪ੍ਰਿੰਟ",
+    "custom": "ਕਸਟਮ ਆਕਾਰ",
+    "instagram": "ਇੰਸਟਾਗ੍ਰਾਮ ਪੋਸਟ",
+    "story": "ਇੰਸਟਾਗ੍ਰਾਮ ਸਟੋਰੀ",
+    "facebook": "ਫੇਸਬੁੱਕ ਪੋਸਟ",
+    "twitter": "ਟਵਿੱਟਰ ਪੋਸਟ",
+    "youtube": "ਯੂਟਿਊਬ ਥੰਬਨੇਲ",
+    "linkedin": "ਲਿੰਕਡਇਨ ਪੋਸਟ",
+    "businessCard": "ਬਿਜ਼ਨਸ ਕਾਰਡ",
+    "flyer": "ਫਲਾਇਰ",
+    "poster": "ਪੋਸਟਰ",
+    "banner": "ਬੈਨਰ"
+  },
+  "customTemplate": {
+    "title": "ਕਸਟਮ ਟੈਂਪਲੇਟ ਬਣਾਓ",
+    "width": "ਚੌੜਾਈ",
+    "height": "ਉਚਾਈ",
+    "unit": "ਯੂਨਿਟ",
+    "create": "ਬਣਾਓ",
+    "cancel": "ਰੱਦ ਕਰੋ"
+  },
+  "pages": {
+    "title": "ਪੰਨੇ",
+    "addPage": "ਪੰਨਾ ਜੋੜੋ",
+    "page": "ਪੰਨਾ"
+  },
+  "layers": {
+    "title": "ਪਰਤਾਂ",
+    "lock": "ਲੌਕ ਕਰੋ",
+    "unlock": "ਅਨਲੌਕ ਕਰੋ",
+    "visible": "ਦਿਖਾਈ ਦੇ ਰਿਹਾ",
+    "hidden": "ਲੁਕਿਆ ਹੋਇਆ",
+    "duplicate": "ਡੁਪਲੀਕੇਟ",
+    "delete": "ਮਿਟਾਓ"
+  },
+  "actions": {
+    "copy": "ਕਾਪੀ ਕਰੋ",
+    "paste": "ਪੇਸਟ ਕਰੋ",
+    "delete": "ਮਿਟਾਓ",
+    "duplicate": "ਡੁਪਲੀਕੇਟ",
+    "group": "ਸਮੂਹ",
+    "ungroup": "ਸਮੂਹ ਤੋੜੋ",
+    "bringToFront": "ਅੱਗੇ ਲਿਆਓ",
+    "sendToBack": "ਪਿੱਛੇ ਭੇਜੋ",
+    "lock": "ਲੌਕ ਕਰੋ",
+    "unlock": "ਅਨਲੌਕ ਕਰੋ"
+  },
+  "canvas": {
+    "zoomIn": "ਜ਼ੂਮ ਇਨ",
+    "zoomOut": "ਜ਼ੂਮ ਆਊਟ",
+    "fitToScreen": "ਸਕ੍ਰੀਨ ਵਿੱਚ ਫਿੱਟ ਕਰੋ",
+    "actualSize": "ਅਸਲ ਆਕਾਰ",
+    "showGrid": "ਗ੍ਰਿੱਡ ਦਿਖਾਓ",
+    "snapToGrid": "ਗ੍ਰਿੱਡ ਵਿੱਚ ਸਨੈਪ ਕਰੋ"
+  },
+  "recording": {
+    "start": "ਰਿਕਾਰਡਿੰਗ ਸ਼ੁਰੂ ਕਰੋ",
+    "stop": "ਰਿਕਾਰਡਿੰਗ ਬੰਦ ਕਰੋ",
+    "recording": "ਰਿਕਾਰਡਿੰਗ...",
+    "duration": "ਮਿਆਦ",
+    "format": "ਫਾਰਮੈਟ",
+    "quality": "ਗੁਣਵੱਤਾ",
+    "timeLeft": "ਬਾਕੀ ਸਮਾਂ"
+  },
+  "language": {
+    "title": "ਭਾਸ਼ਾ ਚੁਣੋ",
+    "english": "ਅੰਗਰੇਜ਼ੀ",
+    "hindi": "ਹਿੰਦੀ",
+    "tamil": "ਤਮਿਲ",
+    "telugu": "ਤੇਲਗੂ",
+    "bengali": "ਬੰਗਾਲੀ",
+    "marathi": "ਮਰਾਠੀ",
+    "gujarati": "ਗੁਜਰਾਤੀ",
+    "kannada": "ਕੰਨੜ",
+    "malayalam": "ਮਲਿਆਲਮ",
+    "punjabi": "ਪੰਜਾਬੀ",
+    "odia": "ਓੜੀਆ",
+    "urdu": "ਉਰਦੂ",
+    "arabic": "ਅਰਬੀ",
+    "hebrew": "ਹਿਬਰੂ",
+    "transliteration": "ਲਿਪੀਅੰਤਰਨ ਸਮਰੱਥ ਕਰੋ",
+    "transliterationDesc": "ਅੰਗਰੇਜ਼ੀ ਵਿੱਚ ਟਾਈਪ ਕਰੋ",
+    "typingHelp": "ਟਾਈਪਿੰਗ ਮਦਦ"
+  },
+  "account": {
+    "profile": "ਪ੍ਰੋਫਾਈਲ",
+    "settings": "ਸੈਟਿੰਗਾਂ",
+    "logout": "ਲੌਗ ਆਊਟ",
+    "signIn": "ਸਾਈਨ ਇਨ",
+    "signUp": "ਸਾਈਨ ਅੱਪ"
+  },
+  "messages": {
+    "saved": "ਸਫਲਤਾਪੂਰਵਕ ਸੇਵ ਕੀਤਾ!",
+    "downloaded": "ਸਫਲਤਾਪੂਰਵਕ ਡਾਊਨਲੋਡ ਕੀਤਾ!",
+    "copied": "ਕਲਿੱਪਬੋਰਡ ਵਿੱਚ ਕਾਪੀ ਕੀਤਾ!",
+    "error": "ਇੱਕ ਗਲਤੀ ਹੋਈ",
+    "loading": "ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ...",
+    "noElements": "ਕੈਨਵਸ ਤੇ ਕੋਈ ਤੱਤ ਨਹੀਂ",
+    "selectElement": "ਸੰਪਾਦਿਤ ਕਰਨ ਲਈ ਇੱਕ ਤੱਤ ਚੁਣੋ"
+  },
+  "buttons": {
+    "ok": "ਠੀਕ ਹੈ",
+    "cancel": "ਰੱਦ ਕਰੋ",
+    "apply": "ਲਾਗੂ ਕਰੋ",
+    "close": "ਬੰਦ ਕਰੋ",
+    "save": "ਸੇਵ",
+    "delete": "ਮਿਟਾਓ",
+    "edit": "ਸੰਪਾਦਿਤ ਕਰੋ",
+    "add": "ਜੋੜੋ",
+    "remove": "ਹਟਾਓ",
+    "create": "ਬਣਾਓ",
+    "upload": "ਅੱਪਲੋਡ ਕਰੋ"
+  },
+  "filters": {
+    "none": "ਕੋਈ ਨਹੀਂ",
+    "grayscale": "ਗ੍ਰੇਸਕੇਲ",
+    "sepia": "ਸੇਪੀਆ",
+    "blur": "ਧੁੰਦਲਾ",
+    "brightness": "ਚਮਕ",
+    "contrast": "ਕੰਟਰਾਸਟ",
+    "saturate": "ਸੈਚੁਰੇਟ",
+    "invert": "ਉਲਟਾ"
+  }
+}
