@@ -205,7 +205,7 @@ const Sowntra = () => {
     zoom: { name: 'Zoom', css: 'animation: zoom 1s ease-in-out;' }
   };
 
-  // FIXED: Center canvas function - now fits the screen
+  // Center canvas function - maximizes canvas size while maintaining aspect ratio
   const centerCanvas = useCallback(() => {
     const canvasContainer = canvasContainerRef.current;
     if (!canvasContainer) return;
@@ -213,19 +213,23 @@ const Sowntra = () => {
     const containerWidth = canvasContainer.clientWidth;
     const containerHeight = canvasContainer.clientHeight;
     
-    // Update canvas size to fill the available space (minus padding)
-    const availableWidth = containerWidth - 20; // 10px padding on each side
-    const availableHeight = containerHeight - 20; // 10px padding on each side
+    // Calculate available space with minimal padding (just 10px on each side)
+    const availableWidth = containerWidth - 20; // Minimal padding
+    const availableHeight = containerHeight - 20;
     
-    setCanvasSize({
-      width: Math.max(400, availableWidth), // Minimum width of 400px
-      height: Math.max(300, availableHeight) // Minimum height of 300px
-    });
+    // Calculate zoom ratios to fill available space
+    const widthRatio = availableWidth / canvasSize.width;
+    const heightRatio = availableHeight / canvasSize.height;
     
-    // Reset canvas offset and zoom since canvas now fills the space
+    // Use the smaller ratio to ensure entire canvas fits while maximizing size
+    const optimalZoom = Math.min(widthRatio, heightRatio);
+    
+    // Set the zoom level with generous bounds for user control
+    setZoomLevel(Math.max(0.1, Math.min(5, optimalZoom)));
+    
+    // Reset canvas offset to center
     setCanvasOffset({ x: 0, y: 0 });
-    setZoomLevel(1);
-  }, []);
+  }, [canvasSize]);
 
   // Update text direction when language changes
   useEffect(() => {
@@ -611,7 +615,7 @@ const Sowntra = () => {
     saveToHistory(newElements);
   }, [getCurrentPageElements, setCurrentPageElements, saveToHistory, currentLanguage, textDirection]);
 
-  // FIXED: Enhanced applyTemplate function with proper centering and auto-zoom
+  // Apply template function with proper centering and auto-zoom
   const applyTemplate = useCallback((platform) => {
     if (platform === 'custom') {
       setShowCustomTemplateModal(true);
@@ -623,33 +627,8 @@ const Sowntra = () => {
       // Set the new canvas size
       setCanvasSize({ width: template.width, height: template.height });
       
-      // Calculate optimal zoom to fit the template
-      const calculateOptimalZoom = () => {
-        const canvasContainer = canvasContainerRef.current;
-        if (!canvasContainer) return 1;
-        
-        const containerWidth = canvasContainer.clientWidth - 80; // Account for padding
-        const containerHeight = canvasContainer.clientHeight - 80;
-        
-        if (containerWidth <= 0 || containerHeight <= 0) return 1;
-        
-        const widthRatio = containerWidth / template.width;
-        const heightRatio = containerHeight / template.height;
-        
-        // Use the smaller ratio to ensure the entire template fits
-        const optimalZoom = Math.min(widthRatio, heightRatio, 1);
-        return Math.max(0.1, optimalZoom);
-      };
-      
-      // Reset canvas offset to center
-      setCanvasOffset({ x: 0, y: 0 });
-      
-      // Set the optimal zoom after DOM update
+      // Center and zoom to fit after a short delay for DOM update
       setTimeout(() => {
-        const optimalZoom = calculateOptimalZoom();
-        setZoomLevel(optimalZoom);
-        
-        // Center the canvas
         centerCanvas();
       }, 100);
       
@@ -657,7 +636,7 @@ const Sowntra = () => {
     }
   }, [centerCanvas]);
 
-  // FIXED: Create custom template function with proper centering
+  // Create custom template function with proper centering
   const createCustomTemplate = useCallback(() => {
     let width = customTemplateSize.width;
     let height = customTemplateSize.height;
@@ -681,30 +660,8 @@ const Sowntra = () => {
     // Set the new canvas size
     setCanvasSize({ width, height });
     
-    // Calculate optimal zoom
-    const calculateOptimalZoom = () => {
-      const canvasContainer = canvasContainerRef.current;
-      if (!canvasContainer) return 1;
-      
-      const containerWidth = canvasContainer.clientWidth - 80;
-      const containerHeight = canvasContainer.clientHeight - 80;
-      
-      if (containerWidth <= 0 || containerHeight <= 0) return 1;
-      
-      const widthRatio = containerWidth / width;
-      const heightRatio = containerHeight / height;
-      
-      const optimalZoom = Math.min(widthRatio, heightRatio, 1);
-      return Math.max(0.1, optimalZoom);
-    };
-    
-    // Reset canvas offset
-    setCanvasOffset({ x: 0, y: 0 });
-    
-    // Apply zoom and center
+    // Center and zoom to fit after a short delay for DOM update
     setTimeout(() => {
-      const optimalZoom = calculateOptimalZoom();
-      setZoomLevel(optimalZoom);
       centerCanvas();
     }, 100);
     
@@ -712,10 +669,6 @@ const Sowntra = () => {
     setShowTemplates(false);
   }, [customTemplateSize, centerCanvas]);
 
-  // Auto-center when zoom changes or canvas resizes
-  useEffect(() => {
-    centerCanvas();
-  }, [zoomLevel, canvasSize, centerCanvas]);
 
   // Auto-center on window resize
   useEffect(() => {
@@ -4633,7 +4586,7 @@ const Sowntra = () => {
                 flex: 1,
                 overflow: 'hidden',
                 backgroundColor: '#f0f0f0',
-                padding: '10px',
+                padding: '5px',
                 width: '100%',
                 height: '100%'
               }}
@@ -4651,16 +4604,14 @@ const Sowntra = () => {
                 <div
                   className="bg-white shadow-lg"
                   style={{
-                    width: '100%',
-                    height: '100%',
-                    maxWidth: '100%',
-                    maxHeight: '100%',
-                    transform: `translate(${canvasOffset.x}px, ${canvasOffset.y}px)`,
+                    width: `${canvasSize.width}px`,
+                    height: `${canvasSize.height}px`,
+                    transform: `scale(${zoomLevel}) translate(${canvasOffset.x / zoomLevel}px, ${canvasOffset.y / zoomLevel}px)`,
+                    transformOrigin: 'center center',
                     position: 'relative',
                     backgroundColor: 'white',
                     boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
-                    minWidth: '400px',
-                    minHeight: '300px'
+                    transition: 'transform 0.2s ease-out'
                   }}
                   ref={canvasRef}
                   onMouseDown={handleCanvasMouseDown}
