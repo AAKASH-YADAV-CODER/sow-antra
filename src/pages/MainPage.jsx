@@ -37,7 +37,7 @@ const Sowntra = () => {
   const [snapToGrid, setSnapToGrid] = useState(false);
   const [recording, setRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState(null);
-  const [recordedChunks, setRecordedChunks] = useState([]);
+  // const [recordedChunks, setRecordedChunks] = useState([]);
   const [drawingPath, setDrawingPath] = useState([]);
   const [isDrawing, setIsDrawing] = useState(false);
   const [textEditing, setTextEditing] = useState(null);
@@ -51,7 +51,7 @@ const Sowntra = () => {
   const [textDirection, setTextDirection] = useState('ltr');
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const [transliterationEnabled, setTransliterationEnabled] = useState(false);
-  const [transliterationMap, setTransliterationMap] = useState({});
+  // const [transliterationMap, setTransliterationMap] = useState({});
   const [showLanguageHelp, setShowLanguageHelp] = useState(false);
   const [videoFormat, setVideoFormat] = useState('webm');
   const [videoQuality, setVideoQuality] = useState('high');
@@ -59,8 +59,8 @@ const Sowntra = () => {
   const [recordingTimeLeft, setRecordingTimeLeft] = useState(0);
   const [gradientPickerKey, setGradientPickerKey] = useState(0);
   const [showEffectsPanel, setShowEffectsPanel] = useState(false);
-  const [resizeDirection, setResizeDirection] = useState('');
-  const [canvasHighlighted, setCanvasHighlighted] = useState(false);
+  // const [resizeDirection, setResizeDirection] = useState('');
+  // const [canvasHighlighted, setCanvasHighlighted] = useState(false);
   
   // New state for custom template
   const [showCustomTemplateModal, setShowCustomTemplateModal] = useState(false);
@@ -1062,7 +1062,7 @@ const Sowntra = () => {
     if (!filters) return '';
     return Object.entries(filters)
       .map(([key, filter]) => {
-        if (filter && filter.value > 0 || (key === 'opacity' && filter.value < 100)) {
+        if ((filter && filter.value > 0) || (key === 'opacity' && filter.value < 100)) {
           return `${key}(${filter.value}${filter.unit})`;
         }
         return '';
@@ -1413,7 +1413,7 @@ const Sowntra = () => {
       
       if (action === 'resize') {
         setIsResizing(true);
-        setResizeDirection(direction);
+        // setResizeDirection(direction);
         
         const rect = canvasRef.current.getBoundingClientRect();
         setDragStart({
@@ -1551,7 +1551,7 @@ const Sowntra = () => {
       setShowAlignmentLines(true);
     } else if (action === 'resize' && !lockedElements.has(targetElement.id)) {
       setIsResizing(true);
-      setResizeDirection(direction);
+      // setResizeDirection(direction);
     } else if (action === 'rotate' && !lockedElements.has(targetElement.id)) {
       setIsRotating(true);
     }
@@ -1706,6 +1706,9 @@ const Sowntra = () => {
         case 'e':
           newWidth = Math.max(20, dragStart.elementWidth + deltaX);
           break;
+        default:
+          // No resize direction specified
+          break;
       }
 
       updateElement(selectedElement, { 
@@ -1733,7 +1736,7 @@ const Sowntra = () => {
     setIsPanning(false);
     setShowAlignmentLines(false);
     setAlignmentLines({ vertical: [], horizontal: [] });
-    setResizeDirection('');
+    // setResizeDirection('');
   }, [currentTool, isDrawing, finishDrawing]);
 
   // Canvas panning
@@ -1784,32 +1787,32 @@ const Sowntra = () => {
   }, [lockedElements]);
 
   // Handle text change with transliteration support
-  const handleTextChange = useCallback((e, elementId) => {
-    let newContent = e.target.textContent;
-    
-    if (transliterationEnabled && Object.keys(transliterationMap).length > 0) {
-      let transliteratedContent = newContent;
-      
-      Object.entries(transliterationMap).forEach(([english, native]) => {
-        const regex = new RegExp(english, 'gi');
-        transliteratedContent = transliteratedContent.replace(regex, native);
-      });
-      
-      newContent = transliteratedContent;
-      
-      if (e.target.textContent !== newContent) {
-        e.target.textContent = newContent;
-        const selection = window.getSelection();
-        const range = document.createRange();
-        range.selectNodeContents(e.target);
-        range.collapse(false);
-        selection.removeAllRanges();
-        selection.addRange(range);
-      }
-    }
-    
-    updateElement(elementId, { content: newContent });
-  }, [transliterationEnabled, transliterationMap, updateElement]);
+  // const handleTextChange = useCallback((e, elementId) => {
+  //   let newContent = e.target.textContent;
+  //   
+  //   if (transliterationEnabled && Object.keys(transliterationMap).length > 0) {
+  //     let transliteratedContent = newContent;
+  //     
+  //     Object.entries(transliterationMap).forEach(([english, native]) => {
+  //       const regex = new RegExp(english, 'gi');
+  //       transliteratedContent = transliteratedContent.replace(regex, native);
+  //     });
+  //     
+  //     newContent = transliteratedContent;
+  //     
+  //     if (e.target.textContent !== newContent) {
+  //       e.target.textContent = newContent;
+  //       const selection = window.getSelection();
+  //       const range = document.createRange();
+  //       range.selectNodeContents(e.target);
+  //       range.collapse(false);
+  //       selection.removeAllRanges();
+  //       selection.addRange(range);
+  //     }
+  //   }
+  //   
+  //   updateElement(elementId, { content: newContent });
+  // }, [transliterationEnabled, transliterationMap, updateElement]);
 
   // Add new page
   const addNewPage = useCallback(() => {
@@ -2192,8 +2195,8 @@ const Sowntra = () => {
       for (let i = 1; i < element.path.length; i++) {
         pathData += ' L ' + element.path[i].x + ' ' + element.path[i].y;
       }
-      let content;
-      content = (
+      // let content;
+      const content = (
         <svg
           id={`element-${element.id}`}
           style={{ ...element.style }}
@@ -2326,18 +2329,18 @@ const Sowntra = () => {
   }, [zoomLevel]);
 
   // Reset zoom and pan
-  const resetView = useCallback(() => {
-    setZoomLevel(1);
-    setCanvasOffset({ x: 0, y: 0 });
-  }, []);
+  // const resetView = useCallback(() => {
+  //   setZoomLevel(1);
+  //   setCanvasOffset({ x: 0, y: 0 });
+  // }, []);
 
   // Handle canvas mouse enter/leave for highlighting
   const handleCanvasMouseEnter = useCallback(() => {
-    setCanvasHighlighted(true);
+    // setCanvasHighlighted(true);
   }, []);
 
   const handleCanvasMouseLeave = useCallback(() => {
-    setCanvasHighlighted(false);
+    // setCanvasHighlighted(false);
   }, []);
 
   // Browser compatibility check
@@ -2490,7 +2493,7 @@ const Sowntra = () => {
       
       recorder.start();
       setMediaRecorder(recorder);
-      setRecordedChunks(chunks);
+      // setRecordedChunks(chunks);
       
       recordingIntervalRef.current = setInterval(() => {
         setRecordingTimeLeft(prev => {
