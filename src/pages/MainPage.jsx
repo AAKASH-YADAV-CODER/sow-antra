@@ -4,17 +4,18 @@ import {
   Copy, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline,
   Download, Save, FolderOpen, Undo, Redo, Group, Ungroup, Move, Minus, 
   Maximize, MinusCircle, PlusCircle, Layers, Grid, MousePointer, ZoomIn,
-  ZoomOut, Lock, Unlock, Share, Users, MessageCircle, Star,
-  Hexagon, PenTool, ArrowRight, 
-  Facebook, Twitter, Linkedin, Music,
-  Film, FileText, BookOpen, Printer, Mail, Heart,
-  Sticker, Zap, 
+  ZoomOut, Lock, Unlock, Users, MessageCircle, Star,
+  Hexagon,  ArrowRight, 
+  Music,
+  Film, FileText, BookOpen, Printer, Heart,
+  Zap, 
   CreditCard, 
   Tv, Smartphone, Monitor,
   Megaphone, 
   User, LogOut, Settings,
   Languages, Sparkles, HelpCircle
 } from 'lucide-react';
+import ShareButton from '../components/ShareButton';
 
 const Sowntra = () => {
   const [selectedElement, setSelectedElement] = useState(null);
@@ -45,7 +46,6 @@ const Sowntra = () => {
   const [currentPage, setCurrentPage] = useState('page-1');
   const [showTemplates, setShowTemplates] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
-  const [showShareMenu, setShowShareMenu] = useState(false);
   const [lockedElements, setLockedElements] = useState(new Set());
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [textDirection, setTextDirection] = useState('ltr');
@@ -274,33 +274,33 @@ const Sowntra = () => {
     const loadTransliterationData = async () => {
       try {
         // Tamil transliteration map (English to Tamil)
-        const tamilMap = {
-          'a': 'அ', 'aa': 'ஆ', 'i': 'இ', 'ii': 'ஈ', 'u': 'உ', 'uu': 'ஊ', 'e': 'எ', 'ee': 'ஏ',
-          'ai': 'ஐ', 'o': 'ஒ', 'oo': 'ஓ', 'au': 'ஔ', 'k': 'க', 'ng': 'ங', 'ch': 'ச', 'j': 'ஜ',
-          'ny': 'ஞ', 't': 'ட', 'th': 'த்', 'd': 'ட', 'dh': 'த', 'n': 'ன', 'p': 'ப', 'm': 'ம',
-          'y': 'ய', 'r': 'ர', 'l': 'ல', 'v': 'வ', 'zh': 'ழ', 'L': 'ள', 'R': 'ற', 'n^': 'ண',
-          's': 'ச', 'sh': 'ஷ', 'S': 'ஸ', 'h': 'ஹ', 'q': 'க்', 'w': 'ங்', 'E': 'ச்', 'r^': 'ன்',
-          't^': 'ண்', 'y^': 'ம்', 'u^': 'ப்', 'i^': 'வ்'
-        };
+        // const tamilMap = {
+        //   'a': 'அ', 'aa': 'ஆ', 'i': 'இ', 'ii': 'ஈ', 'u': 'உ', 'uu': 'ஊ', 'e': 'எ', 'ee': 'ஏ',
+        //   'ai': 'ஐ', 'o': 'ஒ', 'oo': 'ஓ', 'au': 'ஔ', 'k': 'க', 'ng': 'ங', 'ch': 'ச', 'j': 'ஜ',
+        //   'ny': 'ஞ', 't': 'ட', 'th': 'த்', 'd': 'ட', 'dh': 'த', 'n': 'ன', 'p': 'ப', 'm': 'ம',
+        //   'y': 'ய', 'r': 'ர', 'l': 'ல', 'v': 'வ', 'zh': 'ழ', 'L': 'ள', 'R': 'ற', 'n^': 'ண',
+        //   's': 'ச', 'sh': 'ஷ', 'S': 'ஸ', 'h': 'ஹ', 'q': 'க்', 'w': 'ங்', 'E': 'ச்', 'r^': 'ன்',
+        //   't^': 'ண்', 'y^': 'ம்', 'u^': 'ப்', 'i^': 'வ்'
+        // };
         
         // Hindi transliteration map (English to Devanagari)
-        const hindiMap = {
-          'a': 'अ', 'aa': 'आ', 'i': 'इ', 'ee': 'ई', 'u': 'उ', 'oo': 'ऊ', 'e': 'ए', 'ai': 'ऐ',
-          'o': 'ओ', 'au': 'औ', 'k': 'क', 'kh': 'ख', 'g': 'ग', 'gh': 'घ', 'ng': 'ङ', 'ch': 'च',
-          'chh': 'छ', 'j': 'ज', 'jh': 'झ', 'ny': 'ञ', 't': 'ट', 'th': 'ठ', 'd': 'ड', 'dh': 'ढ',
-          'n': 'ण', 't^': 'त', 'th^': 'थ', 'd^': 'द', 'dh^': 'ध', 'n^': 'न', 'p': 'प', 'ph': 'फ',
-          'b': 'ब', 'bh': 'भ', 'm': 'म', 'y': 'य', 'r': 'र', 'l': 'ल', 'v': 'व', 'sh': 'श',
-          'shh': 'ष', 's': 'س', 'h': 'ह'
-        };
+        // const hindiMap = {
+        //   'a': 'अ', 'aa': 'आ', 'i': 'इ', 'ee': 'ई', 'u': 'उ', 'oo': 'ऊ', 'e': 'ए', 'ai': 'ऐ',
+        //   'o': 'ओ', 'au': 'औ', 'k': 'क', 'kh': 'ख', 'g': 'ग', 'gh': 'घ', 'ng': 'ङ', 'ch': 'च',
+        //   'chh': 'छ', 'j': 'ज', 'jh': 'झ', 'ny': 'ञ', 't': 'ट', 'th': 'ठ', 'd': 'ड', 'dh': 'ढ',
+        //   'n': 'ण', 't^': 'त', 'th^': 'थ', 'd^': 'द', 'dh^': 'ध', 'n^': 'न', 'p': 'प', 'ph': 'फ',
+        //   'b': 'ब', 'bh': 'भ', 'm': 'म', 'y': 'य', 'r': 'र', 'l': 'ल', 'v': 'व', 'sh': 'श',
+        //   'shh': 'ष', 's': 'س', 'h': 'ह'
+        // };
         
         // Set the appropriate map based on current language
-        if (currentLanguage === 'ta') {
-          setTransliterationMap(tamilMap);
-        } else if (currentLanguage === 'hi') {
-          setTransliterationMap(hindiMap);
-        } else {
-          setTransliterationMap({});
-        }
+        // if (currentLanguage === 'ta') {
+        //   setTransliterationMap(tamilMap);
+        // } else if (currentLanguage === 'hi') {
+        //   setTransliterationMap(hindiMap);
+        // } else {
+        //   setTransliterationMap({});
+        // }
       } catch (error) {
         console.error('Error loading transliteration data:', error);
       }
@@ -2587,15 +2587,15 @@ const Sowntra = () => {
   // Video Settings Component
   const VideoSettings = useCallback(() => (
     <div className="mb-4 p-3 bg-gray-100 rounded">
-      <h3 className="font-semibold mb-2">Video Settings</h3>
+      <h3 className="font-semibold mb-2 text-gray-700">Video Settings</h3>
       
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium mb-1">Format</label>
+          <label className="block text-sm font-medium mb-1 text-gray-700">Format</label>
           <select
             value={videoFormat}
             onChange={(e) => setVideoFormat(e.target.value)}
-            className="w-full p-2 border rounded text-sm"
+            className="w-full p-2 border rounded text-sm text-gray-700"
           >
             <option value="webm">WebM (Recommended)</option>
             <option value="mp4">MP4 (Limited Browser Support)</option>
@@ -2609,11 +2609,11 @@ const Sowntra = () => {
         </div>
         
         <div>
-          <label className="block text-sm font-medium mb-1">Quality</label>
+          <label className="block text-sm font-medium mb-1 text-gray-700">Quality</label>
           <select
             value={videoQuality}
             onChange={(e) => setVideoQuality(e.target.value)}
-            className="w-full p-2 border rounded text-sm"
+            className="w-full p-2 border rounded text-sm text-gray-700"
           >
             <option value="low">Low (Smaller file)</option>
             <option value="medium">Medium</option>
@@ -2623,7 +2623,7 @@ const Sowntra = () => {
       </div>
       
       <div className="mt-3">
-        <label className="block text-sm font-medium mb-1">
+        <label className="block text-sm font-medium mb-1 text-gray-700">
           Duration: {recordingDuration} seconds
         </label>
         <input
@@ -3963,6 +3963,8 @@ const Sowntra = () => {
             align-items: center;
             gap: 8px;
             transition: all 0.2s;
+            color: #374151;
+            font-weight: 500;
           }
 
           .dropdown-item:hover {
@@ -4274,11 +4276,11 @@ const Sowntra = () => {
               </button>
               {showLanguageMenu && (
                 <div className="dropdown-menu" style={{ width: '200px' }}>
-                  <div className="font-semibold px-3 py-2 border-b">Select Language</div>
+                  <div className="font-semibold px-3 py-2 border-b text-gray-700">Select Language</div>
                   {Object.entries(supportedLanguages).map(([code, lang]) => (
                     <div
                       key={code}
-                      className={`dropdown-item ${currentLanguage === code ? 'bg-blue-100' : ''}`}
+                      className={`dropdown-item ${currentLanguage === code ? 'bg-blue-100 text-blue-800' : ''}`}
                       onClick={() => {
                         setCurrentLanguage(code);
                         setShowLanguageMenu(false);
@@ -4304,39 +4306,12 @@ const Sowntra = () => {
               )}
             </div>
 
-            <div className="relative">
-              <button
-                onClick={() => setShowShareMenu(!showShareMenu)}
-                className="p-2 rounded hover:bg-white/20"
-                title="Share"
-              >
-                <Share size={20} />
-              </button>
-              {showShareMenu && (
-                <div className="dropdown-menu">
-                  <div className="dropdown-item">
-                    <Copy size={16} />
-                    Copy Link
-                  </div>
-                  <div className="dropdown-item">
-                    <Mail size={16} />
-                    Email
-                  </div>
-                  <div className="dropdown-item">
-                    <Facebook size={16} />
-                    Facebook
-                  </div>
-                  <div className="dropdown-item">
-                    <Twitter size={16} />
-                    Twitter
-                  </div>
-                  <div className="dropdown-item">
-                    <Linkedin size={16} />
-                    LinkedIn
-                  </div>
-                </div>
-              )}
-            </div>
+            <ShareButton 
+              url={window.location.href}
+              title="Check out my design on Sowntra!"
+              text="I created this amazing design on Sowntra. Check it out!"
+              className="px-3 py-1.5"
+            />
             
             <div className="relative">
               <button
@@ -4519,7 +4494,7 @@ const Sowntra = () => {
               >
                 <Image size={20} />
               </button>
-              <button
+              {/* <button
                 onClick={() => setCurrentTool('pen')}
                 className={`p-2 rounded-lg ${currentTool === 'pen' ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100'}`}
                 title="Pen Tool"
@@ -4532,7 +4507,7 @@ const Sowntra = () => {
                 title="Stickers"
               >
                 <Sticker size={20} />
-              </button>
+              </button> */}
             </div>
 
             <div className="mt-6 space-y-2">
@@ -5108,18 +5083,18 @@ const Sowntra = () => {
 
             {/* Export Section */}
             <div className="mb-6">
-              <h2 className="text-lg font-bold mb-4">Export</h2>
+              <h2 className="text-lg font-bold mb-4 text-gray-700">Export</h2>
               <div className="grid grid-cols-2 gap-2 mb-3">
                 <button
                   onClick={() => exportAsImage('png')}
-                  className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center"
+                  className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center text-gray-700"
                 >
                   <Download size={14} className="mr-1" />
                   PNG
                 </button>
                 <button
                   onClick={() => exportAsImage('jpeg')}
-                  className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center"
+                  className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center text-gray-700"
                 >
                   <Download size={14} className="mr-1" />
                   JPEG
@@ -5128,14 +5103,14 @@ const Sowntra = () => {
               <div className="grid grid-cols-2 gap-2 mb-3">
                 <button
                   onClick={() => exportAsImage('webp')}
-                  className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center"
+                  className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center text-gray-700"
                 >
                   <Download size={14} className="mr-1" />
                   WebP
                 </button>
                 <button
                   onClick={() => exportAsImage('svg')}
-                  className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center"
+                  className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center text-gray-700"
                 >
                   <Download size={14} className="mr-1" />
                   SVG
@@ -5159,18 +5134,18 @@ const Sowntra = () => {
 
             {/* Project Actions */}
             <div>
-              <h2 className="text-lg font-bold mb-4">Project</h2>
+              <h2 className="text-lg font-bold mb-4 text-gray-700">Project</h2>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => {/* Save project functionality */}}
-                  className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center"
+                  className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center text-gray-700"
                 >
                   <Save size={14} className="mr-1" />
                   Save
                 </button>
                 <button
                   onClick={() => {/* Load project functionality */}}
-                  className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center"
+                  className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center text-gray-700"
                 >
                   <FolderOpen size={14} className="mr-1" />
                   Load
