@@ -45,7 +45,8 @@
     "bold": "گہرا",
     "italic": "ترچھا",
     "underline": "خط کشیدہ",
-    "color": "رنگ"
+    "color": "رنگ",
+    "textStyle": "ٹیکسٹ سٹائل"
   },
   "effects": {
     "title": "اثرات",
@@ -185,5 +186,36 @@
     "contrast": "تضاد",
     "saturate": "سیر شدہ",
     "invert": "الٹا"
+  },
+  "properties": {
+    "title": "خصوصیات",
+    "selectElement": "ترمیم کے لیے ایک عنصر منتخب کریں",
+    "animation": "اینیمیشن",
+    "quickEffects": "فوری اثرات",
+    "openEffectsPanel": "اثرات پینل کھولیں",
+    "delete": "حذف کریں",
+    "x": "X",
+    "y": "Y",
+    "width": "چوڑائی",
+    "height": "اونچائی",
+    "rotation": "گھماؤ"
+  },
+  "export": {
+    "title": "برآمدگی",
+    "exportVideo": "ویڈیو برآمد کریں",
+    "videoSettings": "ویڈیو سیٹنگز",
+    "webmRecommended": "WebM (تجویز کردہ)",
+    "mp4Limited": "MP4 (محدود براؤزر سپورٹ)",
+    "gifAnimated": "GIF (اینیمیٹڈ)",
+    "lowQuality": "کم (چھوٹی فائل)",
+    "mediumQuality": "درمیانی",
+    "highQuality": "اعلی (بہتر کوالٹی)",
+    "durationSeconds": "دورانیہ: {{count}} سیکنڈ",
+    "mp4Warning": "MP4 تمام براؤزرز میں کام نہیں کر سکتا"
+  },
+  "project": {
+    "title": "پروجیکٹ",
+    "save": "محفوظ کریں",
+    "load": "لوڈ کریں"
   }
 }

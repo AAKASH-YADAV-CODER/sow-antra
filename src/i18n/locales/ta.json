@@ -45,7 +45,8 @@
     "bold": "தடிமன்",
     "italic": "சாய்வு",
     "underline": "அடிக்கோடு",
-    "color": "நிறம்"
+    "color": "நிறம்",
+    "textStyle": "உரை பாணி"
   },
   "effects": {
     "title": "விளைவுகள்",
@@ -185,5 +186,36 @@
     "contrast": "மாறுபாடு",
     "saturate": "நிறைவு",
     "invert": "தலைகீழ்"
+  },
+  "properties": {
+    "title": "பண்புகள்",
+    "selectElement": "அதன் பண்புகளை திருத்த ஒரு உறுப்பைத் தேர்ந்தெடுக்கவும்",
+    "animation": "அனிமேஷன்",
+    "quickEffects": "விரைவு விளைவுகள்",
+    "openEffectsPanel": "விளைவுகள் பேனலைத் திறக்கவும்",
+    "delete": "நீக்கு",
+    "x": "X",
+    "y": "Y",
+    "width": "அகலம்",
+    "height": "உயரம்",
+    "rotation": "சுழற்சி"
+  },
+  "export": {
+    "title": "ஏற்றுமதி",
+    "exportVideo": "வீடியோவை ஏற்றுமதி செய்",
+    "videoSettings": "வீடியோ அமைப்புகள்",
+    "webmRecommended": "WebM (பரிந்துரைக்கப்பட்டது)",
+    "mp4Limited": "MP4 (வரையறுக்கப்பட்ட உலாவி ஆதரவு)",
+    "gifAnimated": "GIF (அனிமேஷன்)",
+    "lowQuality": "குறைந்த (சிறிய கோப்பு)",
+    "mediumQuality": "நடுத்தர",
+    "highQuality": "உயர் (சிறந்த தரம்)",
+    "durationSeconds": "கால அளவு: {{count}} வினாடிகள்",
+    "mp4Warning": "MP4 அனைத்து உலாவிகளிலும் செயல்படாது"
+  },
+  "project": {
+    "title": "திட்டம்",
+    "save": "சேமி",
+    "load": "ஏற்று"
   }
 }

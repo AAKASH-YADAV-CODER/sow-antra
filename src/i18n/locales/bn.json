@@ -45,7 +45,8 @@
     "bold": "বোল্ড",
     "italic": "তির্যক",
     "underline": "আন্ডারলাইন",
-    "color": "রঙ"
+    "color": "রঙ",
+    "textStyle": "পাঠ্য শৈলী"
   },
   "effects": {
     "title": "প্রভাব",
@@ -185,5 +186,36 @@
     "contrast": "কনট্রাস্ট",
     "saturate": "সম্পৃক্ত",
     "invert": "উল্টানো"
+  },
+  "properties": {
+    "title": "বৈশিষ্ট্য",
+    "selectElement": "সম্পাদনার জন্য একটি উপাদান নির্বাচন করুন",
+    "animation": "অ্যানিমেশন",
+    "quickEffects": "দ্রুত প্রভাব",
+    "openEffectsPanel": "প্রভাব প্যানেল খুলুন",
+    "delete": "মুছুন",
+    "x": "X",
+    "y": "Y",
+    "width": "প্রস্থ",
+    "height": "উচ্চতা",
+    "rotation": "ঘূর্ণন"
+  },
+  "export": {
+    "title": "রপ্তানি",
+    "exportVideo": "ভিডিও রপ্তানি করুন",
+    "videoSettings": "ভিডিও সেটিংস",
+    "webmRecommended": "WebM (প্রস্তাবিত)",
+    "mp4Limited": "MP4 (সীমিত ব্রাউজার সমর্থন)",
+    "gifAnimated": "GIF (অ্যানিমেটেড)",
+    "lowQuality": "কম (ছোট ফাইল)",
+    "mediumQuality": "মাঝারি",
+    "highQuality": "উচ্চ (ভাল মান)",
+    "durationSeconds": "সময়কাল: {{count}} সেকেন্ড",
+    "mp4Warning": "MP4 সব ব্রাউজারে কাজ নাও করতে পারে"
+  },
+  "project": {
+    "title": "প্রকল্প",
+    "save": "সংরক্ষণ করুন",
+    "load": "লোড করুন"
   }
 }

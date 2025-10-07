@@ -45,7 +45,8 @@
     "bold": "ବୋଲ୍ଡ",
     "italic": "ଇଟାଲିକ୍",
     "underline": "ଅଣ୍ଡରଲାଇନ୍",
-    "color": "ରଙ୍ଗ"
+    "color": "ରଙ୍ଗ",
+    "textStyle": "ଟେକ୍ସଟ୍ ଷ୍ଟାଇଲ୍"
   },
   "effects": {
     "title": "ପ୍ରଭାବ",
@@ -185,5 +186,36 @@
     "contrast": "କଣ୍ଟ୍ରାଷ୍ଟ",
     "saturate": "ସାଚୁରେଟ୍",
     "invert": "ଓଲଟା"
+  },
+  "properties": {
+    "title": "ଗୁଣଧର୍ମ",
+    "selectElement": "ସମ୍ପାଦନ କରିବା ପାଇଁ ଏକ ଉପାଦାନ ଚୟନ କରନ୍ତୁ",
+    "animation": "ଆନିମେସନ୍",
+    "quickEffects": "ଦ୍ରୁତ ପ୍ରଭାବ",
+    "openEffectsPanel": "ପ୍ରଭାବ ପ୍ୟାନେଲ୍ ଖୋଲନ୍ତୁ",
+    "delete": "ମିଟାନ୍ତୁ",
+    "x": "X",
+    "y": "Y",
+    "width": "ପ୍ରସ୍ତ",
+    "height": "ଉଚ୍ଚତା",
+    "rotation": "ଘୂର୍ଣ୍ଣନ"
+  },
+  "export": {
+    "title": "ରପ୍ତାନି",
+    "exportVideo": "ଭିଡିଓ ରପ୍ତାନି କରନ୍ତୁ",
+    "videoSettings": "ଭିଡିଓ ସେଟିଂସ୍",
+    "webmRecommended": "WebM (ପରାମର୍ଶିତ)",
+    "mp4Limited": "MP4 (ସୀମିତ ବ୍ରାଉଜର ସମର୍ଥନ)",
+    "gifAnimated": "GIF (ଆନିମେଟେଡ୍)",
+    "lowQuality": "ନିମ୍ନ (ଛୋଟ ଫାଇଲ୍)",
+    "mediumQuality": "ମଧ୍ୟମ",
+    "highQuality": "ଉଚ୍ଚ (ଉତ୍ତମ ଗୁଣବତ୍ତା)",
+    "durationSeconds": "ଅବଧି: {{count}} ସେକେଣ୍ଡ",
+    "mp4Warning": "MP4 ସମସ୍ତ ବ୍ରାଉଜରରେ କାମ କରିପାରିବ ନାହିଁ"
+  },
+  "project": {
+    "title": "ପ୍ରକଳ୍ପ",
+    "save": "ସେଭ୍ କରନ୍ତୁ",
+    "load": "ଲୋଡ୍ କରନ୍ତୁ"
   }
 }

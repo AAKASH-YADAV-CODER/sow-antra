@@ -2592,44 +2592,44 @@ const Sowntra = () => {
   // Video Settings Component
   const VideoSettings = useCallback(() => (
     <div className="mb-4 p-3 bg-gray-100 rounded">
-      <h3 className="font-semibold mb-2 text-gray-700">Video Settings</h3>
+      <h3 className="font-semibold mb-2 text-gray-700">{t('export.videoSettings')}</h3>
       
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-medium mb-1 text-gray-700">Format</label>
+          <label className="block text-sm font-medium mb-1 text-gray-700">{t('recording.format')}</label>
           <select
             value={videoFormat}
             onChange={(e) => setVideoFormat(e.target.value)}
             className="w-full p-2 border rounded text-sm text-gray-700"
           >
-            <option value="webm">WebM (Recommended)</option>
-            <option value="mp4">MP4 (Limited Browser Support)</option>
-            <option value="gif">GIF (Animated)</option>
+            <option value="webm">{t('export.webmRecommended')}</option>
+            <option value="mp4">{t('export.mp4Limited')}</option>
+            <option value="gif">{t('export.gifAnimated')}</option>
           </select>
           {videoFormat === 'mp4' && (
             <p className="text-xs text-orange-600 mt-1">
-              MP4 may not work in all browsers
+              {t('export.mp4Warning')}
             </p>
           )}
         </div>
         
         <div>
-          <label className="block text-sm font-medium mb-1 text-gray-700">Quality</label>
+          <label className="block text-sm font-medium mb-1 text-gray-700">{t('recording.quality')}</label>
           <select
             value={videoQuality}
             onChange={(e) => setVideoQuality(e.target.value)}
             className="w-full p-2 border rounded text-sm text-gray-700"
           >
-            <option value="low">Low (Smaller file)</option>
-            <option value="medium">Medium</option>
-            <option value="high">High (Better quality)</option>
+            <option value="low">{t('export.lowQuality')}</option>
+            <option value="medium">{t('export.mediumQuality')}</option>
+            <option value="high">{t('export.highQuality')}</option>
           </select>
         </div>
       </div>
       
       <div className="mt-3">
         <label className="block text-sm font-medium mb-1 text-gray-700">
-          Duration: {recordingDuration} seconds
+{t('export.durationSeconds', { count: recordingDuration })}
         </label>
         <input
           type="range"
@@ -2641,7 +2641,7 @@ const Sowntra = () => {
         />
       </div>
     </div>
-  ), [videoFormat, videoQuality, recordingDuration]);
+  ), [videoFormat, videoQuality, recordingDuration, t]);
 
   // Recording Status Component
   const RecordingStatus = useCallback(() => {
@@ -4665,19 +4665,19 @@ const Sowntra = () => {
           <div className="properties-panel">
             {/* Properties Section */}
             <div className="mb-6">
-              <h2 className="text-lg font-bold mb-4">Properties</h2>
+              <h2 className="text-lg font-bold mb-4">{t('properties.title')}</h2>
               
               {selectedElementData ? (
                 <div>
                   {/* Animation Selection */}
                   <div className="mb-3">
-                    <label className="block text-sm font-medium mb-1">Animation</label>
+                    <label className="block text-sm font-medium mb-1">{t('properties.animation')}</label>
                     <select
                       value={selectedElementData.animation || ''}
                       onChange={(e) => updateElement(selectedElement, { animation: e.target.value || null })}
                       className="w-full p-2 border rounded text-sm"
                     >
-                      <option value="">None</option>
+                      <option value="">{t('effects.none')}</option>
                       {Object.entries(animations).map(([key, anim]) => (
                         <option key={key} value={key}>
                           {anim.name}
@@ -4688,20 +4688,20 @@ const Sowntra = () => {
 
                   {/* Effects Quick Access */}
                   <div className="mb-3">
-                    <label className="block text-sm font-medium mb-1">Quick Effects</label>
+                    <label className="block text-sm font-medium mb-1">{t('properties.quickEffects')}</label>
                     <button
                       onClick={() => setShowEffectsPanel(!showEffectsPanel)}
                       className="w-full p-2 bg-purple-100 text-purple-600 rounded text-sm hover:bg-purple-200 flex items-center justify-center"
                     >
                       <Sparkles size={14} className="mr-1" />
-                      Open Effects Panel
+                      {t('properties.openEffectsPanel')}
                     </button>
                   </div>
 
                   {/* Position and Size */}
                   <div className="grid grid-cols-2 gap-2 mb-3">
                     <div>
-                      <label className="block text-sm font-medium mb-1">X</label>
+                      <label className="block text-sm font-medium mb-1">{t('properties.x')}</label>
                       <input
                         type="number"
                         value={selectedElementData.x}
@@ -4710,7 +4710,7 @@ const Sowntra = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Y</label>
+                      <label className="block text-sm font-medium mb-1">{t('properties.y')}</label>
                       <input
                         type="number"
                         value={selectedElementData.y}
@@ -4722,7 +4722,7 @@ const Sowntra = () => {
 
                   <div className="grid grid-cols-2 gap-2 mb-3">
                     <div>
-                      <label className="block text-sm font-medium mb-1">Width</label>
+                      <label className="block text-sm font-medium mb-1">{t('properties.width')}</label>
                       <input
                         type="number"
                         value={selectedElementData.width}
@@ -4732,7 +4732,7 @@ const Sowntra = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Height</label>
+                      <label className="block text-sm font-medium mb-1">{t('properties.height')}</label>
                       <input
                         type="number"
                         value={selectedElementData.height}
@@ -4744,7 +4744,7 @@ const Sowntra = () => {
                   </div>
 
                   <div className="mb-3">
-                    <label className="block text-sm font-medium mb-1">Rotation</label>
+                    <label className="block text-sm font-medium mb-1">{t('properties.rotation')}</label>
                     <input
                       type="range"
                       min="0"
@@ -4828,7 +4828,7 @@ const Sowntra = () => {
                   {selectedElementData.type === 'text' && (
                     <>
                       <div className="mb-3">
-                        <label className="block text-sm font-medium mb-1">Font Size</label>
+                        <label className="block text-sm font-medium mb-1">{t('text.fontSize')}</label>
                         <input
                           type="number"
                           value={selectedElementData.fontSize}
@@ -4839,7 +4839,7 @@ const Sowntra = () => {
                         />
                       </div>
                       <div className="mb-3">
-                        <label className="block text-sm font-medium mb-1">Font Family</label>
+                        <label className="block text-sm font-medium mb-1">{t('text.fontFamily')}</label>
                         <select
                           value={selectedElementData.fontFamily}
                           onChange={(e) => updateElement(selectedElement, { fontFamily: e.target.value })}
@@ -4851,7 +4851,7 @@ const Sowntra = () => {
                         </select>
                       </div>
                       <div className="mb-3">
-                        <label className="block text-sm font-medium mb-1">Color</label>
+                        <label className="block text-sm font-medium mb-1">{t('text.color')}</label>
                         <input
                           type="color"
                           value={selectedElementData.color}
@@ -4860,40 +4860,40 @@ const Sowntra = () => {
                         />
                       </div>
                       <div className="mb-3">
-                        <label className="block text-sm font-medium mb-1">Text Alignment</label>
+                        <label className="block text-sm font-medium mb-1">{t('text.textAlign')}</label>
                         <div className="flex space-x-1">
                           <button
                             onClick={() => updateElement(selectedElement, { textAlign: 'left' })}
                             className={`p-2 rounded ${selectedElementData.textAlign === 'left' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100'}`}
-                            title="Align Left"
+                            title={t('text.left')}
                           >
                             <AlignLeft size={16} />
                           </button>
                           <button
                             onClick={() => updateElement(selectedElement, { textAlign: 'center' })}
                             className={`p-2 rounded ${selectedElementData.textAlign === 'center' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100'}`}
-                            title="Align Center"
+                            title={t('text.center')}
                           >
                             <AlignCenter size={16} />
                           </button>
                           <button
                             onClick={() => updateElement(selectedElement, { textAlign: 'right' })}
                             className={`p-2 rounded ${selectedElementData.textAlign === 'right' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100'}`}
-                            title="Align Right"
+                            title={t('text.right')}
                           >
                             <AlignRight size={16} />
                           </button>
                         </div>
                       </div>
                       <div className="mb-3">
-                        <label className="block text-sm font-medium mb-1">Text Style</label>
+                        <label className="block text-sm font-medium mb-1">{t('text.textStyle')}</label>
                         <div className="flex space-x-1">
                           <button
                             onClick={() => updateElement(selectedElement, { 
                               fontWeight: selectedElementData.fontWeight === 'bold' ? 'normal' : 'bold' 
                             })}
                             className={`p-2 rounded ${selectedElementData.fontWeight === 'bold' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100'}`}
-                            title="Bold"
+                            title={t('text.bold')}
                           >
                             <Bold size={16} />
                           </button>
@@ -4902,7 +4902,7 @@ const Sowntra = () => {
                               fontStyle: selectedElementData.fontStyle === 'italic' ? 'normal' : 'italic' 
                             })}
                             className={`p-2 rounded ${selectedElementData.fontStyle === 'italic' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100'}`}
-                            title="Italic"
+                            title={t('text.italic')}
                           >
                             <Italic size={16} />
                           </button>
@@ -4911,7 +4911,7 @@ const Sowntra = () => {
                               textDecoration: selectedElementData.textDecoration === 'underline' ? 'none' : 'underline' 
                             })}
                             className={`p-2 rounded ${selectedElementData.textDecoration === 'underline' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100'}`}
-                            title="Underline"
+                            title={t('text.underline')}
                           >
                             <Underline size={16} />
                           </button>
@@ -5079,17 +5079,17 @@ const Sowntra = () => {
                     disabled={lockedElements.has(selectedElement)}
                   >
                     <Trash2 size={14} className="mr-1" />
-                    Delete
+                    {t('properties.delete')}
                   </button>
                 </div>
               ) : (
-                <p className="text-gray-500 text-sm">Select an element to edit its properties</p>
+                <p className="text-gray-500 text-sm">{t('properties.selectElement')}</p>
               )}
             </div>
 
             {/* Export Section */}
             <div className="mb-6">
-              <h2 className="text-lg font-bold mb-4 text-gray-700">Export</h2>
+              <h2 className="text-lg font-bold mb-4 text-gray-700">{t('export.title')}</h2>
               <div className="grid grid-cols-2 gap-2 mb-3">
                 <button
                   onClick={() => exportAsImage('png')}
@@ -5134,27 +5134,27 @@ const Sowntra = () => {
                 }`}
               >
                 <Film size={14} className="mr-1" />
-                {recording ? 'Recording...' : 'Export Video'}
+                {recording ? t('recording.recording') : t('export.exportVideo')}
               </button>
             </div>
 
             {/* Project Actions */}
             <div>
-              <h2 className="text-lg font-bold mb-4 text-gray-700">Project</h2>
+              <h2 className="text-lg font-bold mb-4 text-gray-700">{t('project.title')}</h2>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => {/* Save project functionality */}}
                   className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center text-gray-700"
                 >
                   <Save size={14} className="mr-1" />
-                  Save
+                  {t('project.save')}
                 </button>
                 <button
                   onClick={() => {/* Load project functionality */}}
                   className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center text-gray-700"
                 >
                   <FolderOpen size={14} className="mr-1" />
-                  Load
+                  {t('project.load')}
                 </button>
               </div>
             </div>

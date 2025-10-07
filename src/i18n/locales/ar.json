@@ -45,7 +45,8 @@
     "bold": "عريض",
     "italic": "مائل",
     "underline": "تسطير",
-    "color": "لون"
+    "color": "لون",
+    "textStyle": "نمط النص"
   },
   "effects": {
     "title": "تأثيرات",
@@ -185,5 +186,36 @@
     "contrast": "التباين",
     "saturate": "التشبع",
     "invert": "عكس"
+  },
+  "properties": {
+    "title": "الخصائص",
+    "selectElement": "اختر عنصراً لتحريره",
+    "animation": "الرسوم المتحركة",
+    "quickEffects": "التأثيرات السريعة",
+    "openEffectsPanel": "فتح لوحة التأثيرات",
+    "delete": "حذف",
+    "x": "X",
+    "y": "Y",
+    "width": "العرض",
+    "height": "الارتفاع",
+    "rotation": "الدوران"
+  },
+  "export": {
+    "title": "التصدير",
+    "exportVideo": "تصدير الفيديو",
+    "videoSettings": "إعدادات الفيديو",
+    "webmRecommended": "WebM (موصى به)",
+    "mp4Limited": "MP4 (دعم محدود للمتصفح)",
+    "gifAnimated": "GIF (متحرك)",
+    "lowQuality": "منخفض (ملف أصغر)",
+    "mediumQuality": "متوسط",
+    "highQuality": "عالي (جودة أفضل)",
+    "durationSeconds": "المدة: {{count}} ثانية",
+    "mp4Warning": "قد لا يعمل MP4 في جميع المتصفحات"
+  },
+  "project": {
+    "title": "المشروع",
+    "save": "حفظ",
+    "load": "تحميل"
   }
 }

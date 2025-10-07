@@ -45,7 +45,8 @@
     "bold": "બોલ્ડ",
     "italic": "ઇટાલિક",
     "underline": "અન્ડરલાઇન",
-    "color": "રંગ"
+    "color": "રંગ",
+    "textStyle": "ટેક્સ્ટ સ્ટાઇલ"
   },
   "effects": {
     "title": "અસરો",
@@ -185,5 +186,36 @@
     "contrast": "કોન્ટ્રાસ્ટ",
     "saturate": "સંતૃપ્ત",
     "invert": "ઉલટું"
+  },
+  "properties": {
+    "title": "ગુણધર્મો",
+    "selectElement": "સંપાદિત કરવા માટે એક તત્વ પસંદ કરો",
+    "animation": "એનિમેશન",
+    "quickEffects": "ઝડપી અસરો",
+    "openEffectsPanel": "અસરો પેનલ ખોલો",
+    "delete": "દૂર કરો",
+    "x": "X",
+    "y": "Y",
+    "width": "પહોળાઈ",
+    "height": "ઊંચાઈ",
+    "rotation": "ફેરવવું"
+  },
+  "export": {
+    "title": "નિકાસ",
+    "exportVideo": "વિડિયો નિકાસ કરો",
+    "videoSettings": "વિડિયો સેટિંગ્સ",
+    "webmRecommended": "WebM (ભલામણ)",
+    "mp4Limited": "MP4 (મર્યાદિત બ્રાઉઝર સપોર્ટ)",
+    "gifAnimated": "GIF (એનિમેટેડ)",
+    "lowQuality": "ઓછી (નાની ફાઇલ)",
+    "mediumQuality": "મધ્યમ",
+    "highQuality": "ઉચ્ચ (વધુ સારી ગુણવત્તા)",
+    "durationSeconds": "અવધિ: {{count}} સેકન્ડ",
+    "mp4Warning": "MP4 બધા બ્રાઉઝરમાં કામ કરી શકશે નહીં"
+  },
+  "project": {
+    "title": "પ્રોજેક્ટ",
+    "save": "સેવ કરો",
+    "load": "લોડ કરો"
   }
 }
