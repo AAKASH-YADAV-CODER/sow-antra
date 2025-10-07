@@ -1,6 +1,5 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { useNavigate } from "react-router-dom";
 import SignupPage from "./pages/SignupPage";
 import MainPage from "./pages/MainPage";
 

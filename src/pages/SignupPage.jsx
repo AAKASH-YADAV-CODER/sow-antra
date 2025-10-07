@@ -1,5 +1,5 @@
 import React, { useState, createContext, useContext, useEffect } from 'react';
-import { Eye, EyeOff, Mail, Lock, User, ArrowRight, CheckCircle, LogOut } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, CheckCircle, LogOut } from 'lucide-react';
 
 // Auth Context
 const AuthContext = createContext();
@@ -598,9 +598,9 @@ const SignupForm = () => {
         {/* Terms */}
         <p className="text-xs text-gray-500 text-center">
           By continuing, you agree to Sowntra's{' '}
-          <a href="#" className="text-purple-600 hover:underline">Terms of Service</a>{' '}
+          <button className="text-purple-600 hover:underline bg-transparent border-none p-0 cursor-pointer">Terms of Service</button>{' '}
           and acknowledge you've read our{' '}
-          <a href="#" className="text-purple-600 hover:underline">Privacy Policy</a>.
+          <button className="text-purple-600 hover:underline bg-transparent border-none p-0 cursor-pointer">Privacy Policy</button>.
         </p>
 
         {/* Sign In Link */}
