@@ -1,0 +1,189 @@
+{
+  "app": {
+    "title": "سونترا - استوديو التصميم",
+    "tagline": "إنشاء تصميمات مذهلة"
+  },
+  "toolbar": {
+    "undo": "تراجع",
+    "redo": "إعادة",
+    "templates": "قوالب",
+    "save": "حفظ",
+    "download": "تحميل",
+    "language": "اللغة",
+    "account": "الحساب",
+    "share": "مشاركة",
+    "effects": "Effects",
+    "play": "Play",
+    "reset": "Reset",
+    "record": "Record Video"
+  },
+  "tools": {
+    "select": "تحديد",
+    "pan": "تحريك",
+    "text": "نص",
+    "shape": "شكل",
+    "image": "صورة",
+    "draw": "رسم",
+    "sticker": "ملصق",
+    "title": "Tools"
+  },
+  "shapes": {
+    "rectangle": "مستطيل",
+    "circle": "دائرة",
+    "triangle": "مثلث",
+    "hexagon": "مسدس"
+  },
+  "text": {
+    "doubleClickToEdit": "انقر مرتين للتحرير",
+    "fontFamily": "عائلة الخط",
+    "fontSize": "حجم الخط",
+    "fontWeight": "وزن الخط",
+    "textAlign": "محاذاة النص",
+    "left": "يسار",
+    "center": "وسط",
+    "right": "يمين",
+    "bold": "عريض",
+    "italic": "مائل",
+    "underline": "تسطير",
+    "color": "لون"
+  },
+  "effects": {
+    "title": "تأثيرات",
+    "none": "لا شيء",
+    "shadow": "ظل",
+    "glow": "توهج",
+    "blur": "ضبابية",
+    "neon": "نيون",
+    "gradient": "تدرج",
+    "vintage": "قديم",
+    "comic": "كوميدي",
+    "glitch": "خلل"
+  },
+  "templates": {
+    "title": "قوالب",
+    "socialMedia": "وسائل التواصل",
+    "presentation": "عرض تقديمي",
+    "print": "طباعة",
+    "custom": "حجم مخصص",
+    "instagram": "منشور انستغرام",
+    "story": "قصة انستغرام",
+    "facebook": "منشور فيسبوك",
+    "twitter": "منشور تويتر",
+    "youtube": "صورة مصغرة يوتيوب",
+    "linkedin": "منشور لينكد إن",
+    "businessCard": "بطاقة عمل",
+    "flyer": "منشور",
+    "poster": "ملصق",
+    "banner": "لافتة"
+  },
+  "customTemplate": {
+    "title": "إنشاء قالب مخصص",
+    "width": "العرض",
+    "height": "الارتفاع",
+    "unit": "وحدة",
+    "create": "إنشاء",
+    "cancel": "إلغاء"
+  },
+  "pages": {
+    "title": "صفحات",
+    "addPage": "إضافة صفحة",
+    "page": "صفحة"
+  },
+  "layers": {
+    "title": "طبقات",
+    "lock": "قفل",
+    "unlock": "فتح القفل",
+    "visible": "مرئي",
+    "hidden": "مخفي",
+    "duplicate": "نسخ",
+    "delete": "حذف"
+  },
+  "actions": {
+    "copy": "نسخ",
+    "paste": "لصق",
+    "delete": "حذف",
+    "duplicate": "نسخ",
+    "group": "مجموعة",
+    "ungroup": "فك المجموعة",
+    "bringToFront": "إحضار للأمام",
+    "sendToBack": "إرسال للخلف",
+    "lock": "قفل",
+    "unlock": "فتح القفل"
+  },
+  "canvas": {
+    "zoomIn": "تكبير",
+    "zoomOut": "تصغير",
+    "fitToScreen": "ملائمة للشاشة",
+    "actualSize": "الحجم الفعلي",
+    "showGrid": "إظهار الشبكة",
+    "snapToGrid": "التقط إلى الشبكة"
+  },
+  "recording": {
+    "start": "بدء التسجيل",
+    "stop": "إيقاف التسجيل",
+    "recording": "جاري التسجيل...",
+    "duration": "المدة",
+    "format": "التنسيق",
+    "quality": "الجودة",
+    "timeLeft": "الوقت المتبقي"
+  },
+  "language": {
+    "title": "اختر اللغة",
+    "english": "الإنجليزية",
+    "hindi": "الهندية",
+    "tamil": "التاميلية",
+    "telugu": "التيلوغو",
+    "bengali": "البنغالية",
+    "marathi": "الماراثية",
+    "gujarati": "الغوجاراتية",
+    "kannada": "الكانادا",
+    "malayalam": "المالايالامية",
+    "punjabi": "البنجابية",
+    "odia": "الأودية",
+    "urdu": "الأردية",
+    "arabic": "العربية",
+    "hebrew": "العبرية",
+    "transliteration": "تفعيل النقل الحرفي",
+    "transliterationDesc": "اكتب بالإنجليزية",
+    "typingHelp": "مساعدة الكتابة"
+  },
+  "account": {
+    "profile": "الملف الشخصي",
+    "settings": "الإعدادات",
+    "logout": "تسجيل الخروج",
+    "signIn": "تسجيل الدخول",
+    "signUp": "التسجيل"
+  },
+  "messages": {
+    "saved": "تم الحفظ بنجاح!",
+    "downloaded": "تم التحميل بنجاح!",
+    "copied": "تم النسخ إلى الحافظة!",
+    "error": "حدث خطأ",
+    "loading": "جاري التحميل...",
+    "noElements": "لا توجد عناصر على اللوحة",
+    "selectElement": "حدد عنصرًا للتحرير"
+  },
+  "buttons": {
+    "ok": "موافق",
+    "cancel": "إلغاء",
+    "apply": "تطبيق",
+    "close": "إغلاق",
+    "save": "حفظ",
+    "delete": "حذف",
+    "edit": "تحرير",
+    "add": "إضافة",
+    "remove": "إزالة",
+    "create": "إنشاء",
+    "upload": "رفع"
+  },
+  "filters": {
+    "none": "لا شيء",
+    "grayscale": "تدرج الرمادي",
+    "sepia": "بني داكن",
+    "blur": "ضبابية",
+    "brightness": "السطوع",
+    "contrast": "التباين",
+    "saturate": "التشبع",
+    "invert": "عكس"
+  }
+}

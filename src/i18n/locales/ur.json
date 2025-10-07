@@ -1,0 +1,189 @@
+{
+  "app": {
+    "title": "سونترا - ڈیزائن اسٹوڈیو",
+    "tagline": "حیرت انگیز ڈیزائن بنائیں"
+  },
+  "toolbar": {
+    "undo": "واپس کریں",
+    "redo": "دوبارہ کریں",
+    "templates": "ٹیمپلیٹس",
+    "save": "محفوظ کریں",
+    "download": "ڈاؤن لوڈ کریں",
+    "language": "زبان",
+    "account": "اکاؤنٹ",
+    "share": "شیئر کریں",
+    "effects": "Effects",
+    "play": "Play",
+    "reset": "Reset",
+    "record": "Record Video"
+  },
+  "tools": {
+    "select": "منتخب کریں",
+    "pan": "پین",
+    "text": "متن",
+    "shape": "شکل",
+    "image": "تصویر",
+    "draw": "ڈرا",
+    "sticker": "اسٹیکر",
+    "title": "Tools"
+  },
+  "shapes": {
+    "rectangle": "مستطیل",
+    "circle": "دائرہ",
+    "triangle": "مثلث",
+    "hexagon": "مسدس"
+  },
+  "text": {
+    "doubleClickToEdit": "ترمیم کے لیے ڈبل کلک کریں",
+    "fontFamily": "فونٹ خاندان",
+    "fontSize": "فونٹ سائز",
+    "fontWeight": "فونٹ وزن",
+    "textAlign": "متن ترتیب",
+    "left": "بائیں",
+    "center": "وسط",
+    "right": "دائیں",
+    "bold": "گہرا",
+    "italic": "ترچھا",
+    "underline": "خط کشیدہ",
+    "color": "رنگ"
+  },
+  "effects": {
+    "title": "اثرات",
+    "none": "کوئی نہیں",
+    "shadow": "سایہ",
+    "glow": "چمک",
+    "blur": "دھندلا",
+    "neon": "نیون",
+    "gradient": "تدریج",
+    "vintage": "قدیم",
+    "comic": "مزاحیہ",
+    "glitch": "خرابی"
+  },
+  "templates": {
+    "title": "ٹیمپلیٹس",
+    "socialMedia": "سوشل میڈیا",
+    "presentation": "پیشکش",
+    "print": "پرنٹ",
+    "custom": "حسب ضرورت سائز",
+    "instagram": "انسٹاگرام پوسٹ",
+    "story": "انسٹاگرام اسٹوری",
+    "facebook": "فیس بک پوسٹ",
+    "twitter": "ٹویٹر پوسٹ",
+    "youtube": "یوٹیوب تھمب نیل",
+    "linkedin": "لنکڈ ان پوسٹ",
+    "businessCard": "بزنس کارڈ",
+    "flyer": "فلائر",
+    "poster": "پوسٹر",
+    "banner": "بینر"
+  },
+  "customTemplate": {
+    "title": "حسب ضرورت ٹیمپلیٹ بنائیں",
+    "width": "چوڑائی",
+    "height": "اونچائی",
+    "unit": "یونٹ",
+    "create": "بنائیں",
+    "cancel": "منسوخ کریں"
+  },
+  "pages": {
+    "title": "صفحات",
+    "addPage": "صفحہ شامل کریں",
+    "page": "صفحہ"
+  },
+  "layers": {
+    "title": "تہیں",
+    "lock": "لاک کریں",
+    "unlock": "ان لاک کریں",
+    "visible": "نظر آنے والا",
+    "hidden": "چھپا ہوا",
+    "duplicate": "نقل",
+    "delete": "حذف کریں"
+  },
+  "actions": {
+    "copy": "کاپی کریں",
+    "paste": "پیسٹ کریں",
+    "delete": "حذف کریں",
+    "duplicate": "نقل",
+    "group": "گروپ",
+    "ungroup": "ان گروپ",
+    "bringToFront": "سامنے لائیں",
+    "sendToBack": "پیچھے بھیجیں",
+    "lock": "لاک کریں",
+    "unlock": "ان لاک کریں"
+  },
+  "canvas": {
+    "zoomIn": "زوم ان",
+    "zoomOut": "زوم آؤٹ",
+    "fitToScreen": "اسکرین میں فٹ کریں",
+    "actualSize": "اصل سائز",
+    "showGrid": "گرڈ دکھائیں",
+    "snapToGrid": "گرڈ پر سنیپ کریں"
+  },
+  "recording": {
+    "start": "ریکارڈنگ شروع کریں",
+    "stop": "ریکارڈنگ بند کریں",
+    "recording": "ریکارڈنگ...",
+    "duration": "دورانیہ",
+    "format": "فارمیٹ",
+    "quality": "معیار",
+    "timeLeft": "باقی وقت"
+  },
+  "language": {
+    "title": "زبان منتخب کریں",
+    "english": "انگریزی",
+    "hindi": "ہندی",
+    "tamil": "تمل",
+    "telugu": "تیلگو",
+    "bengali": "بنگالی",
+    "marathi": "مراٹھی",
+    "gujarati": "گجراتی",
+    "kannada": "کنڑ",
+    "malayalam": "ملیالم",
+    "punjabi": "پنجابی",
+    "odia": "اڑیا",
+    "urdu": "اردو",
+    "arabic": "عربی",
+    "hebrew": "عبرانی",
+    "transliteration": "نقل حرفی فعال کریں",
+    "transliterationDesc": "انگریزی میں ٹائپ کریں",
+    "typingHelp": "ٹائپنگ مدد"
+  },
+  "account": {
+    "profile": "پروفائل",
+    "settings": "ترتیبات",
+    "logout": "لاگ آؤٹ",
+    "signIn": "سائن ان",
+    "signUp": "سائن اپ"
+  },
+  "messages": {
+    "saved": "کامیابی سے محفوظ ہو گیا!",
+    "downloaded": "کامیابی سے ڈاؤن لوڈ ہو گیا!",
+    "copied": "کلپ بورڈ میں کاپی ہو گیا!",
+    "error": "ایک خرابی واقع ہوئی",
+    "loading": "لوڈ ہو رہا ہے...",
+    "noElements": "کینوس پر کوئی عناصر نہیں",
+    "selectElement": "ترمیم کرنے کے لیے ایک عنصر منتخب کریں"
+  },
+  "buttons": {
+    "ok": "ٹھیک ہے",
+    "cancel": "منسوخ",
+    "apply": "لاگو کریں",
+    "close": "بند کریں",
+    "save": "محفوظ کریں",
+    "delete": "حذف کریں",
+    "edit": "ترمیم کریں",
+    "add": "شامل کریں",
+    "remove": "ہٹائیں",
+    "create": "بنائیں",
+    "upload": "اپ لوڈ کریں"
+  },
+  "filters": {
+    "none": "کوئی نہیں",
+    "grayscale": "گرے اسکیل",
+    "sepia": "سیپیا",
+    "blur": "دھندلا",
+    "brightness": "چمک",
+    "contrast": "تضاد",
+    "saturate": "سیر شدہ",
+    "invert": "الٹا"
+  }
+}

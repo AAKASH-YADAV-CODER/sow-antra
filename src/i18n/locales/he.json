@@ -1,0 +1,189 @@
+{
+  "app": {
+    "title": "סונטרה - אולפן עיצוב",
+    "tagline": "צור עיצובים מדהימים"
+  },
+  "toolbar": {
+    "undo": "בטל",
+    "redo": "בצע שוב",
+    "templates": "תבניות",
+    "save": "שמור",
+    "download": "הורד",
+    "language": "שפה",
+    "account": "חשבון",
+    "share": "שתף",
+    "effects": "Effects",
+    "play": "Play",
+    "reset": "Reset",
+    "record": "Record Video"
+  },
+  "tools": {
+    "select": "בחר",
+    "pan": "הזז",
+    "text": "טקסט",
+    "shape": "צורה",
+    "image": "תמונה",
+    "draw": "צייר",
+    "sticker": "מדבקה",
+    "title": "Tools"
+  },
+  "shapes": {
+    "rectangle": "מלבן",
+    "circle": "עיגול",
+    "triangle": "משולש",
+    "hexagon": "משושה"
+  },
+  "text": {
+    "doubleClickToEdit": "לחץ פעמיים לעריכה",
+    "fontFamily": "משפחת גופנים",
+    "fontSize": "גודל גופן",
+    "fontWeight": "משקל גופן",
+    "textAlign": "יישור טקסט",
+    "left": "שמאל",
+    "center": "מרכז",
+    "right": "ימין",
+    "bold": "מודגש",
+    "italic": "נטוי",
+    "underline": "קו תחתון",
+    "color": "צבע"
+  },
+  "effects": {
+    "title": "אפקטים",
+    "none": "אין",
+    "shadow": "צל",
+    "glow": "זוהר",
+    "blur": "טשטוש",
+    "neon": "ניאון",
+    "gradient": "מעבר צבע",
+    "vintage": "וינטג'",
+    "comic": "קומיקס",
+    "glitch": "תקלה"
+  },
+  "templates": {
+    "title": "תבניות",
+    "socialMedia": "מדיה חברתית",
+    "presentation": "מצגת",
+    "print": "הדפסה",
+    "custom": "גודל מותאם",
+    "instagram": "פוסט אינסטגרם",
+    "story": "סטורי אינסטגרם",
+    "facebook": "פוסט פייסבוק",
+    "twitter": "פוסט טוויטר",
+    "youtube": "תמונה ממוזערת יוטיוב",
+    "linkedin": "פוסט לינקדאין",
+    "businessCard": "כרטיס ביקור",
+    "flyer": "פלייר",
+    "poster": "פוסטר",
+    "banner": "באנר"
+  },
+  "customTemplate": {
+    "title": "צור תבנית מותאמת",
+    "width": "רוחב",
+    "height": "גובה",
+    "unit": "יחידה",
+    "create": "צור",
+    "cancel": "בטל"
+  },
+  "pages": {
+    "title": "דפים",
+    "addPage": "הוסף דף",
+    "page": "דף"
+  },
+  "layers": {
+    "title": "שכבות",
+    "lock": "נעל",
+    "unlock": "בטל נעילה",
+    "visible": "גלוי",
+    "hidden": "מוסתר",
+    "duplicate": "שכפל",
+    "delete": "מחק"
+  },
+  "actions": {
+    "copy": "העתק",
+    "paste": "הדבק",
+    "delete": "מחק",
+    "duplicate": "שכפל",
+    "group": "קבץ",
+    "ungroup": "בטל קיבוץ",
+    "bringToFront": "הבא לחזית",
+    "sendToBack": "שלח לאחור",
+    "lock": "נעל",
+    "unlock": "בטל נעילה"
+  },
+  "canvas": {
+    "zoomIn": "הגדל תצוגה",
+    "zoomOut": "הקטן תצוגה",
+    "fitToScreen": "התאם למסך",
+    "actualSize": "גודל אמיתי",
+    "showGrid": "הצג רשת",
+    "snapToGrid": "הצמד לרשת"
+  },
+  "recording": {
+    "start": "התחל הקלטה",
+    "stop": "עצור הקלטה",
+    "recording": "מקליט...",
+    "duration": "משך",
+    "format": "פורמט",
+    "quality": "איכות",
+    "timeLeft": "זמן שנותר"
+  },
+  "language": {
+    "title": "בחר שפה",
+    "english": "אנגלית",
+    "hindi": "הינדית",
+    "tamil": "טמילית",
+    "telugu": "טלוגו",
+    "bengali": "בנגלית",
+    "marathi": "מראטית",
+    "gujarati": "גוג'ראטית",
+    "kannada": "קנאדה",
+    "malayalam": "מליאלאם",
+    "punjabi": "פנג'בית",
+    "odia": "אודיה",
+    "urdu": "אורדו",
+    "arabic": "ערבית",
+    "hebrew": "עברית",
+    "transliteration": "הפעל תעתיק",
+    "transliterationDesc": "הקלד באנגלית",
+    "typingHelp": "עזרה בהקלדה"
+  },
+  "account": {
+    "profile": "פרופיל",
+    "settings": "הגדרות",
+    "logout": "התנתק",
+    "signIn": "התחבר",
+    "signUp": "הירשם"
+  },
+  "messages": {
+    "saved": "נשמר בהצלחה!",
+    "downloaded": "הורד בהצלחה!",
+    "copied": "הועתק ללוח!",
+    "error": "אירעה שגיאה",
+    "loading": "טוען...",
+    "noElements": "אין אלמנטים בקנבס",
+    "selectElement": "בחר אלמנט לעריכה"
+  },
+  "buttons": {
+    "ok": "אישור",
+    "cancel": "ביטול",
+    "apply": "החל",
+    "close": "סגור",
+    "save": "שמור",
+    "delete": "מחק",
+    "edit": "ערוך",
+    "add": "הוסף",
+    "remove": "הסר",
+    "create": "צור",
+    "upload": "העלה"
+  },
+  "filters": {
+    "none": "אין",
+    "grayscale": "גווני אפור",
+    "sepia": "ספיה",
+    "blur": "טשטוש",
+    "brightness": "בהירות",
+    "contrast": "ניגודיות",
+    "saturate": "רווי",
+    "invert": "הפוך"
+  }
+}

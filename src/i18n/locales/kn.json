@@ -1,0 +1,189 @@
+{
+  "app": {
+    "title": "ಸೌಂತ್ರಾ - ವಿನ್ಯಾಸ ಸ್ಟುಡಿಯೋ",
+    "tagline": "ಅದ್ಭುತ ವಿನ್ಯಾಸಗಳನ್ನು ರಚಿಸಿ"
+  },
+  "toolbar": {
+    "undo": "ರದ್ದುಮಾಡಿ",
+    "redo": "ಮರುಮಾಡಿ",
+    "templates": "ಟೆಂಪ್ಲೇಟ್‌ಗಳು",
+    "save": "ಉಳಿಸಿ",
+    "download": "ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ",
+    "language": "ಭಾಷೆ",
+    "account": "ಖಾತೆ",
+    "share": "ಹಂಚಿಕೊಳ್ಳಿ",
+    "effects": "Effects",
+    "play": "Play",
+    "reset": "Reset",
+    "record": "Record Video"
+  },
+  "tools": {
+    "select": "ಆಯ್ಕೆಮಾಡಿ",
+    "pan": "ಪ್ಯಾನ್",
+    "text": "ಪಠ್ಯ",
+    "shape": "ಆಕಾರ",
+    "image": "ಚಿತ್ರ",
+    "draw": "ಚಿತ್ರಿಸಿ",
+    "sticker": "ಸ್ಟಿಕ್ಕರ್",
+    "title": "Tools"
+  },
+  "shapes": {
+    "rectangle": "ಆಯತ",
+    "circle": "ವೃತ್ತ",
+    "triangle": "ತ್ರಿಕೋನ",
+    "hexagon": "ಷಡ್ಭುಜಾಕೃತಿ"
+  },
+  "text": {
+    "doubleClickToEdit": "ಸಂಪಾದಿಸಲು ಡಬಲ್ ಕ್ಲಿಕ್ ಮಾಡಿ",
+    "fontFamily": "ಫಾಂಟ್ ಕುಟುಂಬ",
+    "fontSize": "ಫಾಂಟ್ ಗಾತ್ರ",
+    "fontWeight": "ಫಾಂಟ್ ತೂಕ",
+    "textAlign": "ಪಠ್ಯ ಜೋಡಣೆ",
+    "left": "ಎಡ",
+    "center": "ಮಧ್ಯ",
+    "right": "ಬಲ",
+    "bold": "ದಪ್ಪ",
+    "italic": "ಇಟಾಲಿಕ್",
+    "underline": "ಅಂಡರ್‌ಲೈನ್",
+    "color": "ಬಣ್ಣ"
+  },
+  "effects": {
+    "title": "ಪರಿಣಾಮಗಳು",
+    "none": "ಯಾವುದೂ ಇಲ್ಲ",
+    "shadow": "ನೆರಳು",
+    "glow": "ಹೊಳಪು",
+    "blur": "ಮಸುಕು",
+    "neon": "ನಿಯಾನ್",
+    "gradient": "ಗ್ರೇಡಿಯಂಟ್",
+    "vintage": "ವಿಂಟೇಜ್",
+    "comic": "ಕಾಮಿಕ್",
+    "glitch": "ದೋಷ"
+  },
+  "templates": {
+    "title": "ಟೆಂಪ್ಲೇಟ್‌ಗಳು",
+    "socialMedia": "ಸಾಮಾಜಿಕ ಮಾಧ್ಯಮ",
+    "presentation": "ಪ್ರಸ್ತುತಿ",
+    "print": "ಮುದ್ರಣ",
+    "custom": "ಕಸ್ಟಮ್ ಗಾತ್ರ",
+    "instagram": "ಇನ್‌ಸ್ಟಾಗ್ರಾಮ್ ಪೋಸ್ಟ್",
+    "story": "ಇನ್‌ಸ್ಟಾಗ್ರಾಮ್ ಕಥೆ",
+    "facebook": "ಫೇಸ್‌ಬುಕ್ ಪೋಸ್ಟ್",
+    "twitter": "ಟ್ವಿಟರ್ ಪೋಸ್ಟ್",
+    "youtube": "ಯೂಟ್ಯೂಬ್ ಥಂಬ್‌ನೇಲ್",
+    "linkedin": "ಲಿಂಕ್ಡ್‌ಇನ್ ಪೋಸ್ಟ್",
+    "businessCard": "ವ್ಯಾಪಾರ ಕಾರ್ಡ್",
+    "flyer": "ಫ್ಲೈಯರ್",
+    "poster": "ಪೋಸ್ಟರ್",
+    "banner": "ಬ್ಯಾನರ್"
+  },
+  "customTemplate": {
+    "title": "ಕಸ್ಟಮ್ ಟೆಂಪ್ಲೇಟ್ ರಚಿಸಿ",
+    "width": "ಅಗಲ",
+    "height": "ಎತ್ತರ",
+    "unit": "ಘಟಕ",
+    "create": "ರಚಿಸಿ",
+    "cancel": "ರದ್ದುಮಾಡಿ"
+  },
+  "pages": {
+    "title": "ಪುಟಗಳು",
+    "addPage": "ಪುಟ ಸೇರಿಸಿ",
+    "page": "ಪುಟ"
+  },
+  "layers": {
+    "title": "ಪದರಗಳು",
+    "lock": "ಲಾಕ್ ಮಾಡಿ",
+    "unlock": "ಅನ್‌ಲಾಕ್ ಮಾಡಿ",
+    "visible": "ಗೋಚರ",
+    "hidden": "ಮರೆಮಾಡಲಾಗಿದೆ",
+    "duplicate": "ನಕಲು",
+    "delete": "ಅಳಿಸಿ"
+  },
+  "actions": {
+    "copy": "ಕಾಪಿ ಮಾಡಿ",
+    "paste": "ಪೇಸ್ಟ್ ಮಾಡಿ",
+    "delete": "ಅಳಿಸಿ",
+    "duplicate": "ನಕಲು",
+    "group": "ಗುಂಪು",
+    "ungroup": "ಗುಂಪುರಹಿತ",
+    "bringToFront": "ಮುಂದಕ್ಕೆ ತನ್ನಿ",
+    "sendToBack": "ಹಿಂದಕ್ಕೆ ಕಳುಹಿಸಿ",
+    "lock": "ಲಾಕ್ ಮಾಡಿ",
+    "unlock": "ಅನ್‌ಲಾಕ್ ಮಾಡಿ"
+  },
+  "canvas": {
+    "zoomIn": "ಜೂಮ್ ಇನ್",
+    "zoomOut": "ಜೂಮ್ ಔಟ್",
+    "fitToScreen": "ಪರದೆಗೆ ಹೊಂದಿಸಿ",
+    "actualSize": "ನಿಜವಾದ ಗಾತ್ರ",
+    "showGrid": "ಗ್ರಿಡ್ ತೋರಿಸಿ",
+    "snapToGrid": "ಗ್ರಿಡ್‌ಗೆ ಸ್ನ್ಯಾಪ್ ಮಾಡಿ"
+  },
+  "recording": {
+    "start": "ರೆಕಾರ್ಡಿಂಗ್ ಪ್ರಾರಂಭಿಸಿ",
+    "stop": "ರೆಕಾರ್ಡಿಂಗ್ ನಿಲ್ಲಿಸಿ",
+    "recording": "ರೆಕಾರ್ಡಿಂಗ್...",
+    "duration": "ಅವಧಿ",
+    "format": "ಫಾರ್ಮ್ಯಾಟ್",
+    "quality": "ಗುಣಮಟ್ಟ",
+    "timeLeft": "ಉಳಿದ ಸಮಯ"
+  },
+  "language": {
+    "title": "ಭಾಷೆ ಆಯ್ಕೆಮಾಡಿ",
+    "english": "ಇಂಗ್ಲಿಷ್",
+    "hindi": "ಹಿಂದಿ",
+    "tamil": "ತಮಿಳು",
+    "telugu": "ತೆಲುಗು",
+    "bengali": "ಬಂಗಾಳಿ",
+    "marathi": "ಮರಾಠಿ",
+    "gujarati": "ಗುಜರಾತಿ",
+    "kannada": "ಕನ್ನಡ",
+    "malayalam": "ಮಲಯಾಳಂ",
+    "punjabi": "ಪಂಜಾಬಿ",
+    "odia": "ಒಡಿಯಾ",
+    "urdu": "ಉರ್ದು",
+    "arabic": "ಅರೇಬಿಕ್",
+    "hebrew": "ಹೀಬ್ರೂ",
+    "transliteration": "ಲಿಪ್ಯಂತರವನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ",
+    "transliterationDesc": "ಇಂಗ್ಲಿಷ್‌ನಲ್ಲಿ ಟೈಪ್ ಮಾಡಿ",
+    "typingHelp": "ಟೈಪಿಂಗ್ ಸಹಾಯ"
+  },
+  "account": {
+    "profile": "ಪ್ರೊಫೈಲ್",
+    "settings": "ಸೆಟ್ಟಿಂಗ್‌ಗಳು",
+    "logout": "ಲಾಗ್ ಔಟ್",
+    "signIn": "ಸೈನ್ ಇನ್",
+    "signUp": "ಸೈನ್ ಅಪ್"
+  },
+  "messages": {
+    "saved": "ಯಶಸ್ವಿಯಾಗಿ ಉಳಿಸಲಾಗಿದೆ!",
+    "downloaded": "ಯಶಸ್ವಿಯಾಗಿ ಡೌನ್‌ಲೋಡ್ ಮಾಡಲಾಗಿದೆ!",
+    "copied": "ಕ್ಲಿಪ್‌ಬೋರ್ಡ್‌ಗೆ ನಕಲಿಸಲಾಗಿದೆ!",
+    "error": "ದೋಷ ಸಂಭವಿಸಿದೆ",
+    "loading": "ಲೋಡ್ ಆಗುತ್ತಿದೆ...",
+    "noElements": "ಕ್ಯಾನ್ವಾಸ್‌ನಲ್ಲಿ ಯಾವುದೇ ಅಂಶಗಳಿಲ್ಲ",
+    "selectElement": "ಸಂಪಾದಿಸಲು ಅಂಶವನ್ನು ಆಯ್ಕೆಮಾಡಿ"
+  },
+  "buttons": {
+    "ok": "ಸರಿ",
+    "cancel": "ರದ್ದುಮಾಡಿ",
+    "apply": "ಅನ್ವಯಿಸಿ",
+    "close": "ಮುಚ್ಚಿ",
+    "save": "ಉಳಿಸಿ",
+    "delete": "ಅಳಿಸಿ",
+    "edit": "ಸಂಪಾದಿಸಿ",
+    "add": "ಸೇರಿಸಿ",
+    "remove": "ತೆಗೆದುಹಾಕಿ",
+    "create": "ರಚಿಸಿ",
+    "upload": "ಅಪ್‌ಲೋಡ್ ಮಾಡಿ"
+  },
+  "filters": {
+    "none": "ಯಾವುದೂ ಇಲ್ಲ",
+    "grayscale": "ಗ್ರೇಸ್ಕೇಲ್",
+    "sepia": "ಸೆಪಿಯಾ",
+    "blur": "ಮಸುಕು",
+    "brightness": "ಹೊಳಪು",
+    "contrast": "ಕಾಂಟ್ರಾಸ್ಟ್",
+    "saturate": "ಸ್ಯಾಚುರೇಟ್",
+    "invert": "ತಲೆಕೆಳಗು"
+  }
+}

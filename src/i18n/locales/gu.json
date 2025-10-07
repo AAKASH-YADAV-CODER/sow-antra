@@ -1,0 +1,189 @@
+{
+  "app": {
+    "title": "સૌન્ત્રા - ડિઝાઇન સ્ટુડિયો",
+    "tagline": "અદ્ભુત ડિઝાઇન બનાવો"
+  },
+  "toolbar": {
+    "undo": "પૂર્વવત્ કરો",
+    "redo": "ફરીથી કરો",
+    "templates": "ટેમ્પલેટ્સ",
+    "save": "સાચવો",
+    "download": "ડાઉનલોડ કરો",
+    "language": "ભાષા",
+    "account": "ખાતું",
+    "share": "શેર કરો",
+    "effects": "Effects",
+    "play": "Play",
+    "reset": "Reset",
+    "record": "Record Video"
+  },
+  "tools": {
+    "select": "પસંદ કરો",
+    "pan": "પૅન",
+    "text": "ટેક્સ્ટ",
+    "shape": "આકાર",
+    "image": "છબી",
+    "draw": "દોરો",
+    "sticker": "સ્ટીકર",
+    "title": "Tools"
+  },
+  "shapes": {
+    "rectangle": "લંબચોરસ",
+    "circle": "વર્તુળ",
+    "triangle": "ત્રિકોણ",
+    "hexagon": "ષડકોણ"
+  },
+  "text": {
+    "doubleClickToEdit": "સંપાદિત કરવા માટે ડબલ ક્લિક કરો",
+    "fontFamily": "ફોન્ટ કુટુંબ",
+    "fontSize": "ફોન્ટ કદ",
+    "fontWeight": "ફોન્ટ વજન",
+    "textAlign": "ટેક્સ્ટ સંરેખણ",
+    "left": "ડાબે",
+    "center": "કેન્દ્ર",
+    "right": "જમણે",
+    "bold": "બોલ્ડ",
+    "italic": "ઇટાલિક",
+    "underline": "અન્ડરલાઇન",
+    "color": "રંગ"
+  },
+  "effects": {
+    "title": "અસરો",
+    "none": "કોઈ નહીં",
+    "shadow": "છાયા",
+    "glow": "ચમક",
+    "blur": "ધૂંધળું",
+    "neon": "નિયોન",
+    "gradient": "ગ્રેડિયન્ટ",
+    "vintage": "વિન્ટેજ",
+    "comic": "કોમિક",
+    "glitch": "ખામી"
+  },
+  "templates": {
+    "title": "ટેમ્પલેટ્સ",
+    "socialMedia": "સોશિયલ મીડિયા",
+    "presentation": "પ્રસ્તુતિ",
+    "print": "પ્રિન્ટ",
+    "custom": "કસ્ટમ કદ",
+    "instagram": "ઇન્સ્ટાગ્રામ પોસ્ટ",
+    "story": "ઇન્સ્ટાગ્રામ સ્ટોરી",
+    "facebook": "ફેસબુક પોસ્ટ",
+    "twitter": "ટ્વિટર પોસ્ટ",
+    "youtube": "યુટ્યુબ થંબનેલ",
+    "linkedin": "લિંક્ડઇન પોસ્ટ",
+    "businessCard": "બિઝનેસ કાર્ડ",
+    "flyer": "ફ્લાયર",
+    "poster": "પોસ્ટર",
+    "banner": "બેનર"
+  },
+  "customTemplate": {
+    "title": "કસ્ટમ ટેમ્પલેટ બનાવો",
+    "width": "પહોળાઈ",
+    "height": "ઊંચાઈ",
+    "unit": "એકમ",
+    "create": "બનાવો",
+    "cancel": "રદ કરો"
+  },
+  "pages": {
+    "title": "પૃષ્ઠો",
+    "addPage": "પૃષ્ઠ ઉમેરો",
+    "page": "પૃષ્ઠ"
+  },
+  "layers": {
+    "title": "સ્તરો",
+    "lock": "લૉક કરો",
+    "unlock": "અનલૉક કરો",
+    "visible": "દૃશ્યમાન",
+    "hidden": "છુપાયેલું",
+    "duplicate": "ડુપ્લિકેટ",
+    "delete": "કાઢી નાખો"
+  },
+  "actions": {
+    "copy": "કૉપિ કરો",
+    "paste": "પેસ્ટ કરો",
+    "delete": "કાઢી નાખો",
+    "duplicate": "ડુપ્લિકેટ",
+    "group": "જૂથ",
+    "ungroup": "જૂથ અલગ",
+    "bringToFront": "આગળ લાવો",
+    "sendToBack": "પાછળ મોકલો",
+    "lock": "લૉક કરો",
+    "unlock": "અનલૉક કરો"
+  },
+  "canvas": {
+    "zoomIn": "ઝૂમ ઇન",
+    "zoomOut": "ઝૂમ આઉટ",
+    "fitToScreen": "સ્ક્રીનમાં ફિટ કરો",
+    "actualSize": "વાસ્તવિક કદ",
+    "showGrid": "ગ્રિડ બતાવો",
+    "snapToGrid": "ગ્રિડમાં સ્નેપ કરો"
+  },
+  "recording": {
+    "start": "રેકોર્ડિંગ શરૂ કરો",
+    "stop": "રેકોર્ડિંગ બંધ કરો",
+    "recording": "રેકોર્ડિંગ...",
+    "duration": "અવધિ",
+    "format": "ફોર્મેટ",
+    "quality": "ગુણવત્તા",
+    "timeLeft": "બાકી સમય"
+  },
+  "language": {
+    "title": "ભાષા પસંદ કરો",
+    "english": "અંગ્રેજી",
+    "hindi": "હિન્દી",
+    "tamil": "તમિલ",
+    "telugu": "તેલુગુ",
+    "bengali": "બંગાળી",
+    "marathi": "મરાઠી",
+    "gujarati": "ગુજરાતી",
+    "kannada": "કન્નડ",
+    "malayalam": "મલયાલમ",
+    "punjabi": "પંજાબી",
+    "odia": "ઓડિયા",
+    "urdu": "ઉર્દુ",
+    "arabic": "અરબી",
+    "hebrew": "હિબ્રુ",
+    "transliteration": "લિપ્યંતરણ સક્ષમ કરો",
+    "transliterationDesc": "અંગ્રેજીમાં ટાઇપ કરો",
+    "typingHelp": "ટાઇપિંગ સહાય"
+  },
+  "account": {
+    "profile": "પ્રોફાઇલ",
+    "settings": "સેટિંગ્સ",
+    "logout": "લૉગ આઉટ",
+    "signIn": "સાઇન ઇન",
+    "signUp": "સાઇન અપ"
+  },
+  "messages": {
+    "saved": "સફળતાપૂર્વક સાચવ્યું!",
+    "downloaded": "સફળતાપૂર્વક ડાઉનલોડ થયું!",
+    "copied": "ક્લિપબોર્ડ પર કૉપિ થયું!",
+    "error": "એક ભૂલ આવી",
+    "loading": "લોડ થઈ રહ્યું છે...",
+    "noElements": "કેનવાસ પર કોઈ તત્વો નથી",
+    "selectElement": "સંપાદિત કરવા માટે તત્વ પસંદ કરો"
+  },
+  "buttons": {
+    "ok": "ઠીક છે",
+    "cancel": "રદ કરો",
+    "apply": "લાગુ કરો",
+    "close": "બંધ કરો",
+    "save": "સાચવો",
+    "delete": "કાઢી નાખો",
+    "edit": "સંપાદિત કરો",
+    "add": "ઉમેરો",
+    "remove": "દૂર કરો",
+    "create": "બનાવો",
+    "upload": "અપલોડ કરો"
+  },
+  "filters": {
+    "none": "કોઈ નહીં",
+    "grayscale": "ગ્રેસ્કેલ",
+    "sepia": "સેપિયા",
+    "blur": "ધૂંધળું",
+    "brightness": "ચમક",
+    "contrast": "કોન્ટ્રાસ્ટ",
+    "saturate": "સંતૃપ્ત",
+    "invert": "ઉલટું"
+  }
+}
