@@ -45,7 +45,8 @@
     "bold": "బోల్డ్",
     "italic": "ఇటాలిక్",
     "underline": "అండర్‌లైన్",
-    "color": "రంగు"
+    "color": "రంగు",
+    "textStyle": "పఠ్య శైలి"
   },
   "effects": {
     "title": "ప్రభావాలు",
@@ -185,5 +186,36 @@
     "contrast": "కాంట్రాస్ట్",
     "saturate": "సంతృప్తం",
     "invert": "విలోమం"
+  },
+  "properties": {
+    "title": "గుణాలు",
+    "selectElement": "సవరించడానికి ఒక మూలకాన్ని ఎంచుకోండి",
+    "animation": "యానిమేషన్",
+    "quickEffects": "వేగవంతమైన ప్రభావాలు",
+    "openEffectsPanel": "ప్రభావాల ప్యానెల్ తెరవండి",
+    "delete": "తొలగించు",
+    "x": "X",
+    "y": "Y",
+    "width": "వెడల్పు",
+    "height": "ఎత్తు",
+    "rotation": "భ్రమణం"
+  },
+  "export": {
+    "title": "ఎగుమతి",
+    "exportVideo": "వీడియో ఎగుమతి చేయండి",
+    "videoSettings": "వీడియో సెట్టింగులు",
+    "webmRecommended": "WebM (సిఫార్సు చేయబడింది)",
+    "mp4Limited": "MP4 (పరిమిత బ్రౌజర్ మద్దతు)",
+    "gifAnimated": "GIF (యానిమేటెడ్)",
+    "lowQuality": "తక్కువ (చిన్న ఫైల్)",
+    "mediumQuality": "మధ్యస్థ",
+    "highQuality": "అధిక (మెరుగైన నాణ్యత)",
+    "durationSeconds": "వ్యవధి: {{count}} సెకన్లు",
+    "mp4Warning": "MP4 అన్ని బ్రౌజర్లలో పనిచేయకపోవచ్చు"
+  },
+  "project": {
+    "title": "ప్రాజెక్ట్",
+    "save": "సేవ్ చేయండి",
+    "load": "లోడ్ చేయండి"
   }
 }

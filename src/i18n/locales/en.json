@@ -38,14 +38,28 @@
     "fontFamily": "Font Family",
     "fontSize": "Font Size",
     "fontWeight": "Font Weight",
-    "textAlign": "Text Align",
-    "left": "Left",
-    "center": "Center",
-    "right": "Right",
+    "textAlign": "Text Alignment",
+    "textStyle": "Text Style",
+    "left": "Align Left",
+    "center": "Align Center",
+    "right": "Align Right",
     "bold": "Bold",
     "italic": "Italic",
     "underline": "Underline",
     "color": "Color"
+  },
+  "properties": {
+    "title": "Properties",
+    "selectElement": "Select an element to edit its properties",
+    "animation": "Animation",
+    "quickEffects": "Quick Effects",
+    "openEffectsPanel": "Open Effects Panel",
+    "delete": "Delete",
+    "x": "X",
+    "y": "Y",
+    "width": "Width",
+    "height": "Height",
+    "rotation": "Rotation"
   },
   "effects": {
     "title": "Effects",
@@ -126,6 +140,24 @@
     "format": "Format",
     "quality": "Quality",
     "timeLeft": "Time Left"
+  },
+  "export": {
+    "title": "Export",
+    "exportVideo": "Export Video",
+    "videoSettings": "Video Settings",
+    "webmRecommended": "WebM (Recommended)",
+    "mp4Limited": "MP4 (Limited Browser Support)",
+    "gifAnimated": "GIF (Animated)",
+    "lowQuality": "Low (Smaller file)",
+    "mediumQuality": "Medium",
+    "highQuality": "High (Better quality)",
+    "durationSeconds": "Duration: {{count}} seconds",
+    "mp4Warning": "MP4 may not work in all browsers"
+  },
+  "project": {
+    "title": "Project",
+    "save": "Save",
+    "load": "Load"
   },
   "language": {
     "title": "Select Language",

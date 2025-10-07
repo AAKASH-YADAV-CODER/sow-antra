@@ -45,7 +45,8 @@
     "bold": "מודגש",
     "italic": "נטוי",
     "underline": "קו תחתון",
-    "color": "צבע"
+    "color": "צבע",
+    "textStyle": "סגנון טקסט"
   },
   "effects": {
     "title": "אפקטים",
@@ -185,5 +186,36 @@
     "contrast": "ניגודיות",
     "saturate": "רווי",
     "invert": "הפוך"
+  },
+  "properties": {
+    "title": "תכונות",
+    "selectElement": "בחר אלמנט לעריכה",
+    "animation": "אנימציה",
+    "quickEffects": "אפקטים מהירים",
+    "openEffectsPanel": "פתח פאנל אפקטים",
+    "delete": "מחק",
+    "x": "X",
+    "y": "Y",
+    "width": "רוחב",
+    "height": "גובה",
+    "rotation": "סיבוב"
+  },
+  "export": {
+    "title": "ייצוא",
+    "exportVideo": "ייצא וידאו",
+    "videoSettings": "הגדרות וידאו",
+    "webmRecommended": "WebM (מומלץ)",
+    "mp4Limited": "MP4 (תמיכה מוגבלת בדפדפן)",
+    "gifAnimated": "GIF (אנימציה)",
+    "lowQuality": "נמוך (קובץ קטן יותר)",
+    "mediumQuality": "בינוני",
+    "highQuality": "גבוה (איכות טובה יותר)",
+    "durationSeconds": "משך: {{count}} שניות",
+    "mp4Warning": "MP4 עלול לא לעבוד בכל הדפדפנים"
+  },
+  "project": {
+    "title": "פרויקט",
+    "save": "שמור",
+    "load": "טען"
   }
 }

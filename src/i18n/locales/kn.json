@@ -45,7 +45,8 @@
     "bold": "ದಪ್ಪ",
     "italic": "ಇಟಾಲಿಕ್",
     "underline": "ಅಂಡರ್‌ಲೈನ್",
-    "color": "ಬಣ್ಣ"
+    "color": "ಬಣ್ಣ",
+    "textStyle": "ಪಠ್ಯ ಶೈಲಿ"
   },
   "effects": {
     "title": "ಪರಿಣಾಮಗಳು",
@@ -185,5 +186,36 @@
     "contrast": "ಕಾಂಟ್ರಾಸ್ಟ್",
     "saturate": "ಸ್ಯಾಚುರೇಟ್",
     "invert": "ತಲೆಕೆಳಗು"
+  },
+  "properties": {
+    "title": "ಗುಣಲಕ್ಷಣಗಳು",
+    "selectElement": "ಸಂಪಾದಿಸಲು ಒಂದು ಅಂಶವನ್ನು ಆಯ್ಕೆಮಾಡಿ",
+    "animation": "ಅನಿಮೇಶನ್",
+    "quickEffects": "ತ್ವರಿತ ಪರಿಣಾಮಗಳು",
+    "openEffectsPanel": "ಪರಿಣಾಮಗಳ ಪ್ಯಾನೆಲ್ ತೆರೆಯಿರಿ",
+    "delete": "ಅಳಿಸಿ",
+    "x": "X",
+    "y": "Y",
+    "width": "ಅಗಲ",
+    "height": "ಎತ್ತರ",
+    "rotation": "ತಿರುಗುವಿಕೆ"
+  },
+  "export": {
+    "title": "ರಫ್ತು",
+    "exportVideo": "ವೀಡಿಯೊ ರಫ್ತು ಮಾಡಿ",
+    "videoSettings": "ವೀಡಿಯೊ ಸೆಟ್ಟಿಂಗ್ಗಳು",
+    "webmRecommended": "WebM (ಶಿಫಾರಸು)",
+    "mp4Limited": "MP4 (ಸೀಮಿತ ಬ್ರೌಸರ್ ಬೆಂಬಲ)",
+    "gifAnimated": "GIF (ಅನಿಮೇಟೆಡ್)",
+    "lowQuality": "ಕಡಿಮೆ (ಸಣ್ಣ ಫೈಲ್)",
+    "mediumQuality": "ಮಧ್ಯಮ",
+    "highQuality": "ಹೆಚ್ಚು (ಉತ್ತಮ ಗುಣಮಟ್ಟ)",
+    "durationSeconds": "ಅವಧಿ: {{count}} ಸೆಕೆಂಡುಗಳು",
+    "mp4Warning": "MP4 ಎಲ್ಲಾ ಬ್ರೌಸರ್ಗಳಲ್ಲಿ ಕೆಲಸ ಮಾಡದಿರಬಹುದು"
+  },
+  "project": {
+    "title": "ಯೋಜನೆ",
+    "save": "ಉಳಿಸಿ",
+    "load": "ಲೋಡ್ ಮಾಡಿ"
   }
 }

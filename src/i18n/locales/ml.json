@@ -45,7 +45,8 @@
     "bold": "ബോൾഡ്",
     "italic": "ഇറ്റാലിക്",
     "underline": "അടിവര",
-    "color": "നിറം"
+    "color": "നിറം",
+    "textStyle": "ടെക്സ്റ്റ് സ്റ്റൈൽ"
   },
   "effects": {
     "title": "ഇഫക്റ്റുകൾ",
@@ -185,5 +186,36 @@
     "contrast": "കോൺട്രാസ്റ്റ്",
     "saturate": "സാച്വറേറ്റ്",
     "invert": "വിപരീതം"
+  },
+  "properties": {
+    "title": "പ്രോപ്പർട്ടികൾ",
+    "selectElement": "എഡിറ്റ് ചെയ്യാൻ ഒരു എലിമെന്റ് തിരഞ്ഞെടുക്കുക",
+    "animation": "ആനിമേഷൻ",
+    "quickEffects": "ദ്രുത ഇഫക്റ്റുകൾ",
+    "openEffectsPanel": "ഇഫക്റ്റ് പാനൽ തുറക്കുക",
+    "delete": "ഇല്ലാതാക്കുക",
+    "x": "X",
+    "y": "Y",
+    "width": "വീതി",
+    "height": "ഉയരം",
+    "rotation": "ഭ്രമണം"
+  },
+  "export": {
+    "title": "കയറ്റുമതി",
+    "exportVideo": "വീഡിയോ കയറ്റുമതി ചെയ്യുക",
+    "videoSettings": "വീഡിയോ സെറ്റിംഗുകൾ",
+    "webmRecommended": "WebM (ശുപാർശ)",
+    "mp4Limited": "MP4 (പരിമിത ബ്രൗസർ പിന്തുണ)",
+    "gifAnimated": "GIF (ആനിമേറ്റഡ്)",
+    "lowQuality": "കുറഞ്ഞ (ചെറിയ ഫയൽ)",
+    "mediumQuality": "ഇടത്തരം",
+    "highQuality": "ഉയർന്ന (മെച്ചപ്പെട്ട ഗുണനിലവാരം)",
+    "durationSeconds": "കാലാവധി: {{count}} സെക്കൻഡ്",
+    "mp4Warning": "MP4 എല്ലാ ബ്രൗസറുകളിലും പ്രവർത്തിക്കണമെന്നില്ല"
+  },
+  "project": {
+    "title": "പ്രോജക്റ്റ്",
+    "save": "സേവ് ചെയ്യുക",
+    "load": "ലോഡ് ചെയ്യുക"
   }
 }

@@ -45,7 +45,8 @@
     "bold": "बोल्ड",
     "italic": "इटैलिक",
     "underline": "रेखांकित",
-    "color": "रंग"
+    "color": "रंग",
+    "textStyle": "टेक्स्ट स्टाइल"
   },
   "effects": {
     "title": "प्रभाव",
@@ -185,5 +186,36 @@
     "contrast": "कंट्रास्ट",
     "saturate": "संतृप्त",
     "invert": "उल्टा"
+  },
+  "properties": {
+    "title": "गुण",
+    "selectElement": "संपादित करने के लिए एक तत्व चुनें",
+    "animation": "एनिमेशन",
+    "quickEffects": "त्वरित प्रभाव",
+    "openEffectsPanel": "प्रभाव पैनल खोलें",
+    "delete": "हटाएं",
+    "x": "X",
+    "y": "Y",
+    "width": "चौड़ाई",
+    "height": "ऊंचाई",
+    "rotation": "घुमाव"
+  },
+  "export": {
+    "title": "निर्यात",
+    "exportVideo": "वीडियो निर्यात करें",
+    "videoSettings": "वीडियो सेटिंग्स",
+    "webmRecommended": "WebM (अनुशंसित)",
+    "mp4Limited": "MP4 (सीमित ब्राउज़र समर्थन)",
+    "gifAnimated": "GIF (एनिमेटेड)",
+    "lowQuality": "कम (छोटी फ़ाइल)",
+    "mediumQuality": "मध्यम",
+    "highQuality": "उच्च (बेहतर गुणवत्ता)",
+    "durationSeconds": "अवधि: {{count}} सेकंड",
+    "mp4Warning": "MP4 सभी ब्राउज़र में काम नहीं कर सकता"
+  },
+  "project": {
+    "title": "प्रोजेक्ट",
+    "save": "सहेजें",
+    "load": "लोड करें"
   }
 }

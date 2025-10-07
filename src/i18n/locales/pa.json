@@ -45,7 +45,8 @@
     "bold": "ਗੂੜ੍ਹਾ",
     "italic": "ਤਿਰਛਾ",
     "underline": "ਅੰਡਰਲਾਈਨ",
-    "color": "ਰੰਗ"
+    "color": "ਰੰਗ",
+    "textStyle": "ਟੈਕਸਟ ਸਟਾਈਲ"
   },
   "effects": {
     "title": "ਪ੍ਰਭਾਵ",
@@ -185,5 +186,36 @@
     "contrast": "ਕੰਟਰਾਸਟ",
     "saturate": "ਸੈਚੁਰੇਟ",
     "invert": "ਉਲਟਾ"
+  },
+  "properties": {
+    "title": "ਵਿਸ਼ੇਸ਼ਤਾਵਾਂ",
+    "selectElement": "ਸੰਪਾਦਨ ਲਈ ਇੱਕ ਤੱਤ ਚੁਣੋ",
+    "animation": "ਐਨੀਮੇਸ਼ਨ",
+    "quickEffects": "ਤੇਜ਼ ਪ੍ਰਭਾਵ",
+    "openEffectsPanel": "ਪ੍ਰਭਾਵ ਪੈਨਲ ਖੋਲ੍ਹੋ",
+    "delete": "ਹਟਾਓ",
+    "x": "X",
+    "y": "Y",
+    "width": "ਚੌੜਾਈ",
+    "height": "ਉਚਾਈ",
+    "rotation": "ਘੁੰਮਣ"
+  },
+  "export": {
+    "title": "ਨਿਰਯਾਤ",
+    "exportVideo": "ਵੀਡੀਓ ਨਿਰਯਾਤ ਕਰੋ",
+    "videoSettings": "ਵੀਡੀਓ ਸੈਟਿੰਗਜ਼",
+    "webmRecommended": "WebM (ਸਿਫਾਰਿਸ਼)",
+    "mp4Limited": "MP4 (ਸੀਮਿਤ ਬ੍ਰਾਊਜ਼ਰ ਸਹਾਇਤਾ)",
+    "gifAnimated": "GIF (ਐਨੀਮੇਟਡ)",
+    "lowQuality": "ਘੱਟ (ਛੋਟੀ ਫਾਈਲ)",
+    "mediumQuality": "ਮੱਧਮ",
+    "highQuality": "ਉੱਚ (ਬਿਹਤਰ ਗੁਣਵੱਤਾ)",
+    "durationSeconds": "ਅਵਧੀ: {{count}} ਸਕਿੰਟ",
+    "mp4Warning": "MP4 ਸਾਰੇ ਬ੍ਰਾਊਜ਼ਰਾਂ ਵਿੱਚ ਕੰਮ ਨਹੀਂ ਕਰ ਸਕਦਾ"
+  },
+  "project": {
+    "title": "ਪ੍ਰੋਜੈਕਟ",
+    "save": "ਸੇਵ ਕਰੋ",
+    "load": "ਲੋਡ ਕਰੋ"
   }
 }
