@@ -920,7 +920,7 @@ const Sowntra = () => {
         className="gradient-picker mt-3 p-3 bg-gray-50 rounded border" 
         style={{ position: 'relative', zIndex: 1, pointerEvents: 'auto' }}
       >
-        <div className="mb-3">
+        {/* <div className="mb-3">
           <label className="block text-sm font-medium mb-2">Gradient Type</label>
           <div className="flex space-x-2">
             {['linear', 'radial'].map(type => (
@@ -935,7 +935,7 @@ const Sowntra = () => {
               </button>
             ))}
           </div>
-        </div>
+        </div> */}
 
         <div className="mb-3">
           <div 
@@ -1032,7 +1032,7 @@ const Sowntra = () => {
         )}
 
         <div className="mb-3">
-          <div className="flex justify-between items-center mb-2">
+          {/* <div className="flex justify-between items-center mb-2">
             <label className="block text-sm font-medium">Color Stops</label>
             <button
               onClick={addColorStop}
@@ -1041,7 +1041,7 @@ const Sowntra = () => {
             >
               Add Color +
             </button>
-          </div>
+          </div> */}
           <div className="text-xs text-gray-500 mb-2">
             {localGradient.colors.length}/5 color stops
           </div>
@@ -2402,8 +2402,89 @@ const Sowntra = () => {
     ctx.restore();
   }, [getFilterCSS, getBackgroundStyle, imageEffects]);
 
+  // Export as SVG
+  const exportAsSVG = useCallback(() => {
+    const currentElements = getCurrentPageElements();
+    
+    let svgContent = `<?xml version="1.0" encoding="UTF-8"?>
+<svg width="${canvasSize.width}" height="${canvasSize.height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <rect width="100%" height="100%" fill="white"/>
+  <defs>`;
+    
+    // Add gradient definitions
+    currentElements.forEach((element, idx) => {
+      if (element.fillType === 'gradient' && element.gradient) {
+        const grad = element.gradient;
+        if (grad.type === 'linear') {
+          svgContent += `
+    <linearGradient id="gradient-${idx}" x1="0%" y1="0%" x2="100%" y2="0%" gradientTransform="rotate(${grad.angle || 90} 0.5 0.5)">`;
+          grad.colors.forEach((color, i) => {
+            svgContent += `
+      <stop offset="${grad.stops[i]}%" style="stop-color:${color};stop-opacity:1" />`;
+          });
+          svgContent += `
+    </linearGradient>`;
+        } else {
+          svgContent += `
+    <radialGradient id="gradient-${idx}" cx="${grad.position?.x || 50}%" cy="${grad.position?.y || 50}%">`;
+          grad.colors.forEach((color, i) => {
+            svgContent += `
+      <stop offset="${grad.stops[i]}%" style="stop-color:${color};stop-opacity:1" />`;
+          });
+          svgContent += `
+    </radialGradient>`;
+        }
+      }
+    });
+    
+    svgContent += `
+  </defs>
+  `;
+    
+    // Add elements
+    currentElements.forEach((element, idx) => {
+      const transform = `rotate(${element.rotation || 0} ${element.x + element.width/2} ${element.y + element.height/2})`;
+      const fill = element.fillType === 'gradient' ? `url(#gradient-${idx})` : element.fill;
+      
+      if (element.type === 'rectangle') {
+        svgContent += `
+  <rect x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}" 
+        fill="${fill}" stroke="${element.stroke}" stroke-width="${element.strokeWidth}" 
+        rx="${element.borderRadius || 0}" transform="${transform}"/>`;
+      } else if (element.type === 'circle') {
+        svgContent += `
+  <circle cx="${element.x + element.width/2}" cy="${element.y + element.height/2}" r="${element.width/2}" 
+          fill="${fill}" stroke="${element.stroke}" stroke-width="${element.strokeWidth}" 
+          transform="${transform}"/>`;
+      } else if (element.type === 'text') {
+        svgContent += `
+  <text x="${element.x}" y="${element.y + element.fontSize}" 
+        font-family="${element.fontFamily}" font-size="${element.fontSize}" 
+        fill="${element.color}" text-anchor="${element.textAlign === 'center' ? 'middle' : element.textAlign === 'right' ? 'end' : 'start'}" 
+        transform="${transform}">${element.content}</text>`;
+      }
+    });
+    
+    svgContent += `
+</svg>`;
+    
+    const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sowntra-design.svg`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [canvasSize, getCurrentPageElements, getBackgroundStyle]);
+
   // Export as image
   const exportAsImage = useCallback((format) => {
+    // Handle SVG export separately
+    if (format === 'svg') {
+      exportAsSVG();
+      return;
+    }
+    
     const canvas = document.createElement('canvas');
     canvas.width = canvasSize.width;
     canvas.height = canvasSize.height;
@@ -2477,7 +2558,7 @@ const Sowntra = () => {
         alert('Error exporting image. Please try again.');
       }
     }
-  }, [canvasSize, getCurrentPageElements, drawElementToCanvas]);
+  }, [canvasSize, getCurrentPageElements, drawElementToCanvas, exportAsSVG]);
 
   // Zoom in/out
   const zoom = useCallback((direction) => {
