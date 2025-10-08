@@ -1,5 +1,6 @@
 import React, { useState, createContext, useContext, useEffect } from 'react';
 import { Eye, EyeOff, ArrowRight, CheckCircle, LogOut } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 // Auth Context
 const AuthContext = createContext();
@@ -622,9 +623,14 @@ const SignupForm = () => {
 // Dashboard Component (after successful login)
 const Dashboard = () => {
   const { user, setUser } = useAuth();
+  const navigate = useNavigate();
   
   const handleLogout = () => {
     setUser(null);
+  };
+
+  const handleGetStarted = () => {
+    navigate('/main');
   };
 
   // Show user registration date
@@ -721,7 +727,10 @@ const Dashboard = () => {
 
           {/* Get Started Button */}
           <div className="mt-12">
-            <button className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 rounded-lg font-semibold text-lg transition-colors inline-flex items-center">
+            <button 
+              onClick={handleGetStarted}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 rounded-lg font-semibold text-lg transition-colors inline-flex items-center"
+            >
               Get Started
               <ArrowRight className="ml-2 w-5 h-5" />
             </button>
