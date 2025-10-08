@@ -804,29 +804,122 @@ const Sowntra = () => {
     };
 
     const gradientPresets = [
-      { colors: ['#ff6b6b', '#4ecdc4'], stops: [0, 100], angle: 90, type: 'linear' },
-      { colors: ['#667eea', '#764ba2'], stops: [0, 100], angle: 90, type: 'linear' },
-      { colors: ['#f093fb', '#f5576c'], stops: [0, 100], angle: 90, type: 'linear' },
-      { colors: ['#4facfe', '#00f2fe'], stops: [0, 100], angle: 90, type: 'linear' },
-      { colors: ['#43e97b', '#38f9d7'], stops: [0, 100], angle: 90, type: 'linear' },
-      { colors: ['#fa709a', '#fee140'], stops: [0, 100], angle: 90, type: 'linear' },
-      { colors: ['#30cfd0', '#330867'], stops: [0, 100], angle: 90, type: 'linear' },
-      { colors: ['#a8edea', '#fed6e3'], stops: [0, 100], angle: 90, type: 'linear' },
-      { colors: ['#5ee7df', '#b490ca'], stops: [0, 100], angle: 90, type: 'linear' }
+      // Linear gradients with multiple color stops
+      { 
+        colors: ['#ff6b6b', '#ff8e8e', '#4ecdc4'], 
+        stops: [0, 50, 100], 
+        angle: 90, 
+        type: 'linear',
+        name: 'Coral Sunset'
+      },
+      { 
+        colors: ['#667eea', '#764ba2', '#f093fb'], 
+        stops: [0, 60, 100], 
+        angle: 135, 
+        type: 'linear',
+        name: 'Purple Dream'
+      },
+      { 
+        colors: ['#f093fb', '#f5576c', '#ff9a9e'], 
+        stops: [0, 40, 100], 
+        angle: 45, 
+        type: 'linear',
+        name: 'Pink Blush'
+      },
+      { 
+        colors: ['#4facfe', '#00f2fe', '#43e97b'], 
+        stops: [0, 70, 100], 
+        angle: 180, 
+        type: 'linear',
+        name: 'Ocean Breeze'
+      },
+      { 
+        colors: ['#43e97b', '#38f9d7', '#a8edea'], 
+        stops: [0, 50, 100], 
+        angle: 270, 
+        type: 'linear',
+        name: 'Mint Fresh'
+      },
+      { 
+        colors: ['#fa709a', '#fee140', '#ff9a9e'], 
+        stops: [0, 30, 100], 
+        angle: 0, 
+        type: 'linear',
+        name: 'Sunset Glow'
+      },
+      { 
+        colors: ['#30cfd0', '#330867', '#667eea'], 
+        stops: [0, 80, 100], 
+        angle: 225, 
+        type: 'linear',
+        name: 'Deep Ocean'
+      },
+      { 
+        colors: ['#a8edea', '#fed6e3', '#f093fb'], 
+        stops: [0, 60, 100], 
+        angle: 315, 
+        type: 'linear',
+        name: 'Soft Pastel'
+      },
+      { 
+        colors: ['#5ee7df', '#b490ca', '#f093fb'], 
+        stops: [0, 40, 100], 
+        angle: 90, 
+        type: 'linear',
+        name: 'Lavender Mist'
+      },
+      // Radial gradients with multiple color stops
+      { 
+        colors: ['#ff6b6b', '#ff8e8e', '#4ecdc4', '#a8edea'], 
+        stops: [0, 30, 70, 100], 
+        angle: 0, 
+        type: 'radial',
+        position: { x: 50, y: 50 },
+        name: 'Radial Coral'
+      },
+      { 
+        colors: ['#667eea', '#764ba2', '#f093fb', '#ff9a9e'], 
+        stops: [0, 25, 60, 100], 
+        angle: 0, 
+        type: 'radial',
+        position: { x: 30, y: 30 },
+        name: 'Radial Purple'
+      },
+      { 
+        colors: ['#4facfe', '#00f2fe', '#43e97b', '#38f9d7'], 
+        stops: [0, 40, 80, 100], 
+        angle: 0, 
+        type: 'radial',
+        position: { x: 70, y: 70 },
+        name: 'Radial Ocean'
+      }
     ];
 
-    const applyPreset = (preset) => {
-      updateGradient({
-        colors: [...preset.colors],
-        stops: [...preset.stops],
-        angle: preset.angle || 90,
-        type: preset.type || 'linear',
-        position: preset.position || { x: 50, y: 50 }
-      });
-    };
+    const applyPreset = useCallback((preset) => {
+      // Create a fresh gradient object with all preset properties
+      const newGradient = {
+        type: preset.type,
+        colors: preset.colors.slice(),
+        stops: preset.stops.slice(),
+        angle: preset.angle !== undefined ? preset.angle : 90,
+        position: preset.position ? { ...preset.position } : { x: 50, y: 50 }
+      };
+      
+      // Update local state immediately for instant visual feedback
+      setLocalGradient(newGradient);
+      
+      // Notify parent component to update the element on canvas
+      if (onGradientChange) {
+        onGradientChange(newGradient);
+      }
+    }, [onGradientChange]);
 
     return (
-      <div key={gradientPickerKey} className="gradient-picker mt-3 p-3 bg-gray-50 rounded border">
+      <div 
+        key={gradientPickerKey} 
+        className="gradient-picker mt-3 p-3 bg-gray-50 rounded border" 
+        style={{ position: 'relative', zIndex: 1, pointerEvents: 'auto' }}
+      >
         <div className="mb-3">
           <label className="block text-sm font-medium mb-2">Gradient Type</label>
           <div className="flex space-x-2">
@@ -859,27 +952,41 @@ const Sowntra = () => {
             <label className="block text-sm font-medium mb-1">
               Angle: {localGradient.angle || 0}°
             </label>
+            <div className="relative">
             <input
               type="range"
               min="0"
               max="360"
+                step="1"
               value={localGradient.angle || 0}
               onChange={(e) => updateGradient({ angle: parseInt(e.target.value) || 0 })}
-              className="w-full"
-            />
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                style={{
+                  background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(localGradient.angle || 0) / 360 * 100}%, #e5e7eb ${(localGradient.angle || 0) / 360 * 100}%, #e5e7eb 100%)`
+                }}
+              />
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>0°</span>
+                <span>90°</span>
+                <span>180°</span>
+                <span>270°</span>
+                <span>360°</span>
+              </div>
+            </div>
           </div>
         )}
 
         {localGradient.type === 'radial' && (
           <div className="mb-3">
-            <label className="block text-sm font-medium mb-1">Position</label>
-            <div className="grid grid-cols-2 gap-2">
+            <label className="block text-sm font-medium mb-1">Radial Center Position</label>
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs block mb-1">X: {localGradient.position?.x || 50}%</label>
+                <label className="text-xs block mb-1 text-gray-600">X: {localGradient.position?.x || 50}%</label>
                 <input
                   type="range"
                   min="0"
                   max="100"
+                  step="1"
                   value={localGradient.position?.x || 50}
                   onChange={(e) => updateGradient({ 
                     position: { 
@@ -887,15 +994,21 @@ const Sowntra = () => {
                       x: parseInt(e.target.value) || 50 
                     }
                   })}
-                  className="w-full"
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                 />
+                <div className="flex justify-between text-xs text-gray-400 mt-1">
+                  <span>0%</span>
+                  <span>50%</span>
+                  <span>100%</span>
+                </div>
               </div>
               <div>
-                <label className="text-xs block mb-1">Y: {localGradient.position?.y || 50}%</label>
+                <label className="text-xs block mb-1 text-gray-600">Y: {localGradient.position?.y || 50}%</label>
                 <input
                   type="range"
                   min="0"
                   max="100"
+                  step="1"
                   value={localGradient.position?.y || 50}
                   onChange={(e) => updateGradient({ 
                     position: { 
@@ -903,9 +1016,17 @@ const Sowntra = () => {
                       y: parseInt(e.target.value) || 50 
                     }
                   })}
-                  className="w-full"
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                 />
+                <div className="flex justify-between text-xs text-gray-400 mt-1">
+                  <span>0%</span>
+                  <span>50%</span>
+                  <span>100%</span>
               </div>
+              </div>
+            </div>
+            <div className="mt-2 text-xs text-gray-500 text-center">
+              Center: ({localGradient.position?.x || 50}%, {localGradient.position?.y || 50}%)
             </div>
           </div>
         )}
@@ -916,23 +1037,26 @@ const Sowntra = () => {
             <button
               onClick={addColorStop}
               disabled={localGradient.colors.length >= 5}
-              className="text-xs bg-blue-500 text-white px-2 py-1 rounded disabled:opacity-50"
+              className="text-xs bg-blue-500 text-white px-2 py-1 rounded disabled:opacity-50 hover:bg-blue-600 transition-colors"
             >
               Add Color +
             </button>
           </div>
+          <div className="text-xs text-gray-500 mb-2">
+            {localGradient.colors.length}/5 color stops
+          </div>
           
           <div className="space-y-3">
             {localGradient.colors.map((color, index) => (
-              <div key={index} className="flex items-center space-x-3">
+              <div key={index} className="flex items-center space-x-3 p-2 bg-gray-50 rounded border">
                 <div className="flex items-center space-x-2">
                   <input
                     type="color"
                     value={color}
                     onChange={(e) => updateColorStop(index, e.target.value)}
-                    className="w-8 h-8 cursor-pointer rounded border"
+                    className="w-8 h-8 cursor-pointer rounded border-2 border-gray-300 hover:border-blue-400 transition-colors"
                   />
-                  <span className="text-xs w-12 font-mono">{localGradient.stops[index]}%</span>
+                  <span className="text-xs w-12 font-mono text-gray-600">{localGradient.stops[index]}%</span>
                 </div>
                 
                 <div className="flex-1">
@@ -940,16 +1064,20 @@ const Sowntra = () => {
                     type="range"
                     min="0"
                     max="100"
+                    step="1"
                     value={localGradient.stops[index]}
                     onChange={(e) => updateStopPosition(index, e.target.value)}
-                    className="w-full"
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    style={{
+                      background: `linear-gradient(to right, #e5e7eb 0%, #e5e7eb ${localGradient.stops[index]}%, #3b82f6 ${localGradient.stops[index]}%, #3b82f6 100%)`
+                    }}
                   />
                 </div>
                 
                 <button
                   onClick={() => removeColorStop(index)}
                   disabled={localGradient.colors.length <= 2}
-                  className="p-1 text-red-500 hover:text-red-700 disabled:opacity-30 transition-colors"
+                  className="p-1 text-red-500 hover:text-red-700 disabled:opacity-30 transition-colors hover:bg-red-50 rounded"
                   title="Remove color stop"
                 >
                   <Trash2 size={14} />
@@ -961,18 +1089,44 @@ const Sowntra = () => {
 
         <div className="mb-3">
           <label className="block text-sm font-medium mb-2">Quick Presets</label>
-          <div className="grid grid-cols-3 gap-2">
-            {gradientPresets.map((preset, index) => (
-              <button
-                key={index}
-                onClick={() => applyPreset(preset)}
-                className="h-8 rounded border border-gray-300 hover:border-blue-400 hover:scale-105 transition-all duration-200 gradient-fix"
-                style={{
-                  background: `linear-gradient(90deg, ${preset.colors[0]} ${preset.stops[0]}%, ${preset.colors[1]} ${preset.stops[1]}%)`
-                }}
-                title={`Preset ${index + 1}`}
-              />
-            ))}
+          <div className="grid grid-cols-4 gap-2">
+            {gradientPresets.map((preset, index) => {
+              // Generate the actual gradient string for this preset
+              const colorStops = preset.colors.map((color, i) => 
+                `${color} ${preset.stops[i]}%`
+              ).join(', ');
+              
+              const gradientString = preset.type === 'linear'
+                ? `linear-gradient(${preset.angle}deg, ${colorStops})`
+                : `radial-gradient(circle at ${preset.position?.x || 50}% ${preset.position?.y || 50}%, ${colorStops})`;
+
+              return (
+                <div
+                  key={`preset-${index}`}
+                  onMouseUp={(e) => {
+                    e.stopPropagation();
+                    applyPreset(preset);
+                  }}
+                  className="h-10 rounded border-2 border-gray-300 hover:border-blue-500 hover:scale-105 transition-all duration-200 gradient-fix cursor-pointer relative"
+                  style={{
+                    background: gradientString,
+                    pointerEvents: 'auto',
+                    userSelect: 'none'
+                  }}
+                  title={`${preset.name} (${preset.type === 'radial' ? 'Radial' : 'Linear'})`}
+                >
+                  <div 
+                    className="absolute bottom-0 right-0 text-xs bg-black bg-opacity-60 text-white px-1 rounded-tl pointer-events-none"
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    {preset.type === 'radial' ? 'R' : 'L'}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="text-xs text-gray-500 mt-1 text-center">
+            Click any preset to apply • L = Linear, R = Radial
           </div>
         </div>
       </div>
