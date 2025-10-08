@@ -77,6 +77,7 @@ const Sowntra = () => {
   const floatingToolbarRef = useRef(null);
   const recordingIntervalRef = useRef(null);
   const canvasContainerRef = useRef(null);
+  const loadProjectInputRef = useRef(null);
 
   // Get current page elements
   const getCurrentPageElements = useCallback(() => {
@@ -2565,6 +2566,88 @@ const Sowntra = () => {
     clearInterval(recordingIntervalRef.current);
   }, [mediaRecorder]);
 
+  // Save project to JSON file
+  const saveProject = useCallback(() => {
+    try {
+      const projectData = {
+        version: '1.0',
+        timestamp: new Date().toISOString(),
+        pages: pages,
+        currentPage: currentPage,
+        canvasSize: canvasSize,
+        zoomLevel: zoomLevel,
+        canvasOffset: canvasOffset,
+        showGrid: showGrid,
+        snapToGrid: snapToGrid,
+        currentLanguage: currentLanguage,
+        textDirection: textDirection
+      };
+
+      const dataStr = JSON.stringify(projectData, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `sowntra-project-${new Date().getTime()}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      alert('Project saved successfully!');
+    } catch (error) {
+      console.error('Error saving project:', error);
+      alert('Error saving project. Please try again.');
+    }
+  }, [pages, currentPage, canvasSize, zoomLevel, canvasOffset, showGrid, snapToGrid, currentLanguage, textDirection]);
+
+  // Load project from JSON file
+  const loadProject = useCallback(() => {
+    loadProjectInputRef.current?.click();
+  }, []);
+
+  // Handle project file load
+  const handleProjectFileLoad = useCallback((event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const projectData = JSON.parse(e.target.result);
+          
+          // Validate project data
+          if (!projectData.version || !projectData.pages) {
+            throw new Error('Invalid project file');
+          }
+
+          // Restore project state
+          setPages(projectData.pages);
+          setCurrentPage(projectData.currentPage || projectData.pages[0]?.id);
+          setCanvasSize(projectData.canvasSize || { width: 800, height: 600 });
+          setZoomLevel(projectData.zoomLevel || 1);
+          setCanvasOffset(projectData.canvasOffset || { x: 0, y: 0 });
+          setShowGrid(projectData.showGrid || false);
+          setSnapToGrid(projectData.snapToGrid || false);
+          setCurrentLanguage(projectData.currentLanguage || 'en');
+          setTextDirection(projectData.textDirection || 'ltr');
+          
+          // Clear selections
+          setSelectedElement(null);
+          setSelectedElements(new Set());
+          
+          alert('Project loaded successfully!');
+        } catch (error) {
+          console.error('Error loading project:', error);
+          alert('Error loading project. Please make sure the file is a valid Sowntra project file.');
+        }
+      };
+      reader.readAsText(file);
+    }
+    
+    // Reset the input value so the same file can be loaded again
+    event.target.value = '';
+  }, []);
+
   // Transliteration Toggle Component
   const TransliterationToggle = useCallback(() => {
     const needsTransliteration = ['hi', 'ta', 'te', 'bn', 'mr', 'gu', 'kn', 'ml', 'pa', 'or'].includes(currentLanguage);
@@ -4556,6 +4639,14 @@ const Sowntra = () => {
               onChange={handleImageUpload}
               className="hidden"
             />
+            
+            <input
+              ref={loadProjectInputRef}
+              type="file"
+              accept="application/json,.json"
+              onChange={handleProjectFileLoad}
+              className="hidden"
+            />
           </div>
 
           {/* Canvas Area - FILLS SCREEN */}
@@ -5143,14 +5234,14 @@ const Sowntra = () => {
               <h2 className="text-lg font-bold mb-4 text-gray-700">{t('project.title')}</h2>
               <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => {/* Save project functionality */}}
+                  onClick={saveProject}
                   className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center text-gray-700"
                 >
                   <Save size={14} className="mr-1" />
                   {t('project.save')}
                 </button>
                 <button
-                  onClick={() => {/* Load project functionality */}}
+                  onClick={loadProject}
                   className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center text-gray-700"
                 >
                   <FolderOpen size={14} className="mr-1" />
