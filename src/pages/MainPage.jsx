@@ -2560,6 +2560,12 @@ const Sowntra = () => {
     }
   }, [canvasSize, getCurrentPageElements, drawElementToCanvas, exportAsSVG]);
 
+  // Logout handler
+  const handleLogout = useCallback(() => {
+    // Navigate to signup/login page
+    window.location.href = '/';
+  }, []);
+
   // Zoom in/out
   const zoom = useCallback((direction) => {
     const newZoom = direction === 'in' 
@@ -4655,7 +4661,10 @@ const Sowntra = () => {
                     <Settings size={16} />
                     Settings
                   </div>
-                  <div className="dropdown-item">
+                  <div 
+                    className="dropdown-item text-red-600 hover:bg-red-50"
+                    onClick={handleLogout}
+                  >
                     <LogOut size={16} />
                     Logout
                   </div>
