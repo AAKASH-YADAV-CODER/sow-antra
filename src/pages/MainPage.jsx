@@ -1296,6 +1296,77 @@ const Sowntra = () => {
     }
   }, []);
 
+  // Get canvas-compatible gradient for export
+  const getCanvasGradient = useCallback((ctx, element) => {
+    if (!element || element.fillType !== 'gradient' || !element.gradient) {
+      return element.fill || '#3b82f6';
+    }
+    
+    const grad = element.gradient;
+    
+    // Validate gradient data
+    if (!grad.colors || !Array.isArray(grad.colors) || grad.colors.length === 0) {
+      return element.fill || '#3b82f6';
+    }
+    
+    // Validate and filter colors
+    const validColors = grad.colors.filter(color => 
+      color && typeof color === 'string' && /^#([0-9A-F]{3}){1,2}$/i.test(color)
+    );
+    
+    if (validColors.length === 0) {
+      return element.fill || '#3b82f6';
+    }
+    
+    // Ensure we have valid stops
+    const validStops = grad.stops || [];
+    const stops = [];
+    
+    for (let i = 0; i < validColors.length; i++) {
+      if (validStops[i] !== undefined && validStops[i] !== null) {
+        stops[i] = Math.max(0, Math.min(100, parseInt(validStops[i]) || 0)) / 100;
+      } else {
+        if (validColors.length === 1) {
+          stops[i] = 0;
+        } else {
+          stops[i] = i === 0 ? 0 : (i === validColors.length - 1 ? 1 : i / (validColors.length - 1));
+        }
+      }
+    }
+    
+    let canvasGradient;
+    
+    if (grad.type === 'radial') {
+      const centerX = element.x + element.width / 2;
+      const centerY = element.y + element.height / 2;
+      const radius = Math.max(element.width, element.height) / 2;
+      
+      canvasGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
+    } else {
+      // Linear gradient
+      const angle = (grad.angle !== undefined && grad.angle !== null) ? grad.angle : 90;
+      const angleRad = (angle - 90) * Math.PI / 180;
+      
+      const centerX = element.x + element.width / 2;
+      const centerY = element.y + element.height / 2;
+      const length = Math.max(element.width, element.height);
+      
+      const x1 = centerX - Math.cos(angleRad) * length / 2;
+      const y1 = centerY - Math.sin(angleRad) * length / 2;
+      const x2 = centerX + Math.cos(angleRad) * length / 2;
+      const y2 = centerY + Math.sin(angleRad) * length / 2;
+      
+      canvasGradient = ctx.createLinearGradient(x1, y1, x2, y2);
+    }
+    
+    // Add color stops
+    validColors.forEach((color, i) => {
+      canvasGradient.addColorStop(stops[i], color);
+    });
+    
+    return canvasGradient;
+  }, []);
+
   // Get effect CSS for an element
   const getEffectCSS = useCallback((element) => {
     let effectCSS = '';
@@ -2220,7 +2291,7 @@ const Sowntra = () => {
     
     ctx.globalAlpha = opacity;
     
-    const backgroundStyle = getBackgroundStyle(element);
+    const backgroundStyle = getCanvasGradient(ctx, element);
     
     if (element.type === 'rectangle') {
       ctx.fillStyle = backgroundStyle;
@@ -2401,7 +2472,7 @@ const Sowntra = () => {
     }
     
     ctx.restore();
-  }, [getFilterCSS, getBackgroundStyle, imageEffects]);
+  }, [getFilterCSS, getCanvasGradient, imageEffects]);
 
   // Export as SVG
   const exportAsSVG = useCallback(() => {
