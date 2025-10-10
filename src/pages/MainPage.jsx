@@ -41,6 +41,7 @@ const Sowntra = () => {
   const [snapToGrid, setSnapToGrid] = useState(false);
   const [recording, setRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState(null);
+  const [recordingStartTime, setRecordingStartTime] = useState(null);
   // const [recordedChunks, setRecordedChunks] = useState([]);
   const [drawingPath, setDrawingPath] = useState([]);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -59,7 +60,7 @@ const Sowntra = () => {
   const [videoFormat, setVideoFormat] = useState('webm');
   const [videoQuality, setVideoQuality] = useState('high');
   const [recordingDuration, setRecordingDuration] = useState(10);
-  const [recordingTimeLeft, setRecordingTimeLeft] = useState(0);
+  const [recordingTimeElapsed, setRecordingTimeElapsed] = useState(0);
   const [gradientPickerKey, setGradientPickerKey] = useState(0);
   const [showEffectsPanel, setShowEffectsPanel] = useState(false);
   // const [resizeDirection, setResizeDirection] = useState('');
@@ -2760,12 +2761,18 @@ const Sowntra = () => {
   // Enhanced startRecording function with MP4 support
   const startRecording = useCallback(async () => {
     try {
+      if (recording) {
+        console.log('Recording already in progress');
+        return;
+      }
+
       if (!checkRecordingCompatibility()) return;
       
       await preloadImages();
       
       setRecording(true);
-      setRecordingTimeLeft(recordingDuration);
+      setRecordingStartTime(Date.now());
+      setRecordingTimeElapsed(0);
       
       const canvas = document.createElement('canvas');
       canvas.width = canvasSize.width;
@@ -2783,6 +2790,7 @@ const Sowntra = () => {
         console.error('Error capturing stream:', error);
         alert('Your browser does not support canvas recording. Please try Chrome or Firefox.');
         setRecording(false);
+        setRecordingStartTime(null);
         return;
       }
       
@@ -2823,6 +2831,7 @@ const Sowntra = () => {
       if (!mimeType) {
         alert('Your browser does not support any video recording formats. Please try Chrome.');
         setRecording(false);
+        setRecordingStartTime(null);
         return;
       }
       
@@ -2853,6 +2862,11 @@ const Sowntra = () => {
       
       recorder.onstop = () => {
         try {
+          if (chunks.length === 0) {
+            console.warn('No data recorded');
+            return;
+          }
+
           const blob = new Blob(chunks, { type: mimeType });
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
@@ -2871,13 +2885,20 @@ const Sowntra = () => {
           a.click();
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
+          
+          console.log('Recording saved successfully');
         } catch (error) {
           console.error('Error creating download:', error);
           alert('Error creating video file. Please try again.');
         } finally {
           setRecording(false);
-          setRecordingTimeLeft(0);
-          clearInterval(recordingIntervalRef.current);
+          setRecordingStartTime(null);
+          setRecordingTimeElapsed(0);
+          setMediaRecorder(null);
+          if (recordingIntervalRef.current) {
+            clearInterval(recordingIntervalRef.current);
+            recordingIntervalRef.current = null;
+          }
         }
       };
       
@@ -2885,36 +2906,33 @@ const Sowntra = () => {
         console.error('MediaRecorder error:', event.error);
         alert('Error during recording: ' + event.error.message);
         setRecording(false);
-        setRecordingTimeLeft(0);
-        clearInterval(recordingIntervalRef.current);
+        setRecordingStartTime(null);
+        setRecordingTimeElapsed(0);
+        setMediaRecorder(null);
+        if (recordingIntervalRef.current) {
+          clearInterval(recordingIntervalRef.current);
+          recordingIntervalRef.current = null;
+        }
       };
       
       recorder.start();
       setMediaRecorder(recorder);
-      // setRecordedChunks(chunks);
       
+      // Elapsed time counter
       recordingIntervalRef.current = setInterval(() => {
-        setRecordingTimeLeft(prev => {
-          if (prev <= 1) {
-            clearInterval(recordingIntervalRef.current);
-            if (recorder.state === 'recording') {
-              recorder.stop();
-            }
-            return 0;
-          }
-          return prev - 1;
-        });
+        setRecordingTimeElapsed(prev => prev + 1);
       }, 1000);
       
       let startTime = null;
       const frameDuration = 1000 / 30;
       let lastFrameTime = 0;
+      let animationId = null;
       
       const drawAnimationFrame = (timestamp) => {
         if (!startTime) startTime = timestamp;
         const elapsed = timestamp - startTime;
         
-        if (recorder.state === 'recording' && elapsed < recordingDuration * 1000) {
+        if (recorder.state === 'recording') {
           if (timestamp - lastFrameTime >= frameDuration) {
             lastFrameTime = timestamp;
             
@@ -2925,38 +2943,57 @@ const Sowntra = () => {
             const sortedElements = [...currentElements].sort((a, b) => a.zIndex - b.zIndex);
             
             sortedElements.forEach((element, index) => {
-              const animationProgress = Math.min(elapsed / 1000, recordingDuration);
+              // Use recordingDuration for animation loop timing
+              const animationProgress = (elapsed / 1000) % recordingDuration;
               drawElementToCanvas(ctx, element, animationProgress, index);
             });
           }
           
-          requestAnimationFrame(drawAnimationFrame);
-        } else if (recorder.state === 'recording') {
-          recorder.stop();
-          clearInterval(recordingIntervalRef.current);
+          animationId = requestAnimationFrame(drawAnimationFrame);
         }
       };
       
-      requestAnimationFrame(drawAnimationFrame);
+      animationId = requestAnimationFrame(drawAnimationFrame);
       
     } catch (error) {
       console.error('Error starting recording:', error);
       alert('Error starting recording: ' + error.message);
       setRecording(false);
-      setRecordingTimeLeft(0);
-      clearInterval(recordingIntervalRef.current);
+      setRecordingStartTime(null);
+      setRecordingTimeElapsed(0);
+      setMediaRecorder(null);
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+        recordingIntervalRef.current = null;
+      }
     }
-  }, [canvasSize, getCurrentPageElements, drawElementToCanvas, recordingDuration, videoQuality, checkRecordingCompatibility, preloadImages, videoFormat]);
+  }, [recording, canvasSize, getCurrentPageElements, drawElementToCanvas, recordingDuration, videoQuality, checkRecordingCompatibility, preloadImages, videoFormat]);
 
   // Stop recording
   const stopRecording = useCallback(() => {
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
-      mediaRecorder.stop();
+    console.log('Stop recording called, state:', mediaRecorder?.state);
+    
+    if (!recording) {
+      console.log('Not currently recording');
+      return;
     }
-    setRecording(false);
-    setRecordingTimeLeft(0);
-    clearInterval(recordingIntervalRef.current);
-  }, [mediaRecorder]);
+
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      console.log('Stopping media recorder');
+      mediaRecorder.stop();
+      // State cleanup is handled in recorder.onstop callback
+    } else {
+      // Cleanup if recorder is in invalid state
+      setRecording(false);
+      setRecordingStartTime(null);
+      setRecordingTimeElapsed(0);
+      setMediaRecorder(null);
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+        recordingIntervalRef.current = null;
+      }
+    }
+  }, [mediaRecorder, recording]);
 
   // Save project to JSON file
   const saveProject = useCallback(() => {
@@ -3104,7 +3141,7 @@ const Sowntra = () => {
       
       <div className="mt-3">
         <label className="block text-sm font-medium mb-1 text-gray-700">
-{t('export.durationSeconds', { count: recordingDuration })}
+          Animation Loop: {recordingDuration}s
         </label>
         <input
           type="range"
@@ -3114,6 +3151,7 @@ const Sowntra = () => {
           onChange={(e) => setRecordingDuration(parseInt(e.target.value))}
           className="w-full"
         />
+        <p className="text-xs text-gray-500 mt-1">Duration for animations to loop (not recording length)</p>
       </div>
     </div>
   ), [videoFormat, videoQuality, recordingDuration, t]);
@@ -3122,15 +3160,21 @@ const Sowntra = () => {
   const RecordingStatus = useCallback(() => {
     if (!recording) return null;
     
+    const formatTime = (seconds) => {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}s`;
+    };
+    
     return (
       <div className="fixed top-4 right-4 bg-red-500 text-white px-3 py-2 rounded-lg shadow-lg z-50">
         <div className="flex items-center">
           <div className="w-3 h-3 bg-white rounded-full mr-2 animate-pulse"></div>
-          <span>Recording... {recordingTimeLeft}s</span>
+          <span>Recording... {formatTime(recordingTimeElapsed)}</span>
         </div>
       </div>
     );
-  }, [recording, recordingTimeLeft]);
+  }, [recording, recordingTimeElapsed]);
 
   // Language Help Modal
   const LanguageHelpModal = useCallback(() => {
@@ -4727,13 +4771,19 @@ const Sowntra = () => {
               {t('toolbar.reset')}
             </button>
             {recording ? (
-              <button
-                onClick={stopRecording}
-                className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 flex items-center"
-            >
-                <Square size={16} className="mr-1" />
-                Stop Recording
-              </button>
+              <div className="flex items-center space-x-2">
+                <div className="px-3 py-2 bg-red-50 border border-red-200 rounded flex items-center text-red-600">
+                  <div className="w-2 h-2 bg-red-500 rounded-full mr-2 animate-pulse"></div>
+                  Recording: {Math.floor(recordingTimeElapsed / 60)}:{(recordingTimeElapsed % 60).toString().padStart(2, '0')}
+                </div>
+                <button
+                  onClick={stopRecording}
+                  className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 flex items-center"
+                >
+                  <Square size={16} className="mr-1" />
+                  Stop
+                </button>
+              </div>
             ) : (
               <button
                 onClick={startRecording}
@@ -5621,16 +5671,31 @@ const Sowntra = () => {
               {/* Video Export Settings */}
               <VideoSettings />
               
-              <button
-                onClick={startRecording}
-                disabled={recording}
-                className={`w-full p-2 rounded text-sm flex items-center justify-center ${
-                  recording ? 'bg-gray-300 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600'
-                }`}
-              >
-                <Film size={14} className="mr-1" />
-                {recording ? t('recording.recording') : t('export.exportVideo')}
-              </button>
+              {!recording ? (
+                <button
+                  onClick={startRecording}
+                  className="w-full p-2 rounded text-sm flex items-center justify-center bg-blue-500 text-white hover:bg-blue-600"
+                >
+                  <Film size={14} className="mr-1" />
+                  {t('export.exportVideo')}
+                </button>
+              ) : (
+                <div className="space-y-2">
+                  <div className="w-full p-2 bg-red-50 border border-red-200 rounded text-sm flex items-center justify-center text-red-600">
+                    <div className="flex items-center">
+                      <div className="w-2 h-2 bg-red-500 rounded-full mr-2 animate-pulse"></div>
+                      {t('recording.recording')}: {Math.floor(recordingTimeElapsed / 60)}:{(recordingTimeElapsed % 60).toString().padStart(2, '0')}
+                    </div>
+                  </div>
+                  <button
+                    onClick={stopRecording}
+                    className="w-full p-2 rounded text-sm flex items-center justify-center bg-red-500 text-white hover:bg-red-600"
+                  >
+                    <Square size={14} className="mr-1" />
+                    {t('recording.stop')}
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Project Actions */}
