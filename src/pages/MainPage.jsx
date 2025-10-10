@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import ShareButton from '../components/ShareButton';
+import jsPDF from 'jspdf';
 
 const Sowntra = () => {
   const { t, i18n } = useTranslation();
@@ -2559,6 +2560,85 @@ const Sowntra = () => {
       }
     }
   }, [canvasSize, getCurrentPageElements, drawElementToCanvas, exportAsSVG]);
+
+  // Export as PDF
+  const exportAsPDF = useCallback(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvasSize.width;
+    canvas.height = canvasSize.height;
+    const ctx = canvas.getContext('2d');
+    
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
+    
+    const currentElements = getCurrentPageElements();
+    const imageElements = currentElements.filter(el => el.type === 'image');
+    
+    const generatePDF = () => {
+      try {
+        const imgData = canvas.toDataURL('image/png');
+        
+        // Create PDF with canvas dimensions (convert pixels to mm, 96 DPI)
+        const pdfWidth = canvasSize.width * 0.264583; // Convert px to mm
+        const pdfHeight = canvasSize.height * 0.264583;
+        
+        const pdf = new jsPDF({
+          orientation: pdfWidth > pdfHeight ? 'landscape' : 'portrait',
+          unit: 'mm',
+          format: [pdfWidth, pdfHeight]
+        });
+        
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+        pdf.save('sowntra-design.pdf');
+      } catch (error) {
+        console.error('Error exporting PDF:', error);
+        alert('Error exporting PDF. Please try again.');
+      }
+    };
+    
+    if (imageElements.length > 0) {
+      let loadedImages = 0;
+      const totalImages = imageElements.length;
+      
+      const drawAllElements = () => {
+        currentElements.forEach(element => {
+          if (element.type !== 'image') {
+            drawElementToCanvas(ctx, element);
+          }
+        });
+        generatePDF();
+      };
+      
+      const checkAllLoaded = () => {
+        loadedImages++;
+        if (loadedImages === totalImages) {
+          drawAllElements();
+        }
+      };
+      
+      imageElements.forEach(element => {
+        const img = new window.Image();
+        img.crossOrigin = 'anonymous';
+        img.src = element.src;
+        img.onload = () => {
+          ctx.save();
+          ctx.translate(element.x + element.width/2, element.y + element.height/2);
+          ctx.rotate((element.rotation || 0) * Math.PI / 180);
+          ctx.translate(-element.x - element.width/2, -element.y - element.height/2);
+          
+          ctx.drawImage(img, element.x, element.y, element.width, element.height);
+          ctx.restore();
+          checkAllLoaded();
+        };
+        img.onerror = checkAllLoaded;
+      });
+    } else {
+      currentElements.forEach(element => {
+        drawElementToCanvas(ctx, element);
+      });
+      generatePDF();
+    }
+  }, [canvasSize, getCurrentPageElements, drawElementToCanvas]);
 
   // Logout handler
   const handleLogout = useCallback(() => {
@@ -5455,6 +5535,15 @@ const Sowntra = () => {
                 >
                   <Download size={14} className="mr-1" />
                   SVG
+                </button>
+              </div>
+              <div className="grid grid-cols-1 gap-2 mb-3">
+                <button
+                  onClick={exportAsPDF}
+                  className="p-2 bg-blue-100 rounded text-sm hover:bg-blue-200 flex items-center justify-center text-blue-700 font-medium"
+                >
+                  <Download size={14} className="mr-1" />
+                  PDF
                 </button>
               </div>
               
