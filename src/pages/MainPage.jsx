@@ -16,11 +16,15 @@ import {
   Languages, Sparkles, HelpCircle
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import ShareButton from '../components/ShareButton';
 import jsPDF from 'jspdf';
 
 const Sowntra = () => {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [selectedElement, setSelectedElement] = useState(null);
   const [selectedElements, setSelectedElements] = useState(new Set());
   const [isDragging, setIsDragging] = useState(false);
@@ -2713,10 +2717,14 @@ const Sowntra = () => {
   }, [canvasSize, getCurrentPageElements, drawElementToCanvas]);
 
   // Logout handler
-  const handleLogout = useCallback(() => {
-    // Navigate to signup/login page
-    window.location.href = '/';
-  }, []);
+  const handleLogout = useCallback(async () => {
+    try {
+      await logout();
+      navigate('/', { replace: true });
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  }, [logout, navigate]);
 
   // Zoom in/out
   const zoom = useCallback((direction) => {

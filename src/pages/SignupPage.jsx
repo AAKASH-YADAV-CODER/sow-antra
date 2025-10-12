@@ -1,135 +1,21 @@
-import React, { useState, createContext, useContext, useEffect } from 'react';
-import { Eye, EyeOff, ArrowRight, CheckCircle, LogOut } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
-// Auth Context
-const AuthContext = createContext();
-const useAuth = () => useContext(AuthContext);
-
-// User Storage (In-memory storage for demo - replace with actual backend)
-const userStorage = {
-  users: new Map(),
-  
-  register: (userData) => {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const { email, password, name } = userData;
-        
-        if (userStorage.users.has(email)) {
-          reject(new Error('User already exists with this email'));
-          return;
-        }
-        
-        const user = {
-          id: Date.now().toString(),
-          email,
-          name,
-          password, // In real app, this should be hashed
-          createdAt: new Date().toISOString()
-        };
-        
-        userStorage.users.set(email, user);
-        
-        // Return user data without password
-        const { password: _, ...userWithoutPassword } = user;
-        resolve(userWithoutPassword);
-      }, 1000);
-    });
-  },
-  
-  login: (email, password) => {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const user = userStorage.users.get(email);
-        
-        if (!user) {
-          reject(new Error('No account found with this email address'));
-          return;
-        }
-        
-        if (user.password !== password) {
-          reject(new Error('Incorrect password'));
-          return;
-        }
-        
-        // Return user data without password
-        const { password: _, ...userWithoutPassword } = user;
-        resolve(userWithoutPassword);
-      }, 1000);
-    });
-  },
-  
-  googleSignIn: () => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const googleUser = {
-          id: Date.now().toString(),
-          email: 'user@gmail.com',
-          name: 'Google User',
-          provider: 'google',
-          createdAt: new Date().toISOString()
-        };
-        
-        userStorage.users.set(googleUser.email, googleUser);
-        resolve(googleUser);
-      }, 1500);
-    });
-  }
-};
-
-// Main App Component
-const App = () => {
-  const [user, setUser] = useState(null);
+const SignupPage = () => {
   const [currentPage, setCurrentPage] = useState('login');
-  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
 
-  // Check for stored user session on app load
   useEffect(() => {
-    const storedUser = sessionStorage.getItem('sowntra_user');
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (error) {
-        console.error('Error parsing stored user:', error);
-        sessionStorage.removeItem('sowntra_user');
-      }
+    if (isAuthenticated) {
+      navigate('/home', { replace: true });
     }
-  }, []);
+  }, [isAuthenticated, navigate]);
 
-  // Store user session when user changes
-  useEffect(() => {
-    if (user) {
-      sessionStorage.setItem('sowntra_user', JSON.stringify(user));
-    } else {
-      sessionStorage.removeItem('sowntra_user');
-    }
-  }, [user]);
-
-  const authContextValue = {
-    user,
-    setUser,
-    currentPage,
-    setCurrentPage,
-    isLoading,
-    setIsLoading
-  };
-
-  return (
-    <AuthContext.Provider value={authContextValue}>
-      <div className="min-h-screen bg-white">
-        {user ? <Dashboard /> : <AuthContainer />}
-      </div>
-    </AuthContext.Provider>
-  );
-};
-
-// Auth Container
-const AuthContainer = () => {
-  const { currentPage } = useAuth();
-  
   return (
     <div className="min-h-screen flex">
-      {/* Left Side - Branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-purple-600 via-blue-600 to-indigo-700 items-center justify-center p-12">
         <div className="max-w-md text-center">
           <div className="inline-flex items-center justify-center w-20 h-20 bg-white/20 backdrop-blur-sm rounded-3xl mb-8">
@@ -154,10 +40,8 @@ const AuthContainer = () => {
         </div>
       </div>
 
-      {/* Right Side - Auth Forms */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
-          {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl mb-4">
               <span className="text-3xl font-bold text-white" style={{fontFamily: 'cursive'}}>S</span>
@@ -166,22 +50,26 @@ const AuthContainer = () => {
             <p className="text-gray-600">Design anything. Publish anywhere.</p>
           </div>
 
-          {currentPage === 'login' ? <LoginForm /> : <SignupForm />}
+          {currentPage === 'login' ? (
+            <LoginForm setCurrentPage={setCurrentPage} />
+          ) : (
+            <SignupForm setCurrentPage={setCurrentPage} />
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-// Login Form Component
-const LoginForm = () => {
-  const { setCurrentPage, setUser, isLoading, setIsLoading } = useAuth();
+const LoginForm = ({ setCurrentPage }) => {
+  const { login, loginWithGoogle } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -216,17 +104,39 @@ const LoginForm = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async () => {
+  const getFirebaseErrorMessage = (error) => {
+    switch (error.code) {
+      case 'auth/user-not-found':
+        return 'No account found with this email address';
+      case 'auth/wrong-password':
+        return 'Incorrect password';
+      case 'auth/invalid-email':
+        return 'Invalid email address';
+      case 'auth/user-disabled':
+        return 'This account has been disabled';
+      case 'auth/too-many-requests':
+        return 'Too many failed attempts. Please try again later';
+      case 'auth/network-request-failed':
+        return 'Network error. Please check your connection';
+      case 'auth/invalid-credential':
+        return 'Invalid email or password';
+      default:
+        return error.message || 'An error occurred. Please try again';
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     if (!validateForm()) return;
     
     setIsLoading(true);
     
     try {
-      const userData = await userStorage.login(formData.email, formData.password);
-      setUser(userData);
+      await login(formData.email, formData.password);
     } catch (error) {
+      console.error('Login error:', error);
       setErrors({
-        general: error.message
+        general: getFirebaseErrorMessage(error)
       });
     } finally {
       setIsLoading(false);
@@ -236,9 +146,9 @@ const LoginForm = () => {
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
     try {
-      const userData = await userStorage.googleSignIn();
-      setUser(userData);
+      await loginWithGoogle();
     } catch (error) {
+      console.error('Google sign-in error:', error);
       setErrors({
         general: 'Google sign-in failed. Please try again.'
       });
@@ -258,15 +168,13 @@ const LoginForm = () => {
         <h2 className="text-2xl font-bold text-gray-900 text-center">Welcome Back</h2>
       </div>
       
-      <div className="space-y-4">
-        {/* Error Message */}
+      <form onSubmit={handleSubmit} className="space-y-4">
         {errors.general && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-3">
             <p className="text-red-600 text-sm">{errors.general}</p>
           </div>
         )}
 
-        {/* Google Sign In - Top */}
         <button
           type="button"
           onClick={handleGoogleSignIn}
@@ -288,7 +196,6 @@ const LoginForm = () => {
           )}
         </button>
 
-        {/* Divider */}
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-gray-300"></div>
@@ -298,27 +205,23 @@ const LoginForm = () => {
           </div>
         </div>
 
-        {/* Email Input */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Email
           </label>
-          <div className="relative">
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleInputChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
-              placeholder="Enter your email"
-            />
-          </div>
+          <input
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleInputChange}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+            placeholder="Enter your email"
+          />
           {errors.email && (
             <p className="text-red-500 text-sm mt-1">{errors.email}</p>
           )}
         </div>
 
-        {/* Password Input */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Password
@@ -345,7 +248,6 @@ const LoginForm = () => {
           )}
         </div>
 
-        {/* Forgot Password */}
         <div className="text-right">
           <button
             type="button"
@@ -355,10 +257,8 @@ const LoginForm = () => {
           </button>
         </div>
 
-        {/* Login Button */}
         <button
-          type="button"
-          onClick={handleSubmit}
+          type="submit"
           disabled={isLoading}
           className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
         >
@@ -369,7 +269,6 @@ const LoginForm = () => {
           )}
         </button>
 
-        {/* Sign Up Link */}
         <p className="text-center text-gray-600 mt-6">
           Don't have an account?{' '}
           <button
@@ -380,14 +279,13 @@ const LoginForm = () => {
             Sign up
           </button>
         </p>
-      </div>
+      </form>
     </div>
   );
 };
 
-// Signup Form Component
-const SignupForm = () => {
-  const { setCurrentPage, setUser, isLoading, setIsLoading } = useAuth();
+const SignupForm = ({ setCurrentPage }) => {
+  const { signup, loginWithGoogle } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -395,6 +293,7 @@ const SignupForm = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -433,21 +332,35 @@ const SignupForm = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async () => {
+  const getFirebaseErrorMessage = (error) => {
+    switch (error.code) {
+      case 'auth/email-already-in-use':
+        return 'An account with this email already exists';
+      case 'auth/invalid-email':
+        return 'Invalid email address';
+      case 'auth/operation-not-allowed':
+        return 'Email/password accounts are not enabled';
+      case 'auth/weak-password':
+        return 'Password is too weak. Please use a stronger password';
+      case 'auth/network-request-failed':
+        return 'Network error. Please check your connection';
+      default:
+        return error.message || 'An error occurred. Please try again';
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     if (!validateForm()) return;
     
     setIsLoading(true);
     
     try {
-      const userData = await userStorage.register({
-        name: formData.name,
-        email: formData.email,
-        password: formData.password
-      });
-      setUser(userData);
+      await signup(formData.email, formData.password, formData.name);
     } catch (error) {
+      console.error('Signup error:', error);
       setErrors({
-        general: error.message
+        general: getFirebaseErrorMessage(error)
       });
     } finally {
       setIsLoading(false);
@@ -457,9 +370,9 @@ const SignupForm = () => {
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
     try {
-      const userData = await userStorage.googleSignIn();
-      setUser(userData);
+      await loginWithGoogle();
     } catch (error) {
+      console.error('Google sign-in error:', error);
       setErrors({
         general: 'Google sign-in failed. Please try again.'
       });
@@ -479,15 +392,13 @@ const SignupForm = () => {
         <h2 className="text-2xl font-bold text-gray-900 text-center">Create Account</h2>
       </div>
       
-      <div className="space-y-4">
-        {/* Error Message */}
+      <form onSubmit={handleSubmit} className="space-y-4">
         {errors.general && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-3">
             <p className="text-red-600 text-sm">{errors.general}</p>
           </div>
         )}
 
-        {/* Google Sign In - Top */}
         <button
           type="button"
           onClick={handleGoogleSignIn}
@@ -509,7 +420,6 @@ const SignupForm = () => {
           )}
         </button>
 
-        {/* Divider */}
         <div className="relative my-6">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-gray-300"></div>
@@ -519,7 +429,6 @@ const SignupForm = () => {
           </div>
         </div>
 
-        {/* Name Input */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Name
@@ -537,7 +446,6 @@ const SignupForm = () => {
           )}
         </div>
 
-        {/* Email Input */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Email
@@ -555,7 +463,6 @@ const SignupForm = () => {
           )}
         </div>
 
-        {/* Password Input */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Password
@@ -582,10 +489,8 @@ const SignupForm = () => {
           )}
         </div>
 
-        {/* Sign Up Button */}
         <button
-          type="button"
-          onClick={handleSubmit}
+          type="submit"
           disabled={isLoading}
           className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
         >
@@ -596,15 +501,13 @@ const SignupForm = () => {
           )}
         </button>
 
-        {/* Terms */}
         <p className="text-xs text-gray-500 text-center">
           By continuing, you agree to Sowntra's{' '}
-          <button className="text-purple-600 hover:underline bg-transparent border-none p-0 cursor-pointer">Terms of Service</button>{' '}
+          <button type="button" className="text-purple-600 hover:underline bg-transparent border-none p-0 cursor-pointer">Terms of Service</button>{' '}
           and acknowledge you've read our{' '}
-          <button className="text-purple-600 hover:underline bg-transparent border-none p-0 cursor-pointer">Privacy Policy</button>.
+          <button type="button" className="text-purple-600 hover:underline bg-transparent border-none p-0 cursor-pointer">Privacy Policy</button>.
         </p>
 
-        {/* Sign In Link */}
         <p className="text-center text-gray-600 mt-6">
           Already have an account?{' '}
           <button
@@ -615,130 +518,9 @@ const SignupForm = () => {
             Log in
           </button>
         </p>
-      </div>
+      </form>
     </div>
   );
 };
 
-// Dashboard Component (after successful login)
-const Dashboard = () => {
-  const { user, setUser } = useAuth();
-  const navigate = useNavigate();
-  
-  const handleLogout = () => {
-    setUser(null);
-  };
-
-  const handleGetStarted = () => {
-    navigate('/main');
-  };
-
-  // Show user registration date
-  const getJoinedDate = () => {
-    if (user?.createdAt) {
-      return new Date(user.createdAt).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
-    }
-    return 'Today';
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="inline-flex items-center justify-center w-8 h-8 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg">
-                  <span className="text-lg font-bold text-white" style={{fontFamily: 'cursive'}}>S</span>
-                </div>
-              </div>
-              <div className="ml-3">
-                <h1 className="text-xl font-bold text-gray-900" style={{fontFamily: 'cursive'}}>Sowntra</h1>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                  <span className="text-sm font-medium text-purple-600">
-                    {user.name ? user.name.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()}
-                  </span>
-                </div>
-                <span className="text-gray-700 text-sm font-medium">{user.name || user.email}</span>
-              </div>
-              <button
-                onClick={handleLogout}
-                className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-                title="Logout"
-              >
-                <LogOut className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-6">
-            <CheckCircle className="w-8 h-8 text-green-600" />
-          </div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Welcome to Sowntra, {user.name}!
-          </h1>
-          <p className="text-xl text-gray-600 mb-4 max-w-2xl mx-auto">
-            You're all set! Start creating amazing designs with our powerful tools and templates.
-          </p>
-          <p className="text-sm text-gray-500 mb-12">
-            Member since {getJoinedDate()}
-          </p>
-          
-          {/* Quick Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            <div className="bg-white p-6 rounded-xl border border-gray-200 hover:border-purple-200 hover:shadow-lg transition-all cursor-pointer">
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4 mx-auto">
-                <span className="text-2xl">🎨</span>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Start Designing</h3>
-              <p className="text-gray-600 text-sm">Create a new design from scratch or choose a template</p>
-            </div>
-            
-            <div className="bg-white p-6 rounded-xl border border-gray-200 hover:border-purple-200 hover:shadow-lg transition-all cursor-pointer">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4 mx-auto">
-                <span className="text-2xl">📁</span>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">My Projects</h3>
-              <p className="text-gray-600 text-sm">Access your saved designs and continue working</p>
-            </div>
-            
-            <div className="bg-white p-6 rounded-xl border border-gray-200 hover:border-purple-200 hover:shadow-lg transition-all cursor-pointer">
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4 mx-auto">
-                <span className="text-2xl">👥</span>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Team Collaboration</h3>
-              <p className="text-gray-600 text-sm">Invite team members and work together in real-time</p>
-            </div>
-          </div>
-
-          {/* Get Started Button */}
-          <div className="mt-12">
-            <button 
-              onClick={handleGetStarted}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 rounded-lg font-semibold text-lg transition-colors inline-flex items-center"
-            >
-              Get Started
-              <ArrowRight className="ml-2 w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      </main>
-    </div>
-  );
-};
-
-export default App;
+export default SignupPage;
