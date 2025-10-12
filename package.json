@@ -6,16 +6,21 @@
     "@testing-library/jest-dom": "^6.4.2",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.5.2",
+    "axios": "^1.7.7",
+    "firebase": "^11.0.2",
     "i18next": "^25.5.3",
     "i18next-browser-languagedetector": "^8.2.0",
     "jspdf": "^3.0.3",
+    "konva": "^9.3.16",
     "lucide-react": "^0.544.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-i18next": "^16.0.0",
+    "react-konva": "^18.2.10",
     "react-router-dom": "^7.9.1",
     "react-scripts": "^5.0.1",
-    "web-vitals": "^2.1.4"
+    "web-vitals": "^2.1.4",
+    "yjs": "^13.6.20"
   },
   "scripts": {
     "start": "react-scripts start",
