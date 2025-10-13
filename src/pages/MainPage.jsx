@@ -51,6 +51,8 @@ const Sowntra = () => {
   const [recordingStartTime, setRecordingStartTime] = useState(null);
   // const [recordedChunks, setRecordedChunks] = useState([]);
   const [drawingPath, setDrawingPath] = useState([]);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [projectName, setProjectName] = useState('');
   const [isDrawing, setIsDrawing] = useState(false);
   const [textEditing, setTextEditing] = useState(null);
   const [pages, setPages] = useState([{ id: 'page-1', name: 'Page 1', elements: [] }]);
@@ -3034,13 +3036,19 @@ const Sowntra = () => {
     }
   }, [mediaRecorder, recording]);
 
+  // Show save dialog
+  const handleSaveClick = useCallback(() => {
+    setProjectName(`My Design ${new Date().toLocaleDateString()}`);
+    setShowSaveDialog(true);
+  }, []);
+
   // Save project to backend (PostgreSQL)
-  const saveProject = useCallback(async () => {
+  const saveProject = useCallback(async (customTitle = null) => {
     try {
       const projectData = {
         version: '1.0',
         timestamp: new Date().toISOString(),
-        title: `My Design ${new Date().toLocaleDateString()}`,
+        title: customTitle || `My Design ${new Date().toLocaleDateString()}`,
         description: 'Created with Sowntra',
         pages: pages,
         currentPage: currentPage,
@@ -3106,6 +3114,17 @@ const Sowntra = () => {
       }
     }
   }, [pages, currentPage, canvasSize, zoomLevel, canvasOffset, showGrid, snapToGrid, currentLanguage, textDirection]);
+
+  // Confirm save with project name
+  const confirmSave = useCallback(async () => {
+    if (!projectName.trim()) {
+      alert('Please enter a project name');
+      return;
+    }
+    
+    setShowSaveDialog(false);
+    await saveProject(projectName.trim());
+  }, [projectName, saveProject]);
 
   // Load project from JSON file
   const loadProject = useCallback(() => {
@@ -5780,7 +5799,7 @@ const Sowntra = () => {
               <h2 className="text-lg font-bold mb-4 text-gray-700">{t('project.title')}</h2>
               <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={saveProject}
+                  onClick={handleSaveClick}
                   className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center text-gray-700"
                 >
                   <Save size={14} className="mr-1" />
@@ -5905,6 +5924,47 @@ const Sowntra = () => {
 
         {/* Recording Status */}
         <RecordingStatus />
+
+        {/* Save Project Dialog */}
+        {showSaveDialog && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Save Project</h3>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Project Name
+                </label>
+                <input
+                  type="text"
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                  placeholder="Enter project name..."
+                  autoFocus
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      confirmSave();
+                    }
+                  }}
+                />
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowSaveDialog(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmSave}
+                  className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
+                >
+                  Save Project
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );
