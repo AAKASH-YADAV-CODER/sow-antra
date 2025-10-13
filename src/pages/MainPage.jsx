@@ -16,15 +16,18 @@ import {
   Languages, Sparkles, HelpCircle
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import ShareButton from '../components/ShareButton';
 import jsPDF from 'jspdf';
+import { projectAPI } from '../services/api';
 
 const Sowntra = () => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { logout } = useAuth();
+  const currentProjectId = searchParams.get('project');
   const [selectedElement, setSelectedElement] = useState(null);
   const [selectedElements, setSelectedElements] = useState(new Set());
   const [isDragging, setIsDragging] = useState(false);
@@ -280,6 +283,34 @@ const Sowntra = () => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [centerCanvas]);
+
+  // Load project if projectId is provided
+  useEffect(() => {
+    const loadProject = async () => {
+      if (currentProjectId) {
+        try {
+          const response = await projectAPI.loadProject(currentProjectId);
+          const { projectData } = response.data;
+          
+          if (projectData) {
+            if (projectData.pages) setPages(projectData.pages);
+            if (projectData.currentPage) setCurrentPage(projectData.currentPage);
+            if (projectData.canvasSize) setCanvasSize(projectData.canvasSize);
+            if (projectData.zoomLevel) setZoomLevel(projectData.zoomLevel);
+            if (projectData.canvasOffset) setCanvasOffset(projectData.canvasOffset);
+            if (projectData.showGrid !== undefined) setShowGrid(projectData.showGrid);
+            if (projectData.snapToGrid !== undefined) setSnapToGrid(projectData.snapToGrid);
+            if (projectData.currentLanguage) setCurrentLanguage(projectData.currentLanguage);
+            if (projectData.textDirection) setTextDirection(projectData.textDirection);
+          }
+        } catch (error) {
+          console.error('Error loading project:', error);
+        }
+      }
+    };
+
+    loadProject();
+  }, [currentProjectId]);
 
   // Load transliteration data
   useEffect(() => {
@@ -3003,12 +3034,14 @@ const Sowntra = () => {
     }
   }, [mediaRecorder, recording]);
 
-  // Save project to JSON file
-  const saveProject = useCallback(() => {
+  // Save project to backend (PostgreSQL)
+  const saveProject = useCallback(async () => {
     try {
       const projectData = {
         version: '1.0',
         timestamp: new Date().toISOString(),
+        title: `My Design ${new Date().toLocaleDateString()}`,
+        description: 'Created with Sowntra',
         pages: pages,
         currentPage: currentPage,
         canvasSize: canvasSize,
@@ -3020,6 +3053,9 @@ const Sowntra = () => {
         textDirection: textDirection
       };
 
+      const response = await projectAPI.saveProject(projectData);
+      
+      // Also save locally as backup
       const dataStr = JSON.stringify(projectData, null, 2);
       const dataBlob = new Blob([dataStr], { type: 'application/json' });
       const url = URL.createObjectURL(dataBlob);
@@ -3031,10 +3067,43 @@ const Sowntra = () => {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
       
-      alert('Project saved successfully!');
+      alert('Project saved successfully to cloud and locally!');
     } catch (error) {
       console.error('Error saving project:', error);
-      alert('Error saving project. Please try again.');
+      alert('Error saving project to cloud. Saving locally only...');
+      
+      // Fallback to local save only
+      try {
+        const projectData = {
+          version: '1.0',
+          timestamp: new Date().toISOString(),
+          pages: pages,
+          currentPage: currentPage,
+          canvasSize: canvasSize,
+          zoomLevel: zoomLevel,
+          canvasOffset: canvasOffset,
+          showGrid: showGrid,
+          snapToGrid: snapToGrid,
+          currentLanguage: currentLanguage,
+          textDirection: textDirection
+        };
+
+        const dataStr = JSON.stringify(projectData, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `sowntra-project-${new Date().getTime()}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        alert('Project saved locally!');
+      } catch (localError) {
+        console.error('Error saving locally:', localError);
+        alert('Error saving project. Please try again.');
+      }
     }
   }, [pages, currentPage, canvasSize, zoomLevel, canvasOffset, showGrid, snapToGrid, currentLanguage, textDirection]);
 
