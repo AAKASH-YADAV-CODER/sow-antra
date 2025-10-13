@@ -5,7 +5,7 @@ import {
   Download, Save, FolderOpen, Undo, Redo, Group, Ungroup, Move, Minus, 
   Maximize, MinusCircle, PlusCircle, Layers, Grid, MousePointer, ZoomIn,
   ZoomOut, Lock, Unlock, Users, MessageCircle, Star,
-  Hexagon,  ArrowRight, 
+  Hexagon,  ArrowRight, ArrowLeft,
   Music,
   Film, FileText, BookOpen, Printer, Heart,
   Zap, 
@@ -4805,6 +4805,13 @@ const Sowntra = () => {
         {/* Header */}
         <div className="main-header">
           <div className="flex items-center space-x-4">
+            <button
+              onClick={() => navigate('/home')}
+              className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+              title="Back to Home"
+            >
+              <ArrowLeft className="w-5 h-5 mr-1" />
+            </button>
             <h1 className="text-xl font-bold flex items-center">
               <span className="handwritten-logo">Sowntra</span>
             </h1>
