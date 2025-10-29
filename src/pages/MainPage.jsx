@@ -96,6 +96,43 @@ const Sowntra = () => {
     return page ? page.elements : [];
   }, [pages, currentPage]);
 
+  // Enhanced z-index sorting for exports
+  const getSortedElementsForExport = useCallback(() => {
+    const currentElements = getCurrentPageElements();
+    
+    // Create a copy and sort by zIndex to ensure proper layering
+    const sortedElements = [...currentElements].sort((a, b) => {
+      // Handle groups and their children properly
+      if (a.type === 'group' && b.groupId === a.id) return -1;
+      if (b.type === 'group' && a.groupId === b.id) return 1;
+      
+      // Regular zIndex comparison
+      return a.zIndex - b.zIndex;
+    });
+    
+    return sortedElements;
+  }, [getCurrentPageElements]);
+
+  // Export-ready elements with proper filtering
+  const getExportReadyElements = useCallback(() => {
+    const currentElements = getCurrentPageElements();
+    
+    return [...currentElements]
+      .sort((a, b) => {
+        // First, sort by zIndex
+        if (a.zIndex !== b.zIndex) {
+          return a.zIndex - b.zIndex;
+        }
+        
+        // If same zIndex, maintain original order
+        return currentElements.indexOf(a) - currentElements.indexOf(b);
+      })
+      .filter(element => {
+        // Include all elements except temporary ones
+        return !element.isTemporary;
+      });
+  }, [getCurrentPageElements]);
+
   // Calculate selectedElementData here at the top level
   const selectedElementData = getCurrentPageElements().find(el => el.id === selectedElement);
 
@@ -129,7 +166,6 @@ const Sowntra = () => {
     ml: { name: 'Malayalam', direction: 'ltr', font: 'Noto Sans Malayalam' },
     pa: { name: 'Punjabi', direction: 'ltr', font: 'Noto Sans Gurmukhi' },
     or: { name: 'Odia', direction: 'ltr', font: 'Noto Sans Oriya' },
-
   };
 
   // Enhanced Text Effects
@@ -591,8 +627,8 @@ const Sowntra = () => {
       type,
       x: 100,
       y: 100,
-      width: type === 'text' ? 200 : type === 'line' ? 150 : 100,
-      height: type === 'text' ? 50 : type === 'line' ? 2 : 100,
+      width: type === 'text' ? 300 : type === 'line' ? 150 : 100, // Wider default for text
+      height: type === 'text' ? 100 : type === 'line' ? 2 : 100, // Taller default for text
       rotation: 0,
       animation: null,
       zIndex: currentElements.length,
@@ -603,8 +639,8 @@ const Sowntra = () => {
                               type === 'triangle' ? '#10b981' : 
                               type === 'star' ? '#f59e0b' : 
                               type === 'hexagon' ? '#8b5cf6' : '#3b82f6'),
-      stroke: properties.stroke || '#000000',
-      strokeWidth: properties.strokeWidth || 2,
+      stroke: properties.stroke || (type === 'image' ? 'transparent' : '#000000'),
+      strokeWidth: properties.strokeWidth || (type === 'image' ? 0 : 2),
       fillType: properties.fillType || 'solid',
       gradient: properties.gradient || {
         type: 'linear',
@@ -618,6 +654,8 @@ const Sowntra = () => {
       shapeEffect: 'none',
       specialEffect: 'none',
       effectSettings: {},
+      borderRadius: properties.borderRadius || 0, // Ensure borderRadius is included
+      shadow: properties.shadow || null, // Ensure shadow is included
       ...properties
     };
 
@@ -631,10 +669,13 @@ const Sowntra = () => {
       newElement.color = '#000000';
       newElement.textAlign = textDirection === 'rtl' ? 'right' : 'left';
     } else if (type === 'rectangle') {
-      newElement.borderRadius = 0;
+      newElement.borderRadius = properties.borderRadius || 0;
     } else if (type === 'image') {
       newElement.src = properties.src || '';
-      newElement.borderRadius = 0;
+      newElement.borderRadius = properties.borderRadius || 0;
+      // Ensure no stroke by default for images
+      newElement.stroke = properties.stroke || 'transparent';
+      newElement.strokeWidth = properties.strokeWidth || 0;
     } else if (type === 'line') {
       // Line specific properties
     } else if (type === 'arrow') {
@@ -658,7 +699,7 @@ const Sowntra = () => {
     setSelectedElements(new Set([newElement.id]));
     setCurrentTool('select');
     saveToHistory(newElements);
-  }, [getCurrentPageElements, setCurrentPageElements, saveToHistory, currentLanguage, textDirection]);
+  }, [getCurrentPageElements, setCurrentPageElements, saveToHistory, currentLanguage, textDirection, t]);
 
   // Apply template function with proper centering and auto-zoom
   const applyTemplate = useCallback((platform) => {
@@ -713,7 +754,6 @@ const Sowntra = () => {
     setShowCustomTemplateModal(false);
     setShowTemplates(false);
   }, [customTemplateSize, centerCanvas]);
-
 
   // Auto-center on window resize
   useEffect(() => {
@@ -959,23 +999,6 @@ const Sowntra = () => {
         className="gradient-picker mt-3 p-3 bg-gray-50 rounded border" 
         style={{ position: 'relative', zIndex: 1, pointerEvents: 'auto' }}
       >
-        {/* <div className="mb-3">
-          <label className="block text-sm font-medium mb-2">Gradient Type</label>
-          <div className="flex space-x-2">
-            {['linear', 'radial'].map(type => (
-              <button
-                key={type}
-                onClick={() => updateGradient({ type })}
-                className={`p-2 rounded text-xs flex-1 ${
-                  localGradient.type === type ? 'bg-blue-100 text-blue-600 border border-blue-300' : 'bg-gray-100 border border-gray-300'
-                }`}
-              >
-                {type.charAt(0).toUpperCase() + type.slice(1)}
-              </button>
-            ))}
-          </div>
-        </div> */}
-
         <div className="mb-3">
           <div 
             className="w-full h-8 rounded border border-gray-300 mb-2 gradient-fix"
@@ -1071,16 +1094,6 @@ const Sowntra = () => {
         )}
 
         <div className="mb-3">
-          {/* <div className="flex justify-between items-center mb-2">
-            <label className="block text-sm font-medium">Color Stops</label>
-            <button
-              onClick={addColorStop}
-              disabled={localGradient.colors.length >= 5}
-              className="text-xs bg-blue-500 text-white px-2 py-1 rounded disabled:opacity-50 hover:bg-blue-600 transition-colors"
-            >
-              Add Color +
-            </button>
-          </div> */}
           <div className="text-xs text-gray-500 mb-2">
             {localGradient.colors.length}/5 color stops
           </div>
@@ -1404,6 +1417,79 @@ const Sowntra = () => {
     
     return canvasGradient;
   }, []);
+
+  // NEW: Get canvas-compatible effects
+  const getCanvasEffects = useCallback((element) => {
+    const effects = {
+      shadow: {},
+      filters: ''
+    };
+    
+    // Text effects for canvas
+    if (element.type === 'text' && element.textEffect && element.textEffect !== 'none') {
+      switch(element.textEffect) {
+        case 'shadow':
+          effects.shadow = {
+            color: 'rgba(0,0,0,0.5)',
+            blur: 4,
+            offsetX: 2,
+            offsetY: 2
+          };
+          break;
+        case 'lift':
+          effects.shadow = {
+            color: 'rgba(0,0,0,0.3)',
+            blur: 8,
+            offsetX: 0,
+            offsetY: 4
+          };
+          break;
+        case 'neon':
+          effects.shadow = {
+            color: '#ff00de',
+            blur: 10,
+            offsetX: 0,
+            offsetY: 0
+          };
+          break;
+        // Add other text effects...
+      }
+    }
+    
+    // Image effects for canvas
+    if (element.type === 'image' && element.imageEffect && element.imageEffect !== 'none') {
+      const effect = imageEffects[element.imageEffect];
+      if (effect && effect.filter) {
+        effects.filters += ' ' + effect.filter;
+      }
+    }
+    
+    // Shape effects for canvas
+    if (['rectangle', 'circle', 'triangle', 'star', 'hexagon'].includes(element.type) && 
+        element.shapeEffect && element.shapeEffect !== 'none') {
+      switch(element.shapeEffect) {
+        case 'shadow':
+          effects.shadow = {
+            color: 'rgba(0,0,0,0.3)',
+            blur: 8,
+            offsetX: 4,
+            offsetY: 4
+          };
+          break;
+        case 'glow':
+          effects.shadow = {
+            color: 'rgba(255,255,255,0.8)',
+            blur: 10,
+            offsetX: 0,
+            offsetY: 0
+          };
+          break;
+        // Add other shape effects...
+      }
+    }
+    
+    return effects;
+  }, [imageEffects]);
 
   // Get effect CSS for an element
   const getEffectCSS = useCallback((element) => {
@@ -2162,7 +2248,7 @@ const Sowntra = () => {
     );
   }, [getCurrentPageElements]);
 
-  // Enhanced drawElementToCanvas function with effects support
+  // Enhanced drawElementToCanvas function with effects support - FIXED VERSION
   const drawElementToCanvas = useCallback((ctx, element, time, elementIndex) => {
     ctx.save();
     
@@ -2311,6 +2397,17 @@ const Sowntra = () => {
     ctx.translate(-centerX, -centerY);
     ctx.translate(translateX, translateY);
     
+    // Apply canvas effects
+    const canvasEffects = getCanvasEffects(element);
+    
+    // Apply shadow effects
+    if (canvasEffects.shadow && Object.keys(canvasEffects.shadow).length > 0) {
+      ctx.shadowColor = canvasEffects.shadow.color;
+      ctx.shadowBlur = canvasEffects.shadow.blur || 0;
+      ctx.shadowOffsetX = canvasEffects.shadow.offsetX || 0;
+      ctx.shadowOffsetY = canvasEffects.shadow.offsetY || 0;
+    }
+    
     // Apply filters
     if (element.filters) {
       const filterCSS = getFilterCSS(element.filters);
@@ -2319,26 +2416,53 @@ const Sowntra = () => {
       }
     }
     
-    // Apply image effects
-    if (element.type === 'image' && element.imageEffect && element.imageEffect !== 'none') {
-      const effect = imageEffects[element.imageEffect];
-      if (effect && effect.filter) {
-        ctx.filter += ' ' + effect.filter;
-      }
+    // Add image effect filters
+    if (canvasEffects.filters) {
+      ctx.filter += ' ' + canvasEffects.filters;
     }
     
     ctx.globalAlpha = opacity;
     
     const backgroundStyle = getCanvasGradient(ctx, element);
     
+    // FIXED: Rectangle with proper border radius handling
     if (element.type === 'rectangle') {
       ctx.fillStyle = backgroundStyle;
       ctx.strokeStyle = element.stroke;
       ctx.lineWidth = element.strokeWidth;
-      ctx.beginPath();
-      ctx.roundRect(element.x, element.y, element.width, element.height, element.borderRadius);
-      ctx.fill();
-      if (element.strokeWidth > 0) ctx.stroke();
+      
+      const borderRadius = element.borderRadius || 0;
+      
+      if (borderRadius > 0) {
+        // Use roundRect for browsers that support it
+        if (ctx.roundRect) {
+          ctx.beginPath();
+          ctx.roundRect(element.x, element.y, element.width, element.height, borderRadius);
+          ctx.fill();
+          if (element.strokeWidth > 0) ctx.stroke();
+        } else {
+          // Fallback for browsers without roundRect
+          ctx.beginPath();
+          ctx.moveTo(element.x + borderRadius, element.y);
+          ctx.lineTo(element.x + element.width - borderRadius, element.y);
+          ctx.arcTo(element.x + element.width, element.y, element.x + element.width, element.y + borderRadius, borderRadius);
+          ctx.lineTo(element.x + element.width, element.y + element.height - borderRadius);
+          ctx.arcTo(element.x + element.width, element.y + element.height, element.x + element.width - borderRadius, element.y + element.height, borderRadius);
+          ctx.lineTo(element.x + borderRadius, element.y + element.height);
+          ctx.arcTo(element.x, element.y + element.height, element.x, element.y + element.height - borderRadius, borderRadius);
+          ctx.lineTo(element.x, element.y + borderRadius);
+          ctx.arcTo(element.x, element.y, element.x + borderRadius, element.y, borderRadius);
+          ctx.closePath();
+          ctx.fill();
+          if (element.strokeWidth > 0) ctx.stroke();
+        }
+      } else {
+        // No border radius
+        ctx.fillRect(element.x, element.y, element.width, element.height);
+        if (element.strokeWidth > 0) {
+          ctx.strokeRect(element.x, element.y, element.width, element.height);
+        }
+      }
     } else if (element.type === 'circle') {
       ctx.fillStyle = backgroundStyle;
       ctx.strokeStyle = element.stroke;
@@ -2362,6 +2486,7 @@ const Sowntra = () => {
       ctx.font = `${element.fontWeight} ${element.fontSize}px ${element.fontFamily}`;
       ctx.fillStyle = element.color;
       ctx.textAlign = element.textAlign;
+      ctx.textBaseline = 'top'; // Add this for better text positioning
       
       let textX = element.x;
       if (element.textAlign === 'center') {
@@ -2378,11 +2503,104 @@ const Sowntra = () => {
         displayText = element.content.substring(0, charsToShow);
       }
       
-      ctx.fillText(displayText, textX, element.y + element.fontSize);
+      // FIXED: Handle text wrapping for canvas
+      const words = displayText.split(' ');
+      const lineHeight = element.fontSize * 1.2;
+      let line = '';
+      let y = element.y;
+      
+      for (let n = 0; n < words.length; n++) {
+        const testLine = line + words[n] + ' ';
+        const metrics = ctx.measureText(testLine);
+        const testWidth = metrics.width;
+        
+        if (testWidth > element.width && n > 0) {
+          ctx.fillText(line, textX, y);
+          line = words[n] + ' ';
+          y += lineHeight;
+          
+          // Stop if we exceed the element height
+          if (y > element.y + element.height - lineHeight) {
+            break;
+          }
+        } else {
+          line = testLine;
+        }
+      }
+      ctx.fillText(line, textX, y);
+      
+      // Reset shadow for text
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
     } else if (element.type === 'image') {
       const img = new window.Image();
       img.src = element.src;
-      ctx.drawImage(img, element.x, element.y, element.width, element.height);
+      
+      // Handle border radius for images - FIXED: Remove stroke unless explicitly set
+      const borderRadius = element.borderRadius || 0;
+      
+      if (borderRadius > 0) {
+        // Create rounded clipping path
+        ctx.save();
+        ctx.beginPath();
+        
+        if (ctx.roundRect) {
+          ctx.roundRect(element.x, element.y, element.width, element.height, borderRadius);
+        } else {
+          // Fallback for browsers without roundRect
+          ctx.moveTo(element.x + borderRadius, element.y);
+          ctx.lineTo(element.x + element.width - borderRadius, element.y);
+          ctx.arcTo(element.x + element.width, element.y, element.x + element.width, element.y + borderRadius, borderRadius);
+          ctx.lineTo(element.x + element.width, element.y + element.height - borderRadius);
+          ctx.arcTo(element.x + element.width, element.y + element.height, element.x + element.width - borderRadius, element.y + element.height, borderRadius);
+          ctx.lineTo(element.x + borderRadius, element.y + element.height);
+          ctx.arcTo(element.x, element.y + element.height, element.x, element.y + element.height - borderRadius, borderRadius);
+          ctx.lineTo(element.x, element.y + borderRadius);
+          ctx.arcTo(element.x, element.y, element.x + borderRadius, element.y, borderRadius);
+        }
+        
+        ctx.closePath();
+        ctx.clip();
+        
+        ctx.drawImage(img, element.x, element.y, element.width, element.height);
+        ctx.restore();
+        
+        // ONLY draw border if strokeWidth is explicitly set and greater than 0
+        if (element.strokeWidth > 0 && element.stroke && element.stroke !== 'transparent') {
+          ctx.strokeStyle = element.stroke;
+          ctx.lineWidth = element.strokeWidth;
+          ctx.beginPath();
+          
+          if (ctx.roundRect) {
+            ctx.roundRect(element.x, element.y, element.width, element.height, borderRadius);
+          } else {
+            ctx.moveTo(element.x + borderRadius, element.y);
+            ctx.lineTo(element.x + element.width - borderRadius, element.y);
+            ctx.arcTo(element.x + element.width, element.y, element.x + element.width, element.y + borderRadius, borderRadius);
+            ctx.lineTo(element.x + element.width, element.y + element.height - borderRadius);
+            ctx.arcTo(element.x + element.width, element.y + element.height, element.x + element.width - borderRadius, element.y + element.height, borderRadius);
+            ctx.lineTo(element.x + borderRadius, element.y + element.height);
+            ctx.arcTo(element.x, element.y + element.height, element.x, element.y + element.height - borderRadius, borderRadius);
+            ctx.lineTo(element.x, element.y + borderRadius);
+            ctx.arcTo(element.x, element.y, element.x + borderRadius, element.y, borderRadius);
+          }
+          
+          ctx.closePath();
+          ctx.stroke();
+        }
+      } else {
+        // No border radius - simple draw
+        ctx.drawImage(img, element.x, element.y, element.width, element.height);
+        
+        // ONLY draw border if strokeWidth is explicitly set and greater than 0
+        if (element.strokeWidth > 0 && element.stroke && element.stroke !== 'transparent') {
+          ctx.strokeStyle = element.stroke;
+          ctx.lineWidth = element.strokeWidth;
+          ctx.strokeRect(element.x, element.y, element.width, element.height);
+        }
+      }
     } else if (element.type === 'line') {
       ctx.strokeStyle = element.stroke;
       ctx.lineWidth = element.strokeWidth;
@@ -2459,28 +2677,16 @@ const Sowntra = () => {
       ctx.fill();
       if (element.strokeWidth > 0) ctx.stroke();
     } else if (element.type === 'drawing' && element.path.length > 1) {
-      if (element.path.length < 2) return null;
+      ctx.strokeStyle = element.stroke;
+      ctx.lineWidth = element.strokeWidth;
+      ctx.beginPath();
+      ctx.moveTo(element.path[0].x, element.path[0].y);
       
-      let pathData = 'M ' + element.path[0].x + ' ' + element.path[0].y;
       for (let i = 1; i < element.path.length; i++) {
-        pathData += ' L ' + element.path[i].x + ' ' + element.path[i].y;
+        ctx.lineTo(element.path[i].x, element.path[i].y);
       }
-      // let content;
-      const content = (
-        <svg
-          id={`element-${element.id}`}
-          style={{ ...element.style }}
-          onMouseDown={(e) => !element.locked && handleMouseDown(e, element.id)}
-        >
-          <path
-           d={pathData}
-           fill="none"
-           stroke={element.stroke}
-           strokeWidth={element.strokeWidth}
-          />
-        </svg>
-
-      );
+      
+      ctx.stroke();
     } else if (element.type === 'sticker') {
       ctx.fillStyle = backgroundStyle;
       ctx.beginPath();
@@ -2510,7 +2716,7 @@ const Sowntra = () => {
     }
     
     ctx.restore();
-  }, [getFilterCSS, getCanvasGradient, imageEffects]);
+  }, [getFilterCSS, getCanvasGradient, getCanvasEffects, imageEffects]);
 
   // Export as SVG
   const exportAsSVG = useCallback(() => {
@@ -2587,7 +2793,7 @@ const Sowntra = () => {
     URL.revokeObjectURL(url);
   }, [canvasSize, getCurrentPageElements, getBackgroundStyle]);
 
-  // Export as image
+  // Export as image - FIXED VERSION with proper zIndex sorting
   const exportAsImage = useCallback((format) => {
     // Handle SVG export separately
     if (format === 'svg') {
@@ -2600,31 +2806,50 @@ const Sowntra = () => {
     canvas.height = canvasSize.height;
     const ctx = canvas.getContext('2d');
     
+    if (!ctx) {
+      console.error('Could not get canvas context');
+      alert('Error: Could not create canvas context');
+      return;
+    }
+    
+    // Set white background
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
     
-    const currentElements = getCurrentPageElements();
-    const imageElements = currentElements.filter(el => el.type === 'image');
+    // FIXED: Use the proper sorting function for correct zIndex layering
+    const sortedElements = getSortedElementsForExport();
+    
+    const imageElements = sortedElements.filter(el => el.type === 'image');
     
     if (imageElements.length > 0) {
       let loadedImages = 0;
       const totalImages = imageElements.length;
       
       const drawAllElements = () => {
-        currentElements.forEach(element => {
-          if (element.type !== 'image') {
-            drawElementToCanvas(ctx, element);
-          }
-        });
-        
         try {
-          const dataUrl = canvas.toDataURL(`image/${format}`);
+          // Clear and redraw background
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
+          
+          // Draw ALL elements in correct zIndex order
+          sortedElements.forEach((element, index) => {
+            try {
+              drawElementToCanvas(ctx, element, undefined, index);
+            } catch (elementError) {
+              console.error(`Error drawing element ${element.id}:`, elementError);
+            }
+          });
+          
+          // Export the final canvas
+          const dataUrl = canvas.toDataURL(`image/${format}`, 0.95);
           const a = document.createElement('a');
           a.href = dataUrl;
           a.download = `sowntra-design.${format}`;
+          document.body.appendChild(a);
           a.click();
+          document.body.removeChild(a);
         } catch (error) {
-          console.error('Error exporting canvas:', error);
+          console.error('Error in drawAllElements:', error);
           alert('Error exporting image. Please try again.');
         }
       };
@@ -2641,47 +2866,55 @@ const Sowntra = () => {
         img.crossOrigin = 'anonymous';
         img.src = element.src;
         img.onload = () => {
-          ctx.save();
-          ctx.translate(element.x + element.width/2, element.y + element.height/2);
-          ctx.rotate((element.rotation || 0) * Math.PI / 180);
-          ctx.translate(-element.x - element.width/2, -element.y - element.height/2);
-          
-          ctx.drawImage(img, element.x, element.y, element.width, element.height);
-          ctx.restore();
           checkAllLoaded();
         };
-        img.onerror = checkAllLoaded;
+        img.onerror = () => {
+          console.error('Failed to load image:', element.src);
+          checkAllLoaded(); // Continue even if some images fail
+        };
       });
     } else {
-      currentElements.forEach(element => {
-        drawElementToCanvas(ctx, element);
-      });
-      
+      // No images, draw all elements directly in correct order
       try {
-        const dataUrl = canvas.toDataURL(`image/${format}`);
+        sortedElements.forEach((element, index) => {
+          drawElementToCanvas(ctx, element, undefined, index);
+        });
+        
+        const dataUrl = canvas.toDataURL(`image/${format}`, 0.95);
         const a = document.createElement('a');
         a.href = dataUrl;
         a.download = `sowntra-design.${format}`;
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
       } catch (error) {
         console.error('Error exporting canvas:', error);
         alert('Error exporting image. Please try again.');
       }
     }
-  }, [canvasSize, getCurrentPageElements, drawElementToCanvas, exportAsSVG]);
+  }, [canvasSize, getSortedElementsForExport, drawElementToCanvas, exportAsSVG]);
 
-  // Export as PDF
+  // Export as PDF - FIXED VERSION with proper zIndex sorting
   const exportAsPDF = useCallback(() => {
     const canvas = document.createElement('canvas');
     canvas.width = canvasSize.width;
     canvas.height = canvasSize.height;
     const ctx = canvas.getContext('2d');
     
+    if (!ctx) {
+      console.error('Could not get canvas context');
+      alert('Error: Could not create canvas context');
+      return;
+    }
+    
+    // Set white background
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
     
-    const currentElements = getCurrentPageElements();
-    const imageElements = currentElements.filter(el => el.type === 'image');
+    // FIXED: Use the proper sorting function for correct zIndex layering
+    const sortedElements = getSortedElementsForExport();
+    
+    const imageElements = sortedElements.filter(el => el.type === 'image');
     
     const generatePDF = () => {
       try {
@@ -2710,10 +2943,13 @@ const Sowntra = () => {
       const totalImages = imageElements.length;
       
       const drawAllElements = () => {
-        currentElements.forEach(element => {
-          if (element.type !== 'image') {
-            drawElementToCanvas(ctx, element);
-          }
+        // Clear and redraw background
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
+        
+        // Draw ALL elements in correct zIndex order
+        sortedElements.forEach((element, index) => {
+          drawElementToCanvas(ctx, element, undefined, index);
         });
         generatePDF();
       };
@@ -2730,24 +2966,25 @@ const Sowntra = () => {
         img.crossOrigin = 'anonymous';
         img.src = element.src;
         img.onload = () => {
-          ctx.save();
-          ctx.translate(element.x + element.width/2, element.y + element.height/2);
-          ctx.rotate((element.rotation || 0) * Math.PI / 180);
-          ctx.translate(-element.x - element.width/2, -element.y - element.height/2);
-          
-          ctx.drawImage(img, element.x, element.y, element.width, element.height);
-          ctx.restore();
           checkAllLoaded();
         };
-        img.onerror = checkAllLoaded;
+        img.onerror = () => {
+          console.error('Failed to load image:', element.src);
+          checkAllLoaded();
+        };
       });
     } else {
-      currentElements.forEach(element => {
-        drawElementToCanvas(ctx, element);
+      // No images, draw all elements directly in correct order
+      // Clear and redraw background
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
+      
+      sortedElements.forEach((element, index) => {
+        drawElementToCanvas(ctx, element, undefined, index);
       });
       generatePDF();
     }
-  }, [canvasSize, getCurrentPageElements, drawElementToCanvas]);
+  }, [canvasSize, getSortedElementsForExport, drawElementToCanvas]);
 
   // Logout handler
   const handleLogout = useCallback(async () => {
@@ -2980,8 +3217,8 @@ const Sowntra = () => {
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            const currentElements = getCurrentPageElements();
-            const sortedElements = [...currentElements].sort((a, b) => a.zIndex - b.zIndex);
+            // FIXED: Use proper zIndex sorting for recording too
+            const sortedElements = getSortedElementsForExport();
             
             sortedElements.forEach((element, index) => {
               // Use recordingDuration for animation loop timing
@@ -3008,7 +3245,7 @@ const Sowntra = () => {
         recordingIntervalRef.current = null;
       }
     }
-  }, [recording, canvasSize, getCurrentPageElements, drawElementToCanvas, recordingDuration, videoQuality, checkRecordingCompatibility, preloadImages, videoFormat]);
+  }, [recording, canvasSize, drawElementToCanvas, recordingDuration, videoQuality, checkRecordingCompatibility, preloadImages, videoFormat, getSortedElementsForExport]);
 
   // Stop recording
   const stopRecording = useCallback(() => {
@@ -3627,7 +3864,7 @@ const Sowntra = () => {
             color: element.color,
             textAlign: isRTL ? 'right' : element.textAlign,
             display: 'flex',
-            alignItems: 'center',
+            alignItems: 'flex-start', // Changed from 'center' to 'flex-start' for better text wrapping
             cursor: isLocked ? 'not-allowed' : (isEditing ? 'text' : 'move'),
             outline: 'none',
             userSelect: isEditing ? 'text' : 'none',
@@ -3635,9 +3872,11 @@ const Sowntra = () => {
             minWidth: element.width,
             padding: '4px',
             wordWrap: 'break-word',
-            whiteSpace: 'pre-wrap'
+            whiteSpace: 'pre-wrap',
+            overflow: 'hidden', // Add this to contain text
+            wordBreak: 'break-word' // Add this for better breaking
           }}
-          className={`${needsComplexScript ? 'complex-script' : ''} ${element.fillType === 'gradient' ? 'gradient-fix' : ''}`}
+          className={`text-element ${needsComplexScript ? 'complex-script' : ''} ${element.fillType === 'gradient' ? 'gradient-fix' : ''}`}
           contentEditable={!isLocked && isEditing}
           suppressContentEditableWarning={true}
           onBlur={(e) => {
@@ -3646,8 +3885,11 @@ const Sowntra = () => {
             setTextEditing(null);
           }}
           onInput={(e) => {
-            // Only update on blur, not on every input
-            // This prevents cursor jumping during typing
+            // Auto-adjust height based on content
+            if (isEditing) {
+              const newHeight = Math.max(element.fontSize * 2, e.target.scrollHeight);
+              updateElement(element.id, { height: newHeight });
+            }
           }}
           onKeyDown={(e) => {
             // Prevent deletion of the entire element
@@ -4741,6 +4983,21 @@ const Sowntra = () => {
             outline-offset: 2px;
           }
 
+          /* FIXED: Text element wrapping improvements */
+          .text-element {
+            white-space: pre-wrap !important;
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+            hyphens: auto;
+          }
+
+          [contenteditable="true"] {
+            white-space: pre-wrap !important;
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+            hyphens: auto;
+          }
+
           /* Smooth transitions for zoom and pan */
           .relative {
             transition: transform 0.2s ease-in-out;
@@ -4797,6 +5054,17 @@ const Sowntra = () => {
           .shape-outline {
             outline: 3px solid #000;
             outline-offset: 2px;
+          }
+
+          /* FIXED: Ensure images don't have unexpected borders */
+          img[id^="element-"] {
+            border: none !important;
+            outline: none !important;
+          }
+
+          /* Remove default borders from image elements */
+          canvas img {
+            border: 0;
           }
         `}
       </style>
