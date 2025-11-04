@@ -18,15 +18,18 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import ShareButton from '../components/ShareButton';
+import ShareButton from '../components/common/ShareButton';
 import jsPDF from 'jspdf';
 import { projectAPI } from '../services/api';
+// Style imports
+import styles from '../styles/MainPage.module.css';
+import * as styleHelpers from '../utils/styleHelpers';
 
 const Sowntra = () => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { logout } = useAuth();
+  const { logout, currentUser } = useAuth();
   const currentProjectId = searchParams.get('project');
   const [selectedElement, setSelectedElement] = useState(null);
   const [selectedElements, setSelectedElements] = useState(new Set());
@@ -48,6 +51,7 @@ const Sowntra = () => {
   const [snapToGrid, setSnapToGrid] = useState(false);
   const [recording, setRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState(null);
+  // eslint-disable-next-line no-unused-vars
   const [recordingStartTime, setRecordingStartTime] = useState(null);
   // const [recordedChunks, setRecordedChunks] = useState([]);
   const [drawingPath, setDrawingPath] = useState([]);
@@ -82,6 +86,16 @@ const Sowntra = () => {
     height: 600,
     unit: 'px'
   });
+  
+  // Mobile panel states
+  const [showMobileTools, setShowMobileTools] = useState(false);
+  const [showMobileProperties, setShowMobileProperties] = useState(false);
+
+  // Mobile touch gesture states
+  const [touchStartDistance, setTouchStartDistance] = useState(0);
+  const [initialZoomLevel, setInitialZoomLevel] = useState(1);
+  const [lastTouchEnd, setLastTouchEnd] = useState(0);
+  const [showZoomIndicator, setShowZoomIndicator] = useState(false);
 
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -89,6 +103,7 @@ const Sowntra = () => {
   const recordingIntervalRef = useRef(null);
   const canvasContainerRef = useRef(null);
   const loadProjectInputRef = useRef(null);
+  const zoomIndicatorTimeoutRef = useRef(null);
 
   // Get current page elements
   const getCurrentPageElements = useCallback(() => {
@@ -114,6 +129,7 @@ const Sowntra = () => {
   }, [getCurrentPageElements]);
 
   // Export-ready elements with proper filtering
+  // eslint-disable-next-line no-unused-vars
   const getExportReadyElements = useCallback(() => {
     const currentElements = getCurrentPageElements();
     
@@ -155,17 +171,17 @@ const Sowntra = () => {
 
   // Supported languages with their scripts
   const supportedLanguages = {
-    en: { name: 'English', direction: 'ltr', font: 'Arial' },
-    hi: { name: 'Hindi', direction: 'ltr', font: 'Noto Sans Devanagari' },
-    ta: { name: 'Tamil', direction: 'ltr', font: 'Noto Sans Tamil' },
-    te: { name: 'Telugu', direction: 'ltr', font: 'Noto Sans Telugu' },
-    bn: { name: 'Bengali', direction: 'ltr', font: 'Noto Sans Bengali' },
-    mr: { name: 'Marathi', direction: 'ltr', font: 'Noto Sans Devanagari' },
-    gu: { name: 'Gujarati', direction: 'ltr', font: 'Noto Sans Gujarati' },
-    kn: { name: 'Kannada', direction: 'ltr', font: 'Noto Sans Kannada' },
-    ml: { name: 'Malayalam', direction: 'ltr', font: 'Noto Sans Malayalam' },
-    pa: { name: 'Punjabi', direction: 'ltr', font: 'Noto Sans Gurmukhi' },
-    or: { name: 'Odia', direction: 'ltr', font: 'Noto Sans Oriya' },
+    en: { name: 'English', nativeName: 'English', direction: 'ltr', font: 'Arial' },
+    hi: { name: 'Hindi', nativeName: 'हिन्दी', direction: 'ltr', font: 'Noto Sans Devanagari' },
+    ta: { name: 'Tamil', nativeName: 'தமிழ்', direction: 'ltr', font: 'Noto Sans Tamil' },
+    te: { name: 'Telugu', nativeName: 'తెలుగు', direction: 'ltr', font: 'Noto Sans Telugu' },
+    bn: { name: 'Bengali', nativeName: 'বাংলা', direction: 'ltr', font: 'Noto Sans Bengali' },
+    mr: { name: 'Marathi', nativeName: 'मराठी', direction: 'ltr', font: 'Noto Sans Devanagari' },
+    gu: { name: 'Gujarati', nativeName: 'ગુજરાતી', direction: 'ltr', font: 'Noto Sans Gujarati' },
+    kn: { name: 'Kannada', nativeName: 'ಕನ್ನಡ', direction: 'ltr', font: 'Noto Sans Kannada' },
+    ml: { name: 'Malayalam', nativeName: 'മലയാളം', direction: 'ltr', font: 'Noto Sans Malayalam' },
+    pa: { name: 'Punjabi', nativeName: 'ਪੰਜਾਬੀ', direction: 'ltr', font: 'Noto Sans Gurmukhi' },
+    or: { name: 'Odia', nativeName: 'ଓଡ଼ିଆ', direction: 'ltr', font: 'Noto Sans Oriya' },
   };
 
   // Enhanced Text Effects
@@ -389,6 +405,15 @@ const Sowntra = () => {
     
     loadTransliterationData();
   }, [currentLanguage]);
+
+  // Cleanup zoom indicator timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (zoomIndicatorTimeoutRef.current) {
+        clearTimeout(zoomIndicatorTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Social media templates with correct dimensions and aspect ratios
   const socialMediaTemplates = {
@@ -805,6 +830,7 @@ const Sowntra = () => {
       onGradientChange(newGradient);
     };
 
+    // eslint-disable-next-line no-unused-vars
     const addColorStop = () => {
       if (localGradient.colors.length >= 5) return;
       
@@ -996,12 +1022,12 @@ const Sowntra = () => {
     return (
       <div 
         key={gradientPickerKey} 
-        className="gradient-picker mt-3 p-3 bg-gray-50 rounded border" 
+        className={`${styles.gradientPicker || ''} gradient-picker mt-3 p-3 bg-gray-50 rounded border`}
         style={{ position: 'relative', zIndex: 1, pointerEvents: 'auto' }}
       >
         <div className="mb-3">
           <div 
-            className="w-full h-8 rounded border border-gray-300 mb-2 gradient-fix"
+            className={`${styles.gradientPreview || ''} w-full h-8 rounded border border-gray-300 mb-2 gradient-fix`}
             style={{ background: getGradientString() }}
           />
           <div className="text-xs text-gray-500 text-center">
@@ -1798,55 +1824,64 @@ const Sowntra = () => {
       }
     };
 
+    const selectionBoxStyle = {
+      position: 'absolute',
+      left: element.x - 10,
+      top: element.y - 10,
+      width: element.width + 20,
+      height: element.height + 20,
+      pointerEvents: 'none',
+      transform: `rotate(${element.rotation || 0}deg)`,
+      zIndex: element.zIndex + 1000
+    };
+
+    const selectionBorderStyle = {
+      position: 'absolute',
+      left: 10,
+      top: 10,
+      width: element.width,
+      height: element.height,
+      border: `2px dashed ${connectionLineColor}`,
+      borderRadius: '2px'
+    };
+
     return (
       <div
-        style={{
-          position: 'absolute',
-          left: element.x - 10,
-          top: element.y - 10,
-          width: element.width + 20,
-          height: element.height + 20,
-          pointerEvents: 'none',
-          transform: `rotate(${element.rotation || 0}deg)`,
-          zIndex: element.zIndex + 1000
-        }}
+        className={styles.selectionBox || ''}
+        style={selectionBoxStyle}
       >
         {/* Selection border */}
-        <div
-          style={{
-            position: 'absolute',
-            left: 10,
-            top: 10,
-            width: element.width,
-            height: element.height,
-            border: `2px dashed ${connectionLineColor}`,
-            borderRadius: '2px'
-          }}
-        />
+        <div style={selectionBorderStyle} />
 
         {/* Handles */}
-        {handles.map((handle, index) => (
-          <div
-            key={index}
-            style={{
-              position: 'absolute',
-              left: handle.x + 10,
-              top: handle.y + 10,
-              width: handle.isSlot ? slotSize : handleSize,
-              height: handle.isSlot ? slotSize : handleSize,
-              backgroundColor: handle.isSlot ? connectionLineColor : handleColor,
-              border: handle.isSlot ? 'none' : `${handleBorder}px solid ${handleBorderColor}`,
-              borderRadius: handle.isSlot ? '1px' : '50%',
-              cursor: handle.cursor,
-              pointerEvents: 'auto',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
-            }}
-            onMouseDown={(e) => handleMouseDown(e, 'resize', handle.type)}
-          />
-        ))}
+        {handles.map((handle, index) => {
+          const handleStyle = {
+            position: 'absolute',
+            left: handle.x + 10,
+            top: handle.y + 10,
+            width: handle.isSlot ? slotSize : handleSize,
+            height: handle.isSlot ? slotSize : handleSize,
+            backgroundColor: handle.isSlot ? connectionLineColor : handleColor,
+            border: handle.isSlot ? 'none' : `${handleBorder}px solid ${handleBorderColor}`,
+            borderRadius: handle.isSlot ? '1px' : '50%',
+            cursor: handle.cursor,
+            pointerEvents: 'auto',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+          };
+          
+          return (
+            <div
+              key={index}
+              className={styles.resizeHandle || ''}
+              style={handleStyle}
+              onMouseDown={(e) => handleMouseDown(e, 'resize', handle.type)}
+            />
+          );
+        })}
 
         {/* Rotate handle */}
         <div
+          className={styles.rotateHandle || ''}
           style={{
             position: 'absolute',
             top: -30,
@@ -2998,11 +3033,33 @@ const Sowntra = () => {
 
   // Zoom in/out
   const zoom = useCallback((direction) => {
-    const newZoom = direction === 'in' 
-      ? Math.min(zoomLevel + 0.1, 3)
-      : Math.max(zoomLevel - 0.1, 0.5);
+    let newZoom;
+    
+    if (typeof direction === 'number') {
+      // Direct zoom level passed
+      newZoom = Math.max(0.1, Math.min(5, direction));
+    } else if (direction === 'in') {
+      newZoom = Math.min(zoomLevel + 0.2, 3);
+    } else if (direction === 'out') {
+      newZoom = Math.max(zoomLevel - 0.2, 0.5);
+    } else {
+      newZoom = zoomLevel;
+    }
     
     setZoomLevel(newZoom);
+    
+    // Show zoom indicator on mobile
+    setShowZoomIndicator(true);
+    
+    // Clear existing timeout
+    if (zoomIndicatorTimeoutRef.current) {
+      clearTimeout(zoomIndicatorTimeoutRef.current);
+    }
+    
+    // Hide after 10 seconds
+    zoomIndicatorTimeoutRef.current = setTimeout(() => {
+      setShowZoomIndicator(false);
+    }, 10000);
   }, [zoomLevel]);
 
   // Reset zoom and pan
@@ -3204,6 +3261,7 @@ const Sowntra = () => {
       let startTime = null;
       const frameDuration = 1000 / 30;
       let lastFrameTime = 0;
+      // eslint-disable-next-line no-unused-vars
       let animationId = null;
       
       const drawAnimationFrame = (timestamp) => {
@@ -3298,6 +3356,7 @@ const Sowntra = () => {
         textDirection: textDirection
       };
 
+      // eslint-disable-next-line no-unused-vars
       const response = await projectAPI.saveProject(projectData);
       
       // Also save locally as backup
@@ -3585,12 +3644,12 @@ const Sowntra = () => {
     if (!showEffectsPanel || !selectedElementData) return null;
     
     return (
-      <div className="fixed right-80 top-20 bg-white shadow-lg rounded-lg p-4 w-80 z-40">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="font-bold">Effects</h3>
+      <div className="fixed md:right-80 md:top-20 right-0 top-0 bottom-0 md:bottom-auto bg-white shadow-lg rounded-lg md:rounded-lg md:p-4 p-2 md:w-80 w-full md:max-w-sm max-w-full z-50 overflow-y-auto">
+        <div className="flex justify-between items-center mb-4 sticky top-0 bg-white pb-2 border-b md:border-0">
+          <h3 className="font-bold text-lg">Effects</h3>
           <button 
             onClick={() => setShowEffectsPanel(false)}
-            className="p-1 rounded hover:bg-gray-200"
+            className="p-2 rounded hover:bg-gray-200 touch-manipulation min-h-[44px] min-w-[44px] text-xl"
           >
             ×
           </button>
@@ -3600,12 +3659,12 @@ const Sowntra = () => {
         {selectedElementData.type === 'text' && (
           <div className="mb-4">
             <label className="block text-sm font-medium mb-2">Text Effects</label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 md:gap-2 gap-3">
               {Object.entries(textEffects).map(([key, effect]) => (
                 <button
                   key={key}
                   onClick={() => updateElement(selectedElement, { textEffect: key })}
-                  className={`p-2 rounded text-xs ${
+                  className={`md:p-2 p-3 rounded md:text-xs text-sm touch-manipulation min-h-[48px] ${
                     selectedElementData.textEffect === key 
                       ? 'bg-blue-100 text-blue-600 border border-blue-300' 
                       : 'bg-gray-100 border border-gray-300 hover:bg-gray-200'
@@ -3622,12 +3681,12 @@ const Sowntra = () => {
         {selectedElementData.type === 'image' && (
           <div className="mb-4">
             <label className="block text-sm font-medium mb-2">Image Effects</label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 md:gap-2 gap-3">
               {Object.entries(imageEffects).map(([key, effect]) => (
                 <button
                   key={key}
                   onClick={() => updateElement(selectedElement, { imageEffect: key })}
-                  className={`p-2 rounded text-xs ${
+                  className={`md:p-2 p-3 rounded md:text-xs text-sm touch-manipulation min-h-[48px] ${
                     selectedElementData.imageEffect === key 
                       ? 'bg-blue-100 text-blue-600 border border-blue-300' 
                       : 'bg-gray-100 border border-gray-300 hover:bg-gray-200'
@@ -3644,12 +3703,12 @@ const Sowntra = () => {
         {['rectangle', 'circle', 'triangle', 'star', 'hexagon'].includes(selectedElementData.type) && (
           <div className="mb-4">
             <label className="block text-sm font-medium mb-2">Shape Effects</label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 md:gap-2 gap-3">
               {Object.entries(shapeEffects).map(([key, effect]) => (
                 <button
                   key={key}
                   onClick={() => updateElement(selectedElement, { shapeEffect: key })}
-                  className={`p-2 rounded text-xs ${
+                  className={`md:p-2 p-3 rounded md:text-xs text-sm touch-manipulation min-h-[48px] ${
                     selectedElementData.shapeEffect === key 
                       ? 'bg-blue-100 text-blue-600 border border-blue-300' 
                       : 'bg-gray-100 border border-gray-300 hover:bg-gray-200'
@@ -3665,12 +3724,12 @@ const Sowntra = () => {
         {/* Special Effects for All Elements */}
         <div className="mb-4">
           <label className="block text-sm font-medium mb-2">Special Effects</label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 md:gap-2 gap-3">
             {Object.entries(specialEffects).map(([key, effect]) => (
               <button
                 key={key}
                 onClick={() => updateElement(selectedElement, { specialEffect: key })}
-                className={`p-2 rounded text-xs ${
+                className={`md:p-2 p-3 rounded md:text-xs text-sm touch-manipulation min-h-[48px] ${
                   selectedElementData.specialEffect === key 
                     ? 'bg-blue-100 text-blue-600 border border-blue-300' 
                     : 'bg-gray-100 border border-gray-300 hover:bg-gray-200'
@@ -3851,32 +3910,34 @@ const Sowntra = () => {
 
     let content;
     if (element.type === 'text') {
+      const textElementStyle = {
+        ...style,
+        fontSize: element.fontSize,
+        fontFamily: needsComplexScript ? supportedLanguages[currentLanguage]?.font : element.fontFamily,
+        fontWeight: element.fontWeight,
+        fontStyle: element.fontStyle,
+        textDecoration: element.textDecoration,
+        color: element.color,
+        textAlign: isRTL ? 'right' : element.textAlign,
+        display: 'flex',
+        alignItems: 'flex-start',
+        cursor: isLocked ? 'not-allowed' : (isEditing ? 'text' : 'move'),
+        outline: 'none',
+        userSelect: isEditing ? 'text' : 'none',
+        minHeight: element.height,
+        minWidth: element.width,
+        padding: '4px',
+        wordWrap: 'break-word',
+        whiteSpace: 'pre-wrap',
+        overflow: 'hidden',
+        wordBreak: 'break-word'
+      };
+      
       content = (
         <div
           id={`element-${element.id}`}
-          style={{
-            ...style,
-            fontSize: element.fontSize,
-            fontFamily: needsComplexScript ? supportedLanguages[currentLanguage]?.font : element.fontFamily,
-            fontWeight: element.fontWeight,
-            fontStyle: element.fontStyle,
-            textDecoration: element.textDecoration,
-            color: element.color,
-            textAlign: isRTL ? 'right' : element.textAlign,
-            display: 'flex',
-            alignItems: 'flex-start', // Changed from 'center' to 'flex-start' for better text wrapping
-            cursor: isLocked ? 'not-allowed' : (isEditing ? 'text' : 'move'),
-            outline: 'none',
-            userSelect: isEditing ? 'text' : 'none',
-            minHeight: element.height,
-            minWidth: element.width,
-            padding: '4px',
-            wordWrap: 'break-word',
-            whiteSpace: 'pre-wrap',
-            overflow: 'hidden', // Add this to contain text
-            wordBreak: 'break-word' // Add this for better breaking
-          }}
-          className={`text-element ${needsComplexScript ? 'complex-script' : ''} ${element.fillType === 'gradient' ? 'gradient-fix' : ''}`}
+          style={textElementStyle}
+          className={`${styles.textElement || ''} text-element ${needsComplexScript ? 'complex-script' : ''} ${element.fillType === 'gradient' ? 'gradient-fix' : ''}`}
           contentEditable={!isLocked && isEditing}
           suppressContentEditableWarning={true}
           onBlur={(e) => {
@@ -3914,64 +3975,73 @@ const Sowntra = () => {
         </div>
       );
     } else if (element.type === 'rectangle') {
+      const rectangleStyle = {
+        ...style,
+        backgroundColor: element.fillType === 'solid' ? element.fill : 'transparent',
+        background: element.fillType === 'gradient' ? getBackgroundStyle(element) : 'none',
+        border: `${element.strokeWidth}px solid ${element.stroke}`,
+        borderRadius: element.borderRadius,
+      };
+      
       content = (
         <div
           id={`element-${element.id}`}
-          className={element.fillType === 'gradient' ? 'gradient-fix' : ''}
-          style={{
-            ...style,
-            backgroundColor: element.fillType === 'solid' ? element.fill : 'transparent',
-            background: element.fillType === 'gradient' ? getBackgroundStyle(element) : 'none',
-            border: `${element.strokeWidth}px solid ${element.stroke}`,
-            borderRadius: element.borderRadius,
-          }}
+          className={`${styles.shapeElement || ''} ${element.fillType === 'gradient' ? 'gradient-fix' : ''}`}
+          style={rectangleStyle}
           onMouseDown={(e) => !isLocked && handleMouseDown(e, element.id)}
         />
       );
     } else if (element.type === 'circle') {
+      const circleStyle = {
+        ...style,
+        backgroundColor: element.fillType === 'solid' ? element.fill : 'transparent',
+        background: element.fillType === 'gradient' ? getBackgroundStyle(element) : 'none',
+        border: `${element.strokeWidth}px solid ${element.stroke}`,
+        borderRadius: '50%',
+      };
+      
       content = (
         <div
           id={`element-${element.id}`}
-          className={element.fillType === 'gradient' ? 'gradient-fix' : ''}
-          style={{
-            ...style,
-            backgroundColor: element.fillType === 'solid' ? element.fill : 'transparent',
-            background: element.fillType === 'gradient' ? getBackgroundStyle(element) : 'none',
-            border: `${element.strokeWidth}px solid ${element.stroke}`,
-            borderRadius: '50%',
-          }}
+          className={`${styles.shapeElement || ''} ${element.fillType === 'gradient' ? 'gradient-fix' : ''}`}
+          style={circleStyle}
           onMouseDown={(e) => !isLocked && handleMouseDown(e, element.id)}
         />
       );
     } else if (element.type === 'triangle') {
+      const triangleStyle = {
+        ...style,
+        width: 0,
+        height: 0,
+        borderLeft: `${element.width/2}px solid transparent`,
+        borderRight: `${element.width/2}px solid transparent`,
+        borderBottom: `${element.height}px solid ${element.fillType === 'solid' ? element.fill : getBackgroundStyle(element)}`,
+        borderTop: 'none',
+        background: element.fillType === 'gradient' ? getBackgroundStyle(element) : 'none'
+      };
+      
       content = (
         <div
           id={`element-${element.id}`}
-          className={element.fillType === 'gradient' ? 'gradient-fix' : ''}
-          style={{
-            ...style,
-            width: 0,
-            height: 0,
-            borderLeft: `${element.width/2}px solid transparent`,
-            borderRight: `${element.width/2}px solid transparent`,
-            borderBottom: `${element.height}px solid ${element.fillType === 'solid' ? element.fill : getBackgroundStyle(element)}`,
-            borderTop: 'none',
-            background: element.fillType === 'gradient' ? getBackgroundStyle(element) : 'none'
-          }}
+          className={`${styles.shapeElement || ''} ${element.fillType === 'gradient' ? 'gradient-fix' : ''}`}
+          style={triangleStyle}
           onMouseDown={(e) => !isLocked && handleMouseDown(e, element.id)}
         />
       );
     } else if (element.type === 'image') {
+      const imageStyle = {
+        ...style,
+        objectFit: 'cover',
+        borderRadius: element.borderRadius,
+      };
+      
       content = (
         <img
           id={`element-${element.id}`}
           src={element.src}
           alt=""
-          style={{
-            ...style,
-            objectFit: 'cover',
-            borderRadius: element.borderRadius,
-          }}
+          className={styles.imageElement || ''}
+          style={imageStyle}
           onMouseDown={(e) => !isLocked && handleMouseDown(e, element.id)}
           draggable={false}
         />
@@ -4785,6 +4855,18 @@ const Sowntra = () => {
             display: flex;
             gap: 4px;
           }
+          
+          @media (max-width: 768px) {
+            .floating-toolbar {
+              bottom: 80px;
+              left: 50%;
+              transform: translateX(-50%);
+              flex-wrap: wrap;
+              max-width: 90%;
+              padding: 6px;
+              gap: 2px;
+            }
+          }
 
           .toolbar-button {
             padding: 8px;
@@ -4794,6 +4876,14 @@ const Sowntra = () => {
             justify-content: center;
             transition: all 0.2s;
             cursor: pointer;
+          }
+          
+          @media (max-width: 768px) {
+            .toolbar-button {
+              padding: 6px;
+              min-width: 36px;
+              min-height: 36px;
+            }
           }
 
           .toolbar-button:hover {
@@ -4833,7 +4923,7 @@ const Sowntra = () => {
             background-color: #f1f5f9;
           }
 
-          /* FIXED: Canvas container that fills the screen */
+          /* FIXED: Canvas container that fills the screen - RESPONSIVE */
           .canvas-container {
             display: flex !important;
             justify-content: center !important;
@@ -4845,6 +4935,31 @@ const Sowntra = () => {
             width: 100%;
             height: 100%;
             min-height: 0;
+            touch-action: none;
+          }
+          
+          @media (max-width: 768px) {
+            .canvas-container {
+              padding: 5px;
+            }
+          }
+          
+          /* Touch-friendly styles */
+          .touch-manipulation {
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            min-height: 44px;
+            min-width: 44px;
+          }
+          
+          /* Make canvas elements touch-friendly */
+          .canvas-element {
+            touch-action: none;
+            cursor: move;
+          }
+          
+          button, input, select, textarea {
+            touch-action: manipulation;
           }
 
           .main-content {
@@ -4852,6 +4967,12 @@ const Sowntra = () => {
             flex: 1;
             overflow: hidden;
             min-height: 0;
+          }
+          
+          @media (max-width: 768px) {
+            .main-content {
+              width: 100%;
+            }
           }
 
           .flex-1 {
@@ -4878,6 +4999,12 @@ const Sowntra = () => {
             overflow-y: auto;
             padding: 16px;
           }
+          
+          @media (max-width: 768px) {
+            .properties-panel {
+              display: none !important;
+            }
+          }
 
           .tools-panel {
             width: 64px;
@@ -4888,6 +5015,12 @@ const Sowntra = () => {
             align-items: center;
             padding: 8px 0;
           }
+          
+          @media (max-width: 768px) {
+            .tools-panel {
+              display: none !important;
+            }
+          }
 
           .main-header {
             height: 60px;
@@ -4897,6 +5030,18 @@ const Sowntra = () => {
             justify-content: space-between;
             padding: 0 20px;
             color: white;
+            flex-wrap: wrap;
+          }
+          
+          @media (max-width: 768px) {
+            .main-header {
+              height: auto;
+              min-height: 50px;
+              padding: 8px 12px;
+              flex-wrap: nowrap;
+              overflow-x: auto;
+              -webkit-overflow-scrolling: touch;
+            }
           }
 
           .filter-slider {
@@ -5070,37 +5215,37 @@ const Sowntra = () => {
       </style>
       
       <div className={`h-screen flex flex-col ${textDirection === 'rtl' ? 'rtl-layout' : ''}`}>
-        {/* Header */}
-        <div className="main-header">
-          <div className="flex items-center space-x-4">
+        {/* Header - Responsive */}
+        <div className="main-header flex">
+          <div className="flex items-center space-x-2 md:space-x-4">
             <button
               onClick={() => navigate('/home')}
-              className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+              className="flex items-center text-gray-600 hover:text-gray-900 transition-colors p-2 touch-manipulation"
               title="Back to Home"
             >
-              <ArrowLeft className="w-5 h-5 mr-1" />
+              <ArrowLeft className="w-5 h-5 md:mr-1" />
             </button>
-            <h1 className="text-xl font-bold flex items-center">
+            <h1 className="text-base md:text-xl font-bold flex items-center">
               <span className="handwritten-logo">Sowntra</span>
             </h1>
-            <div className="flex space-x-2">
+            <div className="hidden md:flex space-x-2">
               <button
                 onClick={() => zoom('in')}
-                className="p-2 rounded hover:bg-white/20"
+                className="p-2 rounded hover:bg-white/20 touch-manipulation"
                 title="Zoom In"
               >
                 <ZoomIn size={18} />
               </button>
               <button
                 onClick={() => zoom('out')}
-                className="p-2 rounded hover:bg-white/20"
+                className="p-2 rounded hover:bg-white/20 touch-manipulation"
                 title="Zoom Out"
               >
                 <ZoomOut size={18} />
               </button>
               <button
                 onClick={centerCanvas}
-                className="p-2 rounded hover:bg-white/20"
+                className="p-2 rounded hover:bg-white/20 touch-manipulation"
                 title="Fit to Viewport"
               >
                 <Maximize size={18} />
@@ -5111,17 +5256,17 @@ const Sowntra = () => {
             </div>
           </div>
 
-          <div className="flex space-x-2">
+          <div className="hidden md:flex space-x-2">
             <button
               onClick={() => setShowTemplates(!showTemplates)}
-              className={`px-3 py-2 rounded flex items-center ${showTemplates ? 'bg-white text-purple-600' : 'bg-white/20 hover:bg-white/30'}`}
+              className={`px-3 py-2 rounded flex items-center touch-manipulation ${showTemplates ? 'bg-white text-purple-600' : 'bg-white/20 hover:bg-white/30'}`}
             >
               <Layers size={16} className="mr-1" />
               {t('toolbar.templates')}
             </button>
             <button
               onClick={() => setShowEffectsPanel(!showEffectsPanel)}
-              className={`px-3 py-2 rounded flex items-center ${showEffectsPanel ? 'bg-white text-purple-600' : 'bg-white/20 hover:bg-white/30'}`}
+              className={`px-3 py-2 rounded flex items-center touch-manipulation ${showEffectsPanel ? 'bg-white text-purple-600' : 'bg-white/20 hover:bg-white/30'}`}
             >
               <Sparkles size={16} className="mr-1" />
               {t('toolbar.effects')}
@@ -5129,14 +5274,14 @@ const Sowntra = () => {
             <button
               onClick={playAnimations}
               disabled={isPlaying}
-              className="px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50 flex items-center"
+              className="px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50 flex items-center touch-manipulation"
             >
               <Play size={16} className="mr-1" />
               {t('toolbar.play')}
             </button>
             <button
               onClick={resetAnimations}
-              className="px-3 py-2 bg-white/20 text-white rounded hover:bg-white/30 flex items-center"
+              className="px-3 py-2 bg-white/20 text-white rounded hover:bg-white/30 flex items-center touch-manipulation"
             >
               <Pause size={16} className="mr-1" />
               {t('toolbar.reset')}
@@ -5149,7 +5294,7 @@ const Sowntra = () => {
                 </div>
                 <button
                   onClick={stopRecording}
-                  className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 flex items-center"
+                  className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 flex items-center touch-manipulation"
                 >
                   <Square size={16} className="mr-1" />
                   Stop
@@ -5158,7 +5303,7 @@ const Sowntra = () => {
             ) : (
               <button
                 onClick={startRecording}
-                className="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center"
+                className="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center touch-manipulation"
               >
                 <Film size={16} className="mr-1" />
                 {t('toolbar.record')}
@@ -5166,45 +5311,76 @@ const Sowntra = () => {
             )}
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1 md:space-x-2">
             <div className="relative">
               <button
                 onClick={() => setShowLanguageMenu(!showLanguageMenu)}
-                className="p-2 rounded hover:bg-white/20"
+                className="px-2 md:px-3 py-1.5 md:py-2 rounded bg-white/10 hover:bg-white/20 flex items-center gap-1 md:gap-2 touch-manipulation transition-colors"
                 title="Language"
               >
-                <Languages size={20} />
+                <Languages size={16} className="md:w-[18px] md:h-[18px]" />
+                <span className="text-xs md:text-sm font-medium hidden sm:inline">
+                  {supportedLanguages[currentLanguage]?.name}
+                </span>
               </button>
               {showLanguageMenu && (
-                <div className="dropdown-menu" style={{ width: '200px' }}>
-                  <div className="font-semibold px-3 py-2 border-b text-gray-700">{t('language.title')}</div>
-                  {Object.entries(supportedLanguages).map(([code, lang]) => (
-                    <div
-                      key={code}
-                      className={`dropdown-item ${currentLanguage === code ? 'bg-blue-100 text-blue-800' : ''}`}
-                      onClick={() => {
-                        setCurrentLanguage(code);
-                        i18n.changeLanguage(code);
-                        setShowLanguageMenu(false);
-                        setGradientPickerKey(prev => prev + 1);
-                      }}
-                    >
-                      <span>{lang.name}</span>
+                <>
+                  {/* Mobile: Full screen overlay */}
+                  <div 
+                    className="md:hidden fixed inset-0 bg-black/50 z-50"
+                    onClick={() => setShowLanguageMenu(false)}
+                  />
+                  <div className="md:dropdown-menu md:relative md:w-[200px] md:shadow-lg md:border md:border-gray-200 fixed md:static left-0 right-0 top-0 bottom-0 md:top-auto md:left-auto md:right-auto md:bottom-auto bg-white md:rounded-lg z-50 flex flex-col md:max-h-96 max-h-screen overflow-hidden">
+                    <div className="font-semibold px-4 py-3 border-b text-gray-700 flex items-center justify-between sticky top-0 bg-white z-10">
+                      <div className="text-base md:text-sm font-bold">{t('language.title')}</div>
+                      <button 
+                        onClick={() => setShowLanguageMenu(false)}
+                        className="md:hidden p-2 rounded-lg hover:bg-gray-100 touch-manipulation text-2xl leading-none min-h-[44px] min-w-[44px]"
+                      >
+                        ×
+                      </button>
                     </div>
-                  ))}
-                  <div className="border-t mt-1">
-                    <div
-                      className="dropdown-item text-blue-500"
-                      onClick={() => {
-                        setShowLanguageHelp(true);
-                        setShowLanguageMenu(false);
-                      }}
-                    >
-                      <HelpCircle size={16} className="mr-2" />
-                      Typing Help
+                    <div className="overflow-y-auto flex-1">
+                      {Object.entries(supportedLanguages).map(([code, lang]) => (
+                        <div
+                          key={code}
+                          className={`dropdown-item md:px-3 md:py-2 px-4 py-3 cursor-pointer touch-manipulation ${currentLanguage === code ? 'bg-blue-50 text-blue-800' : 'hover:bg-gray-50'}`}
+                          onClick={() => {
+                            setCurrentLanguage(code);
+                            i18n.changeLanguage(code);
+                            setShowLanguageMenu(false);
+                            setGradientPickerKey(prev => prev + 1);
+                          }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="font-medium text-sm md:text-xs">{lang.name}</div>
+                              <div className="text-xs text-gray-500 mt-0.5 md:hidden">{lang.nativeName}</div>
+                            </div>
+                            {currentLanguage === code && (
+                              <div className="text-blue-500 text-lg md:text-sm ml-2">✓</div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="border-t bg-white sticky bottom-0">
+                      <div
+                        className="dropdown-item md:px-3 md:py-2 px-5 py-3.5 text-blue-500 cursor-pointer hover:bg-blue-50 touch-manipulation flex items-center gap-3"
+                        onClick={() => {
+                          setShowLanguageHelp(true);
+                          setShowLanguageMenu(false);
+                        }}
+                      >
+                        <HelpCircle size={20} className="md:w-4 md:h-4" />
+                        <div>
+                          <div className="font-medium text-sm md:text-xs">Typing Help</div>
+                          <div className="text-xs text-gray-500 md:hidden">Learn how to type in your language</div>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
+                </>
               )}
             </div>
 
@@ -5212,64 +5388,114 @@ const Sowntra = () => {
               url={window.location.href}
               title="Check out my design on Sowntra!"
               text="I created this amazing design on Sowntra. Check it out!"
-              className="px-3 py-1.5"
+              className="px-2 md:px-3 py-1.5 hidden md:flex"
             />
             
             <div className="relative">
               <button
                 onClick={() => setShowAccountMenu(!showAccountMenu)}
-                className="p-2 rounded hover:bg-white/20"
+                className="px-2 md:px-3 py-1.5 md:py-2 rounded bg-white/10 hover:bg-white/20 flex items-center gap-1 md:gap-2 touch-manipulation transition-colors min-h-[36px]"
                 title="Account"
               >
-                <User size={20} />
+                <User size={16} className="md:w-[18px] md:h-[18px]" />
+                <span className="text-xs md:text-sm font-medium hidden sm:inline truncate max-w-[60px] sm:max-w-[80px] md:max-w-[100px] lg:max-w-[120px]">
+                  {currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Account'}
+                </span>
               </button>
               {showAccountMenu && (
-                <div className="dropdown-menu">
-                  <div className="dropdown-item">
-                    <User size={16} />
-                    Profile
-                  </div>
-                  <div className="dropdown-item">
-                    <Settings size={16} />
-                    Settings
-                  </div>
+                <>
+                  {/* Mobile: Full screen overlay */}
                   <div 
-                    className="dropdown-item text-red-600 hover:bg-red-50"
-                    onClick={handleLogout}
-                  >
-                    <LogOut size={16} />
-                    Logout
+                    className="md:hidden fixed inset-0 bg-black/50 z-50"
+                    onClick={() => setShowAccountMenu(false)}
+                  />
+                  {/* Dropdown menu - Full screen on mobile, normal dropdown on desktop */}
+                  <div className="fixed md:absolute md:right-0 left-0 right-0 top-0 bottom-0 md:top-full md:mt-2 md:left-auto md:bottom-auto md:w-56 bg-white shadow-lg border border-gray-200 z-50 md:rounded-lg flex flex-col md:max-h-96 max-h-screen overflow-hidden">
+                    {/* Mobile header */}
+                    <div className="md:hidden font-semibold px-4 py-3 border-b text-gray-700 flex items-center justify-between sticky top-0 bg-white z-10">
+                      <div className="text-base font-bold">Account</div>
+                      <button 
+                        onClick={() => setShowAccountMenu(false)}
+                        className="p-2 rounded-lg hover:bg-gray-100 touch-manipulation text-2xl leading-none min-h-[44px] min-w-[44px]"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    
+                    {/* Scrollable content */}
+                    <div className="flex-1 overflow-y-auto">
+                      {/* User Info Card - Mobile only */}
+                      <div className="px-4 py-3 border-b bg-gray-50 md:hidden">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-md">
+                            {currentUser?.displayName?.[0]?.toUpperCase() || currentUser?.email?.[0]?.toUpperCase() || 'U'}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm truncate">{currentUser?.displayName || 'User'}</div>
+                            <div className="text-xs text-gray-500 truncate">{currentUser?.email}</div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Menu items */}
+                      <div className="py-1">
+                        <div className="dropdown-item md:px-3 md:py-2 px-4 py-3 cursor-pointer touch-manipulation hover:bg-gray-50">
+                          <User size={18} className="md:w-4 md:h-4" />
+                          <span className="text-sm md:text-xs font-medium">Profile</span>
+                        </div>
+                        <div className="dropdown-item md:px-3 md:py-2 px-4 py-3 cursor-pointer touch-manipulation hover:bg-gray-50">
+                          <Settings size={18} className="md:w-4 md:h-4" />
+                          <span className="text-sm md:text-xs font-medium">Settings</span>
+                        </div>
+                        <div className="border-t my-1 md:my-0"></div>
+                        <div 
+                          className="dropdown-item text-red-600 hover:bg-red-50 md:px-3 md:py-2 px-4 py-3 cursor-pointer touch-manipulation"
+                          onClick={handleLogout}
+                        >
+                          <LogOut size={18} className="md:w-4 md:h-4" />
+                          <span className="text-sm md:text-xs font-medium">Logout</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                </>
               )}
             </div>
           </div>
         </div>
 
-        {/* Template Selector */}
+        {/* Template Selector - Responsive */}
         {showTemplates && (
-          <div className="bg-white shadow-sm p-3 border-b">
-            <h3 className="font-semibold mb-2">Select Template</h3>
-            <div className="template-grid">
+          <div className="bg-white shadow-sm p-4 border-b md:p-3">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="font-semibold text-base md:text-base">Select Template</h3>
+              <button 
+                onClick={() => setShowTemplates(false)}
+                className="p-2 rounded-lg hover:bg-gray-100 text-2xl leading-none min-h-[44px] min-w-[44px] touch-manipulation"
+              >
+                ×
+              </button>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-3 md:gap-2">
               {/* Custom Template Option */}
               <button
                 onClick={() => applyTemplate('custom')}
-                className="template-button"
+                className="template-button min-h-[120px] md:min-h-[100px] flex flex-col items-center justify-center p-3"
               >
-                <div className="mb-1"><Plus size={24} /></div>
-                <div className="text-xs text-center">Custom Size</div>
-                <div className="text-xs text-gray-500 mt-1">Create your own</div>
+                <div className="mb-2"><Plus size={24} className="md:w-5 md:h-5" /></div>
+                <div className="text-sm md:text-xs text-center font-medium">Custom</div>
+                <div className="text-xs text-gray-500 mt-1">Your size</div>
               </button>
               
               {Object.entries(socialMediaTemplates).map(([key, template]) => (
                 <button
                   key={key}
                   onClick={() => applyTemplate(key)}
-                  className="template-button"
+                  className="template-button min-h-[120px] md:min-h-[100px] flex flex-col items-center justify-center p-3"
                 >
-                  <div className="mb-1">{template.icon}</div>
-                  <div className="text-xs text-center">{template.name}</div>
-                  <div className="text-xs text-gray-500 mt-1">{template.width}×{template.height}</div>
+                  <div className="mb-2 text-2xl md:text-xl">{template.icon}</div>
+                  <div className="text-sm md:text-xs text-center font-medium leading-tight mb-1">{template.name}</div>
+                  <div className="text-xs text-gray-500">{template.width}×{template.height}</div>
                 </button>
               ))}
             </div>
@@ -5279,24 +5505,24 @@ const Sowntra = () => {
         {/* Custom Template Modal */}
         <CustomTemplateModal />
 
-        {/* Pages Navigation */}
-        <div className="bg-white shadow-sm p-2 border-b flex items-center space-x-2">
-          <span className="text-sm font-medium">{t('pages.title')}:</span>
+        {/* Pages Navigation - Responsive */}
+        <div className="bg-white shadow-sm p-2 border-b flex items-center space-x-2 overflow-x-auto md:p-2 sm:p-1.5">
+          <span className="text-sm font-medium whitespace-nowrap md:text-sm sm:text-xs">{t('pages.title')}:</span>
           {pages.map(page => (
             <button
               key={page.id}
               onClick={() => setCurrentPage(page.id)}
-              className={`px-3 py-1 rounded text-sm ${currentPage === page.id ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}`}
+              className={`px-3 py-1 rounded text-sm whitespace-nowrap md:px-3 md:py-1 sm:px-2 sm:py-0.5 md:text-sm sm:text-xs flex-shrink-0 ${currentPage === page.id ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}`}
             >
               {page.name}
             </button>
           ))}
           <button
             onClick={addNewPage}
-            className="p-1 rounded hover:bg-gray-100"
+            className="p-1 rounded hover:bg-gray-100 flex-shrink-0"
             title="Add Page"
           >
-            <Plus size={16} />
+            <Plus size={16} className="md:w-4 md:h-4 sm:w-3.5 sm:h-3.5" />
           </button>
           <button
             onClick={deleteCurrentPage}
@@ -5317,8 +5543,8 @@ const Sowntra = () => {
 
         {/* Main Content Area */}
         <div className="main-content">
-          {/* Left Tools Panel */}
-          <div className="tools-panel">
+          {/* Left Tools Panel - Hidden on mobile */}
+          <div className="tools-panel hidden md:flex">
             <h2 className="text-sm font-bold mb-4 text-center">{t('tools.title')}</h2>
             
             <div className="space-y-2">
@@ -5502,12 +5728,95 @@ const Sowntra = () => {
                     position: 'relative',
                     backgroundColor: 'white',
                     boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
-                    transition: 'transform 0.2s ease-out'
+                    transition: 'transform 0.2s ease-out',
+                    touchAction: 'none'
                   }}
                   ref={canvasRef}
                   onMouseDown={handleCanvasMouseDown}
                   onMouseEnter={handleCanvasMouseEnter}
                   onMouseLeave={handleCanvasMouseLeave}
+                  onTouchStart={(e) => {
+                    if (e.touches.length === 2) {
+                      // Two-finger pinch to zoom
+                      e.preventDefault();
+                      const touch1 = e.touches[0];
+                      const touch2 = e.touches[1];
+                      const distance = Math.hypot(
+                        touch2.clientX - touch1.clientX,
+                        touch2.clientY - touch1.clientY
+                      );
+                      setTouchStartDistance(distance);
+                      setInitialZoomLevel(zoomLevel);
+                    } else if (e.touches.length === 1) {
+                      // Single touch - convert to mouse event for element interaction
+                      const touch = e.touches[0];
+                      const now = Date.now();
+                      
+                      // Detect double-tap to zoom
+                      if (now - lastTouchEnd < 300) {
+                        e.preventDefault();
+                        // Double tap detected - zoom in/out
+                        if (zoomLevel > 1) {
+                          zoom(1); // Reset zoom
+                        } else {
+                          zoom(1.5); // Zoom in
+                        }
+                        setLastTouchEnd(0);
+                        return;
+                      }
+                      setLastTouchEnd(now);
+                      
+                      const mouseEvent = new MouseEvent('mousedown', {
+                        clientX: touch.clientX,
+                        clientY: touch.clientY,
+                        bubbles: true
+                      });
+                      e.target.dispatchEvent(mouseEvent);
+                    }
+                  }}
+                  onTouchMove={(e) => {
+                    if (e.touches.length === 2) {
+                      // Pinch zoom
+                      e.preventDefault();
+                      const touch1 = e.touches[0];
+                      const touch2 = e.touches[1];
+                      const distance = Math.hypot(
+                        touch2.clientX - touch1.clientX,
+                        touch2.clientY - touch1.clientY
+                      );
+                      
+                      if (touchStartDistance > 0) {
+                        const scale = distance / touchStartDistance;
+                        const newZoom = Math.max(0.1, Math.min(5, initialZoomLevel * scale));
+                        setZoomLevel(newZoom);
+                      }
+                    } else if (e.touches.length === 1) {
+                      // Single finger - pan or drag element
+                      const touch = e.touches[0];
+                      const mouseEvent = new MouseEvent('mousemove', {
+                        clientX: touch.clientX,
+                        clientY: touch.clientY,
+                        bubbles: true
+                      });
+                      document.dispatchEvent(mouseEvent);
+                    }
+                  }}
+                  onTouchEnd={(e) => {
+                    if (e.touches.length === 0) {
+                      // All touches ended
+                      setTouchStartDistance(0);
+                      setInitialZoomLevel(zoomLevel);
+                      
+                      // Dispatch mouseup event
+                      const mouseEvent = new MouseEvent('mouseup', {
+                        bubbles: true
+                      });
+                      document.dispatchEvent(mouseEvent);
+                    } else if (e.touches.length === 1) {
+                      // One finger still touching - reset pinch state
+                      setTouchStartDistance(0);
+                    }
+                  }}
                 >
                   {/* Grid */}
                   {showGrid && (
@@ -5568,8 +5877,8 @@ const Sowntra = () => {
             </div>
           </div>
 
-          {/* Right Properties Panel */}
-          <div className="properties-panel">
+          {/* Right Properties Panel - Hidden on mobile */}
+          <div className="properties-panel hidden md:block">
             {/* Properties Section */}
             <div className="mb-6">
               <h2 className="text-lg font-bold mb-4">{t('properties.title')}</h2>
@@ -6099,7 +6408,7 @@ const Sowntra = () => {
         {selectedElements.size > 0 && (
           <div
             ref={floatingToolbarRef}
-            className="fixed left-1/2 bottom-4 transform -translate-x-1/2 floating-toolbar"
+            className={`${styles.toolbar || ''} fixed left-1/2 bottom-4 transform -translate-x-1/2 floating-toolbar`}
             style={{ zIndex: 1000 }}
           >
             <button
@@ -6200,10 +6509,263 @@ const Sowntra = () => {
         {/* Recording Status */}
         <RecordingStatus />
 
+        {/* Mobile Zoom Indicator - Auto-hides after 10 seconds */}
+        {showZoomIndicator && (
+          <div 
+            className={`${styles.zoomIndicator || ''} md:hidden`}
+            style={styleHelpers.getZoomIndicatorStyle(showZoomIndicator)}
+          >
+            <div className="flex items-center gap-2">
+              <ZoomIn size={16} />
+              <span className="font-medium">{Math.round(zoomLevel * 100)}%</span>
+            </div>
+          </div>
+        )}
+
+        {/* Mobile Floating Action Buttons */}
+        <div className="md:hidden fixed bottom-4 right-4 flex flex-col gap-3 z-40">
+          {/* Zoom In Button */}
+          <button
+            onClick={() => zoom('in')}
+            className="w-12 h-12 bg-gray-700 hover:bg-gray-800 text-white rounded-full shadow-lg flex items-center justify-center touch-manipulation"
+            title="Zoom In"
+          >
+            <ZoomIn size={20} />
+          </button>
+          
+          {/* Zoom Out Button */}
+          <button
+            onClick={() => zoom('out')}
+            className="w-12 h-12 bg-gray-700 hover:bg-gray-800 text-white rounded-full shadow-lg flex items-center justify-center touch-manipulation"
+            title="Zoom Out"
+          >
+            <ZoomOut size={20} />
+          </button>
+          
+          {/* Fit to Screen Button */}
+          <button
+            onClick={centerCanvas}
+            className="w-12 h-12 bg-gray-700 hover:bg-gray-800 text-white rounded-full shadow-lg flex items-center justify-center touch-manipulation"
+            title="Fit to Screen"
+          >
+            <Maximize size={20} />
+          </button>
+          
+          <button
+            onClick={() => {
+              setShowMobileTools(true);
+              setShowMobileProperties(false);
+            }}
+            className="w-14 h-14 bg-purple-500 hover:bg-purple-600 text-white rounded-full shadow-lg flex items-center justify-center touch-manipulation"
+            title="Tools"
+          >
+            <Layers size={24} />
+          </button>
+          
+          {selectedElement && (
+            <button
+              onClick={() => {
+                setShowMobileProperties(true);
+                setShowMobileTools(false);
+              }}
+              className="w-14 h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center touch-manipulation"
+              title="Properties"
+            >
+              <Settings size={24} />
+            </button>
+          )}
+        </div>
+
+        {/* Mobile Tools Drawer */}
+        {showMobileTools && (
+          <>
+            <div 
+              className="md:hidden fixed inset-0 bg-black/50 z-50"
+              onClick={() => setShowMobileTools(false)}
+            />
+            <div className="md:hidden fixed left-0 top-0 bottom-0 w-72 bg-white shadow-2xl z-50 overflow-y-auto">
+              <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between">
+                <h2 className="text-lg font-bold">{t('tools.title')}</h2>
+                <button
+                  onClick={() => setShowMobileTools(false)}
+                  className="p-3 rounded-lg hover:bg-gray-100 text-2xl leading-none touch-manipulation min-h-[44px] min-w-[44px]"
+                >
+                  ×
+                </button>
+              </div>
+              
+              <div className="p-4 space-y-2">
+                {/* Recording & Playback Controls */}
+                <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-3 rounded-lg mb-3">
+                  <h3 className="text-xs font-semibold text-gray-600 mb-2">RECORDING & PLAYBACK</h3>
+                  {!recording ? (
+                    <button onClick={() => { startRecording(); setShowMobileTools(false); }} className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-blue-500 text-white hover:bg-blue-600 touch-manipulation mb-2">
+                      <Film size={20} /> <span className="font-medium">Start Recording</span>
+                    </button>
+                  ) : (
+                    <button onClick={() => { stopRecording(); setShowMobileTools(false); }} className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-red-500 text-white hover:bg-red-600 touch-manipulation mb-2">
+                      <Square size={20} /> <span className="font-medium">Stop Recording ({Math.floor(recordingTimeElapsed / 60)}:{(recordingTimeElapsed % 60).toString().padStart(2, '0')})</span>
+                    </button>
+                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button onClick={() => { playAnimations(); setShowMobileTools(false); }} disabled={isPlaying} className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-green-500 text-white hover:bg-green-600 disabled:opacity-50 touch-manipulation">
+                      <Play size={18} /> <span>Play</span>
+                    </button>
+                    <button onClick={() => { resetAnimations(); setShowMobileTools(false); }} className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-orange-500 text-white hover:bg-orange-600 touch-manipulation">
+                      <Pause size={18} /> <span>Reset</span>
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Templates & Effects */}
+                <button onClick={() => { setShowTemplates(!showTemplates); setShowMobileTools(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-purple-50 hover:bg-purple-100 touch-manipulation">
+                  <Layers size={20} className="text-purple-600" /> <span className="font-medium">Templates</span>
+                </button>
+                
+                <button onClick={() => { setShowEffectsPanel(!showEffectsPanel); setShowMobileTools(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-indigo-50 hover:bg-indigo-100 touch-manipulation">
+                  <Sparkles size={20} className="text-indigo-600" /> <span className="font-medium">Effects</span>
+                </button>
+                
+                <div className="border-t my-3" />
+                
+                {/* Add Elements */}
+                <h3 className="text-xs font-semibold text-gray-500 mb-2">ADD ELEMENTS</h3>
+                <button onClick={() => { setCurrentTool('select'); setShowMobileTools(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg touch-manipulation ${currentTool === 'select' ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100'}`}>
+                  <MousePointer size={20} /> <span>Select</span>
+                </button>
+                <button onClick={() => { addElement('text'); setShowMobileTools(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 touch-manipulation">
+                  <Type size={20} /> <span>Add Text</span>
+                </button>
+                <button onClick={() => { addElement('rectangle'); setShowMobileTools(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 touch-manipulation">
+                  <Square size={20} /> <span>Rectangle</span>
+                </button>
+                <button onClick={() => { addElement('circle'); setShowMobileTools(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 touch-manipulation">
+                  <Circle size={20} /> <span>Circle</span>
+                </button>
+                <button onClick={() => { addElement('triangle'); setShowMobileTools(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 touch-manipulation">
+                  <Triangle size={20} /> <span>Triangle</span>
+                </button>
+                <button onClick={() => { addElement('star'); setShowMobileTools(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 touch-manipulation">
+                  <Star size={20} /> <span>Star</span>
+                </button>
+                <button onClick={() => { fileInputRef.current?.click(); setShowMobileTools(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 touch-manipulation">
+                  <Image size={20} /> <span>Add Image</span>
+                </button>
+                
+                <div className="border-t my-3" />
+                
+                {/* Zoom Controls */}
+                <h3 className="text-xs font-semibold text-gray-500 mb-2">VIEW</h3>
+                <div className="flex gap-2">
+                  <button onClick={() => { zoom('in'); }} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg hover:bg-gray-100 touch-manipulation">
+                    <ZoomIn size={20} /> <span>Zoom In</span>
+                  </button>
+                  <button onClick={() => { zoom('out'); }} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg hover:bg-gray-100 touch-manipulation">
+                    <ZoomOut size={20} /> <span>Zoom Out</span>
+                  </button>
+                </div>
+                
+                <div className="border-t my-3" />
+                
+                {/* Undo/Redo & Save */}
+                <h3 className="text-xs font-semibold text-gray-500 mb-2">ACTIONS</h3>
+                <div className="flex gap-2">
+                  <button onClick={undo} disabled={historyIndex <= 0} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg hover:bg-gray-100 disabled:opacity-50 touch-manipulation">
+                    <Undo size={20} /> <span>Undo</span>
+                  </button>
+                  <button onClick={redo} disabled={historyIndex >= history.length - 1} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg hover:bg-gray-100 disabled:opacity-50 touch-manipulation">
+                    <Redo size={20} /> <span>Redo</span>
+                  </button>
+                </div>
+                
+                <button onClick={() => { handleSaveClick(); setShowMobileTools(false); }} className="w-full flex items-center gap-3 px-4 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 touch-manipulation">
+                  <Save size={20} /> <span>Save Project</span>
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Mobile Properties Drawer */}
+        {showMobileProperties && selectedElementData && (
+          <>
+            <div 
+              className="md:hidden fixed inset-0 bg-black/50 z-50"
+              onClick={() => setShowMobileProperties(false)}
+            />
+            <div className="md:hidden fixed right-0 top-0 bottom-0 w-80 max-w-full bg-white shadow-2xl z-50 overflow-y-auto">
+              <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between">
+                <h2 className="text-lg font-bold">{t('properties.title')}</h2>
+                <button onClick={() => setShowMobileProperties(false)} className="p-3 rounded-lg hover:bg-gray-100 text-2xl leading-none touch-manipulation min-h-[44px] min-w-[44px]">
+                  ×
+                </button>
+              </div>
+              
+              <div className="p-4 space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium mb-2">X</label>
+                    <input type="number" value={Math.round(selectedElementData.x)} onChange={(e) => updateElement(selectedElement, { x: parseInt(e.target.value) })} className="w-full px-3 py-3 text-base border rounded-lg touch-manipulation" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-2">Y</label>
+                    <input type="number" value={Math.round(selectedElementData.y)} onChange={(e) => updateElement(selectedElement, { y: parseInt(e.target.value) })} className="w-full px-3 py-3 text-base border rounded-lg touch-manipulation" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-2">Width</label>
+                    <input type="number" value={Math.round(selectedElementData.width)} onChange={(e) => updateElement(selectedElement, { width: parseInt(e.target.value) })} className="w-full px-3 py-3 text-base border rounded-lg touch-manipulation" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-2">Height</label>
+                    <input type="number" value={Math.round(selectedElementData.height)} onChange={(e) => updateElement(selectedElement, { height: parseInt(e.target.value) })} className="w-full px-3 py-3 text-base border rounded-lg touch-manipulation" />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium mb-2">Rotation</label>
+                  <div className="flex items-center gap-3">
+                    <input type="range" min="0" max="360" value={selectedElementData.rotation || 0} onChange={(e) => updateElement(selectedElement, { rotation: parseInt(e.target.value) })} className="flex-1 h-8 touch-manipulation" />
+                    <span className="text-base font-medium min-w-[50px]">{selectedElementData.rotation || 0}°</span>
+                  </div>
+                </div>
+
+                {selectedElementData.type === 'text' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-medium mb-2">Font Size</label>
+                      <input type="number" value={selectedElementData.fontSize} onChange={(e) => updateElement(selectedElement, { fontSize: parseInt(e.target.value) })} className="w-full px-3 py-3 text-base border rounded-lg touch-manipulation" min="8" max="200" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-2">Color</label>
+                      <input type="color" value={selectedElementData.color} onChange={(e) => updateElement(selectedElement, { color: e.target.value })} className="w-full h-12 rounded-lg cursor-pointer touch-manipulation" />
+                    </div>
+                  </>
+                )}
+
+                {['rectangle', 'circle', 'triangle', 'star', 'hexagon'].includes(selectedElementData.type) && (
+                  <div>
+                    <label className="block text-xs font-medium mb-2">Fill Color</label>
+                    <input type="color" value={selectedElementData.fill} onChange={(e) => updateElement(selectedElement, { fill: e.target.value })} className="w-full h-12 rounded-lg cursor-pointer touch-manipulation" />
+                  </div>
+                )}
+
+                <div className="border-t pt-4 flex gap-2">
+                  <button onClick={() => { duplicateElement(selectedElement); setShowMobileProperties(false); }} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-blue-100 text-blue-600 rounded-lg touch-manipulation">
+                    <Copy size={18} /> <span>Duplicate</span>
+                  </button>
+                  <button onClick={() => { deleteElement(selectedElement); setShowMobileProperties(false); }} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-100 text-red-600 rounded-lg touch-manipulation">
+                    <Trash2 size={18} /> <span>Delete</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
         {/* Save Project Dialog */}
         {showSaveDialog && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+          <div className={`${styles.modalOverlay || ''} fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50`}>
+            <div className={`${styles.modalContent || ''} bg-white rounded-lg p-6 w-full max-w-md mx-4`}>
               <h3 className="text-xl font-bold text-gray-900 mb-4">Save Project</h3>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
