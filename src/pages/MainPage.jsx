@@ -757,8 +757,8 @@ const Sowntra = () => {
 
   // Create custom template function with proper centering
   const createCustomTemplate = useCallback(() => {
-    let width = customTemplateSize.width;
-    let height = customTemplateSize.height;
+    let width = parseInt(customTemplateSize.width) || 800;
+    let height = parseInt(customTemplateSize.height) || 600;
     
     // Convert units to pixels if needed
     if (customTemplateSize.unit === 'in') {
@@ -772,9 +772,9 @@ const Sowntra = () => {
       height = Math.round(height * 37.79527559);
     }
     
-    // Set minimum and maximum limits
-    width = Math.max(100, Math.min(10000, width));
-    height = Math.max(100, Math.min(10000, height));
+    // Set minimum and maximum limits (more flexible range)
+    width = Math.max(50, Math.min(50000, width));
+    height = Math.max(50, Math.min(50000, height));
     
     // Set the new canvas size
     setCanvasSize({ width, height });

@@ -11,16 +11,18 @@ const CustomTemplateModal = ({
   if (!show) return null;
 
   const handleWidthChange = (value) => {
+    // Always update with the raw value (including empty string)
     onSizeChange({
       ...templateSize,
-      width: parseInt(value) || 800
+      width: value
     });
   };
 
   const handleHeightChange = (value) => {
+    // Always update with the raw value (including empty string)
     onSizeChange({
       ...templateSize,
-      height: parseInt(value) || 600
+      height: value
     });
   };
 
@@ -33,12 +35,17 @@ const CustomTemplateModal = ({
 
   const getPixelEquivalent = () => {
     const { width, height, unit } = templateSize;
-    if (unit === 'px') return { width, height };
+    
+    // Handle empty or invalid values
+    const w = parseInt(width) || 0;
+    const h = parseInt(height) || 0;
+    
+    if (unit === 'px') return { width: w, height: h };
     
     const multiplier = unit === 'in' ? 96 : unit === 'mm' ? 3.78 : 37.8;
     return {
-      width: Math.round(width * multiplier),
-      height: Math.round(height * multiplier)
+      width: Math.round(w * multiplier),
+      height: Math.round(h * multiplier)
     };
   };
 
@@ -69,14 +76,22 @@ const CustomTemplateModal = ({
                 Width
               </label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={templateSize.width}
-                onChange={(e) => handleWidthChange(e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Allow empty or numeric values only
+                  if (value === '' || /^\d+$/.test(value)) {
+                    handleWidthChange(value);
+                  }
+                }}
                 className="w-full p-2 border-2 border-gray-300 rounded-lg 
                            focus:border-blue-500 focus:outline-none
                            md:p-2 sm:p-1.5 sm:text-sm"
-                min="100"
-                max="10000"
+                placeholder="Enter width"
+                autoComplete="off"
               />
             </div>
             <div>
@@ -103,14 +118,22 @@ const CustomTemplateModal = ({
               Height
             </label>
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={templateSize.height}
-              onChange={(e) => handleHeightChange(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                // Allow empty or numeric values only
+                if (value === '' || /^\d+$/.test(value)) {
+                  handleHeightChange(value);
+                }
+              }}
               className="w-full p-2 border-2 border-gray-300 rounded-lg 
                          focus:border-blue-500 focus:outline-none
                          md:p-2 sm:p-1.5 sm:text-sm"
-              min="100"
-              max="10000"
+              placeholder="Enter height"
+              autoComplete="off"
             />
           </div>
           
