@@ -1,6 +1,7 @@
 import React from 'react';
 import { Sparkles, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline } from 'lucide-react';
 import GradientPicker from './GradientPicker';
+import { animations } from '../types/types.js';
 
 const PropertiesPanel = ({
   t,

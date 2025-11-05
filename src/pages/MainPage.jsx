@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { textEffects,imageEffects,fontFamilies,supportedLanguages,specialEffects,stickerOptions,filterOptions,animations,gradientPresets, shapeEffects } from '../types/types.ts';
+import { textEffects,imageEffects,fontFamilies,supportedLanguages,specialEffects,stickerOptions,filterOptions,animations,gradientPresets, shapeEffects } from '../types/types.js';
 import "../styles/MainPageStyles.css";
 
 import { 
@@ -24,6 +24,12 @@ import { useAuth } from '../contexts/AuthContext';
 import ShareButton from '../components/ShareButton';
 import jsPDF from 'jspdf';
 import { projectAPI } from '../services/api';
+import Header from './../components/Header';
+import TemplateSelector from '../components/TemplateSelector.jsx';
+import LeftToolsPanel from '../components/LeftToolsPanel.jsx';
+import Canvas from '../components/Canvas.jsx';
+import FloatingToolbar from '../components/FloatingToolbar.jsx';
+import PagesNav from '../components/PagesNav.jsx';
 
 const Sowntra = () => {
   const { t, i18n } = useTranslation();
@@ -4059,502 +4065,88 @@ const Sowntra = () => {
 
       <div className={`h-screen flex flex-col ${textDirection === 'rtl' ? 'rtl-layout' : ''}`}>
         {/* Header */}
-        <div className="main-header">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => navigate('/home')}
-              className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-              title="Back to Home"
-            >
-              <ArrowLeft className="w-5 h-5 mr-1" />
-            </button>
-            <h1 className="text-xl font-bold flex items-center">
-              <span className="handwritten-logo">Sowntra</span>
-            </h1>
-            <div className="flex space-x-2">
-              <button
-                onClick={() => zoom('in')}
-                className="p-2 rounded hover:bg-white/20"
-                title="Zoom In"
-              >
-                <ZoomIn size={18} />
-              </button>
-              <button
-                onClick={() => zoom('out')}
-                className="p-2 rounded hover:bg-white/20"
-                title="Zoom Out"
-              >
-                <ZoomOut size={18} />
-              </button>
-              <button
-                onClick={centerCanvas}
-                className="p-2 rounded hover:bg-white/20"
-                title="Fit to Viewport"
-              >
-                <Maximize size={18} />
-              </button>
-              <span className="px-2 py-1 bg-white/20 rounded text-sm">
-                {Math.round(zoomLevel * 100)}%
-              </span>
-            </div>
-          </div>
+         <Header
+        t={t}
+        i18n={i18n}
+        navigate={navigate}
+        zoom={zoom}
+        centerCanvas={centerCanvas}
+        zoomLevel={zoomLevel}
+        showTemplates={showTemplates}
+        setShowTemplates={setShowTemplates}
+        showEffectsPanel={showEffectsPanel}
+        setShowEffectsPanel={setShowEffectsPanel}
+        playAnimations={playAnimations}
+        resetAnimations={resetAnimations}
+        isPlaying={isPlaying}
+        setShowLanguageMenu={setShowLanguageMenu}
+        showLanguageMenu={showLanguageMenu}
+        supportedLanguages={supportedLanguages}
+        currentLanguage={currentLanguage}
+        setCurrentLanguage={setCurrentLanguage}
+        setShowLanguageHelp={setShowLanguageHelp}
+        showAccountMenu={showAccountMenu}
+        setShowAccountMenu={setShowAccountMenu}
+        handleLogout={handleLogout}
+        setGradientPickerKey={setGradientPickerKey}
+      />
 
-          <div className="flex space-x-2">
-            <button
-              onClick={() => setShowTemplates(!showTemplates)}
-              className={`px-3 py-2 rounded flex items-center ${showTemplates ? 'bg-white text-purple-600' : 'bg-white/20 hover:bg-white/30'}`}
-            >
-              <Layers size={16} className="mr-1" />
-              {t('toolbar.templates')}
-            </button>
-            <button
-              onClick={() => setShowEffectsPanel(!showEffectsPanel)}
-              className={`px-3 py-2 rounded flex items-center ${showEffectsPanel ? 'bg-white text-purple-600' : 'bg-white/20 hover:bg-white/30'}`}
-            >
-              <Sparkles size={16} className="mr-1" />
-              {t('toolbar.effects')}
-            </button>
-            <button
-              onClick={playAnimations}
-              disabled={isPlaying}
-              className="px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50 flex items-center"
-            >
-              <Play size={16} className="mr-1" />
-              {t('toolbar.play')}
-            </button>
-            <button
-              onClick={resetAnimations}
-              className="px-3 py-2 bg-white/20 text-white rounded hover:bg-white/30 flex items-center"
-            >
-              <Pause size={16} className="mr-1" />
-              {t('toolbar.reset')}
-            </button>
-            {recording ? (
-              <div className="flex items-center space-x-2">
-                <div className="px-3 py-2 bg-red-50 border border-red-200 rounded flex items-center text-red-600">
-                  <div className="w-2 h-2 bg-red-500 rounded-full mr-2 animate-pulse"></div>
-                  Recording: {Math.floor(recordingTimeElapsed / 60)}:{(recordingTimeElapsed % 60).toString().padStart(2, '0')}
-                </div>
-                <button
-                  onClick={stopRecording}
-                  className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 flex items-center"
-                >
-                  <Square size={16} className="mr-1" />
-                  Stop
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={startRecording}
-                className="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center"
-              >
-                <Film size={16} className="mr-1" />
-                {t('toolbar.record')}
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <div className="relative">
-              <button
-                onClick={() => setShowLanguageMenu(!showLanguageMenu)}
-                className="p-2 rounded hover:bg-white/20"
-                title="Language"
-              >
-                <Languages size={20} />
-              </button>
-              {showLanguageMenu && (
-                <div className="dropdown-menu" style={{ width: '200px' }}>
-                  <div className="font-semibold px-3 py-2 border-b text-gray-700">{t('language.title')}</div>
-                  {Object.entries(supportedLanguages).map(([code, lang]) => (
-                    <div
-                      key={code}
-                      className={`dropdown-item ${currentLanguage === code ? 'bg-blue-100 text-blue-800' : ''}`}
-                      onClick={() => {
-                        setCurrentLanguage(code);
-                        i18n.changeLanguage(code);
-                        setShowLanguageMenu(false);
-                        setGradientPickerKey(prev => prev + 1);
-                      }}
-                    >
-                      <span>{lang.name}</span>
-                    </div>
-                  ))}
-                  <div className="border-t mt-1">
-                    <div
-                      className="dropdown-item text-blue-500"
-                      onClick={() => {
-                        setShowLanguageHelp(true);
-                        setShowLanguageMenu(false);
-                      }}
-                    >
-                      <HelpCircle size={16} className="mr-2" />
-                      Typing Help
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <ShareButton 
-              url={window.location.href}
-              title="Check out my design on Sowntra!"
-              text="I created this amazing design on Sowntra. Check it out!"
-              className="px-3 py-1.5"
-            />
-            
-            <div className="relative">
-              <button
-                onClick={() => setShowAccountMenu(!showAccountMenu)}
-                className="p-2 rounded hover:bg-white/20"
-                title="Account"
-              >
-                <User size={20} />
-              </button>
-              {showAccountMenu && (
-                <div className="dropdown-menu">
-                  <div className="dropdown-item">
-                    <User size={16} />
-                    Profile
-                  </div>
-                  <div className="dropdown-item">
-                    <Settings size={16} />
-                    Settings
-                  </div>
-                  <div 
-                    className="dropdown-item text-red-600 hover:bg-red-50"
-                    onClick={handleLogout}
-                  >
-                    <LogOut size={16} />
-                    Logout
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
 
         {/* Template Selector */}
         {showTemplates && (
-          <div className="bg-white shadow-sm p-3 border-b">
-            <h3 className="font-semibold mb-2">Select Template</h3>
-            <div className="template-grid">
-              {/* Custom Template Option */}
-              <button
-                onClick={() => applyTemplate('custom')}
-                className="template-button"
-              >
-                <div className="mb-1"><Plus size={24} /></div>
-                <div className="text-xs text-center">Custom Size</div>
-                <div className="text-xs text-gray-500 mt-1">Create your own</div>
-              </button>
-              
-              {Object.entries(socialMediaTemplates).map(([key, template]) => (
-                <button
-                  key={key}
-                  onClick={() => applyTemplate(key)}
-                  className="template-button"
-                >
-                  <div className="mb-1">{template.icon}</div>
-                  <div className="text-xs text-center">{template.name}</div>
-                  <div className="text-xs text-gray-500 mt-1">{template.width}×{template.height}</div>
-                </button>
-              ))}
-            </div>
-          </div>
+          <TemplateSelector/>
         )}
 
         {/* Custom Template Modal */}
         <CustomTemplateModal />
 
         {/* Pages Navigation */}
-        <div className="bg-white shadow-sm p-2 border-b flex items-center space-x-2">
-          <span className="text-sm font-medium">{t('pages.title')}:</span>
-          {pages.map(page => (
-            <button
-              key={page.id}
-              onClick={() => setCurrentPage(page.id)}
-              className={`px-3 py-1 rounded text-sm ${currentPage === page.id ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'}`}
-            >
-              {page.name}
-            </button>
-          ))}
-          <button
-            onClick={addNewPage}
-            className="p-1 rounded hover:bg-gray-100"
-            title="Add Page"
-          >
-            <Plus size={16} />
-          </button>
-          <button
-            onClick={deleteCurrentPage}
-            className="p-1 rounded hover:bg-gray-100"
-            title="Delete Page"
-            disabled={pages.length <= 1}
-          >
-            <Trash2 size={16} />
-          </button>
-          <button
-            onClick={renameCurrentPage}
-            className="p-1 rounded hover:bg-gray-100"
-            title="Rename Page"
-          >
-            <Type size={16} />
-          </button>
-        </div>
+        <PagesNav
+          pages={pages}
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+          addNewPage={addNewPage}
+          deleteCurrentPage={deleteCurrentPage}
+          renameCurrentPage={renameCurrentPage}
+          t={t}
+        />
 
         {/* Main Content Area */}
         <div className="main-content">
-          {/* Left Tools Panel */}
-          <div className="tools-panel">
-            <h2 className="text-sm font-bold mb-4 text-center">{t('tools.title')}</h2>
-            
-            <div className="space-y-2">
-              <button
-                onClick={() => setCurrentTool('select')}
-                className={`p-2 rounded-lg ${currentTool === 'select' ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100'}`}
-                title="Select"
-              >
-                <MousePointer size={20} />
-              </button>
-              <button
-                onClick={() => setCurrentTool('pan')}
-                className={`p-2 rounded-lg ${currentTool === 'pan' ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100'}`}
-                title="Pan"
-              >
-                <Move size={20} />
-              </button>
-              <button
-                onClick={() => addElement('text')}
-                className="p-2 rounded-lg hover:bg-gray-100"
-                title="Text"
-              >
-                <Type size={20} />
-              </button>
-              <button
-                onClick={() => addElement('rectangle')}
-                className="p-2 rounded-lg hover:bg-gray-100"
-                title="Rectangle"
-              >
-                <Square size={20} />
-              </button>
-              <button
-                onClick={() => addElement('circle')}
-                className="p-2 rounded-lg hover:bg-gray-100"
-                title="Circle"
-              >
-                <Circle size={20} />
-              </button>
-              <button
-                onClick={() => addElement('triangle')}
-                className="p-2 rounded-lg hover:bg-gray-100"
-                title="Triangle"
-              >
-                <Triangle size={20} />
-              </button>
-              <button
-                onClick={() => addElement('line')}
-                className="p-2 rounded-lg hover:bg-gray-100"
-                title="Line"
-              >
-                <Minus size={20} />
-              </button>
-              <button
-                onClick={() => addElement('arrow')}
-                className="p-2 rounded-lg hover:bg-gray-100"
-                title="Arrow"
-              >
-                <ArrowRight size={20} />
-              </button>
-              <button
-                onClick={() => addElement('star')}
-                className="p-2 rounded-lg hover:bg-gray-100"
-                title="Star"
-              >
-                <Star size={20} />
-              </button>
-              <button
-                onClick={() => addElement('hexagon')}
-                className="p-2 rounded-lg hover:bg-gray-100"
-                title="Hexagon"
-              >
-                <Hexagon size={20} />
-              </button>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="p-2 rounded-lg hover:bg-gray-100"
-                title="Image"
-              >
-                <Image size={20} />
-              </button>
-              {/* <button
-                onClick={() => setCurrentTool('pen')}
-                className={`p-2 rounded-lg ${currentTool === 'pen' ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100'}`}
-                title="Pen Tool"
-              >
-                <PenTool size={20} />
-              </button>
-              <button
-                onClick={() => setCurrentTool('sticker')}
-                className={`p-2 rounded-lg ${currentTool === 'sticker' ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100'}`}
-                title="Stickers"
-              >
-                <Sticker size={20} />
-              </button> */}
-            </div>
-
-            <div className="mt-6 space-y-2">
-              <button
-                onClick={undo}
-                disabled={historyIndex <= 0}
-                className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50"
-                title="Undo"
-              >
-                <Undo size={20} />
-              </button>
-              <button
-                onClick={redo}
-                disabled={historyIndex >= history.length - 1}
-                className="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50"
-                title="Redo"
-              >
-                <Redo size={20} />
-              </button>
-              <button
-                onClick={() => setShowGrid(!showGrid)}
-                className={`p-2 rounded-lg ${showGrid ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100'}`}
-                title="Toggle Grid"
-              >
-                <Grid size={20} />
-              </button>
-              <button
-                onClick={() => setSnapToGrid(!snapToGrid)}
-                className={`p-2 rounded-lg ${snapToGrid ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100'}`}
-                title="Snap to Grid"
-              >
-                <Layers size={20} />
-              </button>
-            </div>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleImageUpload}
-              className="hidden"
-            />
-            
-            <input
-              ref={loadProjectInputRef}
-              type="file"
-              accept="application/json,.json"
-              onChange={handleProjectFileLoad}
-              className="hidden"
-            />
-          </div>
+          {/* Left Tools Panel component added*/}
+          <LeftToolsPanel
+            t={(key) => key}
+            currentTool={currentTool}
+            setCurrentTool={setCurrentTool}
+            addElement={addElement}
+            fileInputRef={fileInputRef}
+            undo={undo}
+            redo={redo}
+            historyIndex={historyIndex}
+            history={history}
+            showGrid={showGrid}
+            setShowGrid={setShowGrid}
+            snapToGrid={snapToGrid}
+            setSnapToGrid={setSnapToGrid}
+          />
 
           {/* Canvas Area - FILLS SCREEN */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <div 
-              className="canvas-container"
-              ref={canvasContainerRef}
-              style={{
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                flex: 1,
-                overflow: 'hidden',
-                backgroundColor: '#f0f0f0',
-                padding: '5px',
-                width: '100%',
-                height: '100%'
-              }}
-            >
-              <div
-                style={{
-                  position: 'relative',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  width: '100%',
-                  height: '100%'
-                }}
-              >
-                <div
-                  className="bg-white shadow-lg"
-                  style={{
-                    width: `${canvasSize.width}px`,
-                    height: `${canvasSize.height}px`,
-                    transform: `scale(${zoomLevel}) translate(${canvasOffset.x / zoomLevel}px, ${canvasOffset.y / zoomLevel}px)`,
-                    transformOrigin: 'center center',
-                    position: 'relative',
-                    backgroundColor: 'white',
-                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
-                    transition: 'transform 0.2s ease-out'
-                  }}
-                  ref={canvasRef}
-                  onMouseDown={handleCanvasMouseDown}
-                  onMouseEnter={handleCanvasMouseEnter}
-                  onMouseLeave={handleCanvasMouseLeave}
-                >
-                  {/* Grid */}
-                  {showGrid && (
-                    <div 
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        backgroundSize: '20px 20px',
-                        backgroundImage: 'linear-gradient(to right, #ccc 1px, transparent 1px), linear-gradient(to bottom, #ccc 1px, transparent 1px)',
-                        pointerEvents: 'none'
-                      }}
-                    />
-                  )}
-                  
-                  {getCurrentPageElements().map(renderElement)}
-                  {renderDrawingPath()}
-                  
-                  {/* Alignment Lines */}
-                  {showAlignmentLines && (
-                    <>
-                      {alignmentLines.vertical.map((x, i) => (
-                        <div
-                          key={`v-${i}`}
-                          style={{
-                            position: 'absolute',
-                            left: x,
-                            top: 0,
-                            width: 1,
-                            height: '100%',
-                            backgroundColor: '#cb0ee4ff',
-                            pointerEvents: 'none',
-                            zIndex: 10000
-                          }}
-                        />
-                      ))}
-                      {alignmentLines.horizontal.map((y, i) => (
-                        <div
-                          key={`h-${i}`}
-                          style={{
-                            position: 'absolute',
-                            left: 0,
-                            top: y,
-                            width: '100%',
-                            height: 1,
-                            backgroundColor: '#cb0ee4ff',
-                            pointerEvents: 'none',
-                            zIndex: 10000
-                          }}
-                        />
-                      ))}
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+          <Canvas
+              canvasContainerRef={canvasContainerRef}
+              canvasRef={canvasRef}
+              canvasSize={canvasSize}
+              zoomLevel={zoomLevel}
+              canvasOffset={canvasOffset}
+              handleCanvasMouseDown={handleCanvasMouseDown}
+              handleCanvasMouseEnter={handleCanvasMouseEnter}
+              handleCanvasMouseLeave={handleCanvasMouseLeave}
+              showGrid={showGrid}
+              getCurrentPageElements={getCurrentPageElements}
+              renderElement={renderElement}
+              renderDrawingPath={renderDrawingPath}
+              showAlignmentLines={showAlignmentLines}
+              alignmentLines={alignmentLines}
+            />
 
           {/* Right Properties Panel */}
           <div className="properties-panel">
@@ -5077,7 +4669,8 @@ const Sowntra = () => {
                 </button>
               </div>
             </div>
-          </div>
+          </div> 
+          {/* <PropertiesPanel/> This will need to be added */}
         </div>
 
         {/* Effects Panel */}
@@ -5085,101 +4678,18 @@ const Sowntra = () => {
 
         {/* Floating Toolbar for Selected Elements */}
         {selectedElements.size > 0 && (
-          <div
-            ref={floatingToolbarRef}
-            className="fixed left-1/2 bottom-4 transform -translate-x-1/2 floating-toolbar"
-            style={{ zIndex: 1000 }}
-          >
-            <button
-              onClick={() => {
-                if (selectedElements.size > 1) {
-                  groupElements();
-                }
-              }}
-              className="toolbar-button"
-              title="Group"
-              disabled={selectedElements.size < 2}
-            >
-              <Group size={18} />
-            </button>
-            <button
-              onClick={() => {
-                if (selectedElementData?.type === 'group') {
-                  ungroupElements(selectedElement);
-                }
-              }}
-              className="toolbar-button"
-              title="Ungroup"
-              disabled={selectedElementData?.type !== 'group'}
-            >
-              <Ungroup size={18} />
-            </button>
-            <button
-              onClick={() => {
-                Array.from(selectedElements).forEach(id => {
-                  if (!lockedElements.has(id)) {
-                    changeZIndex(id, 'forward');
-                  }
-                });
-              }}
-              className="toolbar-button"
-              title="Bring Forward"
-            >
-              <PlusCircle size={18} />
-            </button>
-            <button
-              onClick={() => {
-                Array.from(selectedElements).forEach(id => {
-                  if (!lockedElements.has(id)) {
-                    changeZIndex(id, 'backward');
-                  }
-                });
-              }}
-              className="toolbar-button"
-              title="Send Backward"
-            >
-              <MinusCircle size={18} />
-            </button>
-            <button
-              onClick={() => {
-                Array.from(selectedElements).forEach(id => {
-                  if (!lockedElements.has(id)) {
-                    toggleElementLock(id);
-                  }
-                });
-              }}
-              className="toolbar-button"
-              title="Toggle Lock"
-            >
-              <Lock size={18} />
-            </button>
-            <button
-              onClick={() => {
-                Array.from(selectedElements).forEach(id => {
-                  if (!lockedElements.has(id)) {
-                    duplicateElement(id);
-                  }
-                });
-              }}
-              className="toolbar-button"
-              title="Duplicate"
-            >
-              <Copy size={18} />
-            </button>
-            <button
-              onClick={() => {
-                Array.from(selectedElements).forEach(id => {
-                  if (!lockedElements.has(id)) {
-                    deleteElement(id);
-                  }
-                });
-              }}
-              className="toolbar-button text-red-500"
-              title="Delete"
-            >
-              <Trash2 size={18} />
-            </button>
-          </div>
+           <FloatingToolbar
+            selectedElements={selectedElements}
+            selectedElementData={selectedElementData}
+            groupElements={groupElements}
+            ungroupElements={ungroupElements}
+            selectedElement={selectedElement}
+            changeZIndex={changeZIndex}
+            toggleElementLock={toggleElementLock}
+            duplicateElement={duplicateElement}
+            deleteElement={deleteElement}
+            lockedElements={lockedElements}
+          />
         )}
 
         {/* Language Help Modal */}

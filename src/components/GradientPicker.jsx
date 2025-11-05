@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { gradientPresets } from '../types/types.ts';
+import { gradientPresets } from '../types/types.js';
 import { Trash2 } from 'lucide-react';
 
 const GradientPicker = ({ gradient, onGradientChange }) => {
