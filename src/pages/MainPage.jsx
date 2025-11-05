@@ -2,21 +2,13 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { textEffects,imageEffects,fontFamilies,supportedLanguages,specialEffects,stickerOptions,filterOptions,animations,gradientPresets, shapeEffects,socialMediaTemplates } from '../types/types.js';
 import "../styles/MainPageStyles.css";
 
-import { 
-  Plus, Square, Circle, Triangle, Type, Image, Play, Pause, 
+import {  Square,  
   Copy, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline,
-  Download, Save, FolderOpen, Undo, Redo, Group, Ungroup, Move, Minus, 
-  Maximize, MinusCircle, PlusCircle, Layers, Grid, MousePointer, ZoomIn,
-  ZoomOut, Lock, Unlock, Users, MessageCircle, Star,
-  Hexagon,  ArrowRight, ArrowLeft,
-  Music,
-  Film, FileText, BookOpen, Printer, Heart,
-  Zap, 
-  CreditCard, 
-  Tv, Smartphone, Monitor,
-  Megaphone, 
-  User, LogOut, Settings,
-  Languages, Sparkles, HelpCircle
+  Download, Save, FolderOpen, 
+ MinusCircle, PlusCircle, 
+ Lock, Unlock,
+  Film,
+ Sparkles, 
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -3964,7 +3956,11 @@ const Sowntra = () => {
 
         {/* Template Selector */}
         {showTemplates && (
-          <TemplateSelector/>
+         <TemplateSelector
+            showTemplates={showTemplates}
+            socialMediaTemplates={socialMediaTemplates}
+            applyTemplate={applyTemplate}
+            />
         )}
 
         {/* Custom Template Modal */}
