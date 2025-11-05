@@ -277,7 +277,7 @@ const Sowntra = () => {
     loadTransliterationData();
   }, [currentLanguage]);
 
-  // Generate unique ID
+    // Generate unique ID
   const generateId = () => Math.random().toString(36).substr(2, 9);
 
   // Set current page elements

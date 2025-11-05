@@ -148,8 +148,6 @@ export const socialMediaTemplates = {
     }
   };
 
-
-
 export const textEffects = {
     none: { name: 'None', css: '' },
     shadow: { 
