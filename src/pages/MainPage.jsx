@@ -29,9 +29,32 @@ import LanguageHelpModal from '../features/canvas/components/modals/LanguageHelp
 import RecordingStatus from '../features/canvas/components/RecordingStatus';
 import EffectsPanel from '../features/canvas/components/EffectsPanel';
 import GradientPicker from '../features/canvas/components/GradientPicker';
+import PropertiesPanel from '../features/canvas/components/PropertiesPanel';
+import { MobileToolsDrawer, MobilePropertiesDrawer } from '../features/canvas/components/MobileDrawers';
+import MobileFABButtons from '../features/canvas/components/MobileFABButtons';
+import CanvasElement from '../features/canvas/components/CanvasElement';
 // Style imports
 import styles from '../styles/MainPage.module.css';
 import * as styleHelpers from '../utils/styleHelpers';
+// Utility imports
+import { 
+  getFilterCSS, 
+  getBackgroundStyle, 
+  getCanvasGradient, 
+  getCanvasEffects, 
+  getEffectCSS,
+  parseCSS 
+} from '../utils/helpers';
+import { 
+  drawElementToCanvas as drawElementToCanvasUtil,
+  exportAsImage as exportAsImageUtil,
+  exportAsPDF as exportAsPDFUtil,
+  exportAsSVG as exportAsSVGUtil,
+  getSortedElementsForExport
+} from '../utils/canvasExport';
+// Custom hooks
+import useElements from '../features/canvas/hooks/useElements';
+import useHistory from '../features/canvas/hooks/useHistory';
 
 const Sowntra = () => {
   const { t, i18n } = useTranslation();
@@ -53,8 +76,7 @@ const Sowntra = () => {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
-  const [history, setHistory] = useState([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
+  // history and historyIndex now managed by useHistory hook
   const [showGrid, setShowGrid] = useState(false);
   const [snapToGrid, setSnapToGrid] = useState(false);
   const [recording, setRecording] = useState(false);
@@ -113,52 +135,7 @@ const Sowntra = () => {
   const loadProjectInputRef = useRef(null);
   const zoomIndicatorTimeoutRef = useRef(null);
 
-  // Get current page elements
-  const getCurrentPageElements = useCallback(() => {
-    const page = pages.find(p => p.id === currentPage);
-    return page ? page.elements : [];
-  }, [pages, currentPage]);
-
-  // Enhanced z-index sorting for exports
-  const getSortedElementsForExport = useCallback(() => {
-    const currentElements = getCurrentPageElements();
-    
-    // Create a copy and sort by zIndex to ensure proper layering
-    const sortedElements = [...currentElements].sort((a, b) => {
-      // Handle groups and their children properly
-      if (a.type === 'group' && b.groupId === a.id) return -1;
-      if (b.type === 'group' && a.groupId === b.id) return 1;
-      
-      // Regular zIndex comparison
-      return a.zIndex - b.zIndex;
-    });
-    
-    return sortedElements;
-  }, [getCurrentPageElements]);
-
-  // Export-ready elements with proper filtering
-  // eslint-disable-next-line no-unused-vars
-  const getExportReadyElements = useCallback(() => {
-    const currentElements = getCurrentPageElements();
-    
-    return [...currentElements]
-      .sort((a, b) => {
-        // First, sort by zIndex
-        if (a.zIndex !== b.zIndex) {
-          return a.zIndex - b.zIndex;
-        }
-        
-        // If same zIndex, maintain original order
-        return currentElements.indexOf(a) - currentElements.indexOf(b);
-      })
-      .filter(element => {
-        // Include all elements except temporary ones
-        return !element.isTemporary;
-      });
-  }, [getCurrentPageElements]);
-
-  // Calculate selectedElementData here at the top level
-  const selectedElementData = getCurrentPageElements().find(el => el.id === selectedElement);
+  // getCurrentPageElements will be provided by useElements hook below
 
   // Font families with Indian language support
   const fontFamilies = [
@@ -616,632 +593,78 @@ const Sowntra = () => {
     opacity: { name: 'Opacity', value: 100, max: 100, unit: '%' }
   };
 
-  // Generate unique ID
-  const generateId = () => Math.random().toString(36).substr(2, 9);
-
-  // Set current page elements
+  // Helper function for setCurrentPageElements (needed before hooks)
   const setCurrentPageElements = useCallback((newElements) => {
     setPages(pages.map(page => 
       page.id === currentPage ? { ...page, elements: newElements } : page
     ));
   }, [pages, currentPage]);
 
-  // Save to history
-  const saveToHistory = useCallback((newElements) => {
-    const newHistory = history.slice(0, historyIndex + 1);
-    newHistory.push(JSON.stringify(newElements));
-    setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
-  }, [history, historyIndex]);
+  // Custom Hooks - History Management
+  const {
+    history,
+    historyIndex,
+    saveToHistory,
+    undo,
+    redo,
+    canUndo,
+    canRedo
+  } = useHistory(setCurrentPageElements);
 
-  // Undo
-  const undo = useCallback(() => {
-    if (historyIndex > 0) {
-      const prevElements = JSON.parse(history[historyIndex - 1]);
-      setCurrentPageElements(prevElements);
-      setHistoryIndex(historyIndex - 1);
-    }
-  }, [history, historyIndex, setCurrentPageElements]);
+  // Custom Hooks - Element Management
+  const {
+    getCurrentPageElements,
+    addElement,
+    updateElement,
+    deleteElement,
+    duplicateElement,
+    toggleElementLock,
+    updateFilter,
+    groupElements,
+    ungroupElements,
+    changeZIndex
+  } = useElements({
+    pages,
+    currentPage,
+    setPages,
+    saveToHistory,
+    lockedElements,
+    setLockedElements,
+    selectedElement,
+    setSelectedElement,
+    selectedElements,
+    setSelectedElements,
+    setCurrentTool,
+    currentLanguage,
+    textDirection,
+    t,
+    filterOptions,
+    supportedLanguages
+  });
 
-  // Redo
-  const redo = useCallback(() => {
-    if (historyIndex < history.length - 1) {
-      const nextElements = JSON.parse(history[historyIndex + 1]);
-      setCurrentPageElements(nextElements);
-      setHistoryIndex(historyIndex + 1);
-    }
-  }, [history, historyIndex, setCurrentPageElements]);
-
-  // Add element to canvas
-  const addElement = useCallback((type, properties = {}) => {
+  // Export-ready elements with proper filtering (now that getCurrentPageElements is available)
+  // eslint-disable-next-line no-unused-vars
+  const getExportReadyElements = useCallback(() => {
     const currentElements = getCurrentPageElements();
-    const newElement = {
-      id: generateId(),
-      type,
-      x: 100,
-      y: 100,
-      width: type === 'text' ? 300 : type === 'line' ? 150 : 100, // Wider default for text
-      height: type === 'text' ? 100 : type === 'line' ? 2 : 100, // Taller default for text
-      rotation: 0,
-      animation: null,
-      zIndex: currentElements.length,
-      locked: false,
-      filters: JSON.parse(JSON.stringify(filterOptions)),
-      fill: properties.fill || (type === 'rectangle' ? '#3b82f6' : 
-                              type === 'circle' ? '#ef4444' : 
-                              type === 'triangle' ? '#10b981' : 
-                              type === 'star' ? '#f59e0b' : 
-                              type === 'hexagon' ? '#8b5cf6' : '#3b82f6'),
-      stroke: properties.stroke || (type === 'image' ? 'transparent' : '#000000'),
-      strokeWidth: properties.strokeWidth || (type === 'image' ? 0 : 2),
-      fillType: properties.fillType || 'solid',
-      gradient: properties.gradient || {
-        type: 'linear',
-        colors: ['#3b82f6', '#ef4444'],
-        stops: [0, 100],
-        angle: 90,
-        position: { x: 50, y: 50 }
-      },
-      textEffect: 'none',
-      imageEffect: 'none',
-      shapeEffect: 'none',
-      specialEffect: 'none',
-      effectSettings: {},
-      borderRadius: properties.borderRadius || 0, // Ensure borderRadius is included
-      shadow: properties.shadow || null, // Ensure shadow is included
-      ...properties
-    };
-
-    if (type === 'text') {
-      newElement.content = t('text.doubleClickToEdit');
-      newElement.fontSize = 24;
-      newElement.fontFamily = supportedLanguages[currentLanguage]?.font || 'Arial';
-      newElement.fontWeight = 'normal';
-      newElement.fontStyle = 'normal';
-      newElement.textDecoration = 'none';
-      newElement.color = '#000000';
-      newElement.textAlign = textDirection === 'rtl' ? 'right' : 'left';
-    } else if (type === 'rectangle') {
-      newElement.borderRadius = properties.borderRadius || 0;
-    } else if (type === 'image') {
-      newElement.src = properties.src || '';
-      newElement.borderRadius = properties.borderRadius || 0;
-      // Ensure no stroke by default for images
-      newElement.stroke = properties.stroke || 'transparent';
-      newElement.strokeWidth = properties.strokeWidth || 0;
-    } else if (type === 'line') {
-      // Line specific properties
-    } else if (type === 'arrow') {
-      newElement.fill = '#000000';
-    } else if (type === 'star') {
-      newElement.points = 5;
-    } else if (type === 'drawing') {
-      newElement.stroke = '#000000';
-      newElement.strokeWidth = 3;
-      newElement.path = properties.path || [];
-    } else if (type === 'sticker') {
-      newElement.sticker = properties.sticker || 'smile';
-      newElement.fill = properties.fill || '#f59e0b';
-      newElement.width = 80;
-      newElement.height = 80;
-    }
-
-    const newElements = [...currentElements, newElement];
-    setCurrentPageElements(newElements);
-    setSelectedElement(newElement.id);
-    setSelectedElements(new Set([newElement.id]));
-    setCurrentTool('select');
-    saveToHistory(newElements);
-  }, [getCurrentPageElements, setCurrentPageElements, saveToHistory, currentLanguage, textDirection, t]);
-
-  // Apply template function with proper centering and auto-zoom
-  const applyTemplate = useCallback((platform) => {
-    if (platform === 'custom') {
-      setShowCustomTemplateModal(true);
-      return;
-    }
     
-    const template = socialMediaTemplates[platform];
-    if (template) {
-      // Set the new canvas size
-      setCanvasSize({ width: template.width, height: template.height });
-      
-      // Center and zoom to fit after a short delay for DOM update
-      setTimeout(() => {
-        centerCanvas();
-      }, 100);
-      
-      setShowTemplates(false);
-    }
-  }, [centerCanvas]);
-
-  // Create custom template function with proper centering
-  const createCustomTemplate = useCallback(() => {
-    let width = parseInt(customTemplateSize.width) || 800;
-    let height = parseInt(customTemplateSize.height) || 600;
-    
-    // Convert units to pixels if needed
-    if (customTemplateSize.unit === 'in') {
-      width = Math.round(width * 96); // 96 DPI
-      height = Math.round(height * 96);
-    } else if (customTemplateSize.unit === 'mm') {
-      width = Math.round(width * 3.779527559); // 1mm = 3.78px
-      height = Math.round(height * 3.779527559);
-    } else if (customTemplateSize.unit === 'cm') {
-      width = Math.round(width * 37.79527559); // 1cm = 37.8px
-      height = Math.round(height * 37.79527559);
-    }
-    
-    // Set minimum and maximum limits (more flexible range)
-    width = Math.max(50, Math.min(50000, width));
-    height = Math.max(50, Math.min(50000, height));
-    
-    // Set the new canvas size
-    setCanvasSize({ width, height });
-    
-    // Center and zoom to fit after a short delay for DOM update
-    setTimeout(() => {
-      centerCanvas();
-    }, 100);
-    
-    setShowCustomTemplateModal(false);
-    setShowTemplates(false);
-  }, [customTemplateSize, centerCanvas]);
-
-  // Auto-center on window resize
-  useEffect(() => {
-    const handleResize = () => {
-      centerCanvas();
-    };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [centerCanvas]);
-
-  // GradientPicker is now imported from components
-
-  // Handle image upload
-  const handleImageUpload = useCallback((event) => {
-    const file = event.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        addElement('image', { src: e.target.result });
-      };
-      reader.readAsDataURL(file);
-    }
-  }, [addElement]);
-
-  // Update element properties
-  const updateElement = useCallback((id, updates) => {
-    const currentElements = getCurrentPageElements();
-    const newElements = currentElements.map(el => 
-      el.id === id ? { ...el, ...updates } : el
-    );
-    setCurrentPageElements(newElements);
-    saveToHistory(newElements);
-  }, [getCurrentPageElements, setCurrentPageElements, saveToHistory]);
-
-  // Delete element
-  const deleteElement = useCallback((id) => {
-    if (lockedElements.has(id)) return;
-    
-    const currentElements = getCurrentPageElements();
-    const newElements = currentElements.filter(el => el.id !== id);
-    setCurrentPageElements(newElements);
-    if (selectedElement === id) setSelectedElement(null);
-    const newSelected = new Set(selectedElements);
-    newSelected.delete(id);
-    setSelectedElements(newSelected);
-    saveToHistory(newElements);
-  }, [lockedElements, getCurrentPageElements, setCurrentPageElements, selectedElement, selectedElements, saveToHistory]);
-
-  // Duplicate element
-  const duplicateElement = useCallback((id) => {
-    if (lockedElements.has(id)) return;
-    
-    const currentElements = getCurrentPageElements();
-    const element = currentElements.find(el => el.id === id);
-    if (element) {
-      const duplicated = {
-        ...element,
-        id: generateId(),
-        x: element.x + 20,
-        y: element.y + 20,
-        zIndex: currentElements.length
-      };
-      const newElements = [...currentElements, duplicated];
-      setCurrentPageElements(newElements);
-      setSelectedElement(duplicated.id);
-      setSelectedElements(new Set([duplicated.id]));
-      saveToHistory(newElements);
-    }
-  }, [lockedElements, getCurrentPageElements, setCurrentPageElements, saveToHistory]);
-
-  // Toggle element lock
-  const toggleElementLock = useCallback((id) => {
-    const newLocked = new Set(lockedElements);
-    if (newLocked.has(id)) {
-      newLocked.delete(id);
-      updateElement(id, { locked: false });
-    } else {
-      newLocked.add(id);
-      updateElement(id, { locked: true });
-    }
-    setLockedElements(newLocked);
-  }, [lockedElements, updateElement]);
-
-  // Update filter value
-  const updateFilter = useCallback((elementId, filterName, value) => {
-    const currentElements = getCurrentPageElements();
-    const element = currentElements.find(el => el.id === elementId);
-    if (element) {
-      const updatedFilters = { ...element.filters };
-      if (updatedFilters[filterName]) {
-        updatedFilters[filterName] = { ...updatedFilters[filterName], value };
-        updateElement(elementId, { filters: updatedFilters });
-      }
-    }
-  }, [getCurrentPageElements, updateElement]);
-
-  // Get filter CSS string
-  const getFilterCSS = useCallback((filters) => {
-    if (!filters) return '';
-    return Object.entries(filters)
-      .map(([key, filter]) => {
-        if ((filter && filter.value > 0) || (key === 'opacity' && filter.value < 100)) {
-          return `${key}(${filter.value}${filter.unit})`;
+    return [...currentElements]
+      .sort((a, b) => {
+        // First, sort by zIndex
+        if (a.zIndex !== b.zIndex) {
+          return a.zIndex - b.zIndex;
         }
-        return '';
+        
+        // If same zIndex, maintain original order
+        return currentElements.indexOf(a) - currentElements.indexOf(b);
       })
-      .filter(Boolean)
-      .join(' ');
-  }, []);
+      .filter(element => {
+        // Include all elements except temporary ones
+        return !element.isTemporary;
+      });
+  }, [getCurrentPageElements]);
 
-  // Fixed getBackgroundStyle function
-  const getBackgroundStyle = useCallback((element) => {
-    if (!element) return '#3b82f6';
-    
-    // If element doesn't have gradient fill type or gradient data, return solid color
-    if (element.fillType !== 'gradient' || !element.gradient) {
-      return element.fill || '#3b82f6';
-    }
-    
-    const grad = element.gradient;
-    
-    // Validate gradient data structure
-    if (!grad.colors || !Array.isArray(grad.colors) || grad.colors.length === 0) {
-      return element.fill || '#3b82f6';
-    }
-    
-    // Validate and filter colors
-    const validColors = grad.colors.filter(color => 
-      color && typeof color === 'string' && /^#([0-9A-F]{3}){1,2}$/i.test(color)
-    );
-    
-    if (validColors.length === 0) {
-      return element.fill || '#3b82f6';
-    }
-    
-    // Ensure we have valid stops
-    const validStops = grad.stops || [];
-    const stops = [];
-    
-    for (let i = 0; i < validColors.length; i++) {
-      if (validStops[i] !== undefined && validStops[i] !== null) {
-        stops[i] = Math.max(0, Math.min(100, parseInt(validStops[i]) || 0));
-      } else {
-        // Auto-generate stops if missing or invalid
-        if (validColors.length === 1) {
-          stops[i] = 0;
-        } else {
-          stops[i] = i === 0 ? 0 : (i === validColors.length - 1 ? 100 : Math.round((i / (validColors.length - 1)) * 100));
-        }
-      }
-    }
-    
-    // Ensure stops are in correct order
-    const colorStopPairs = validColors.map((color, i) => ({
-      color,
-      stop: stops[i] || 0
-    })).sort((a, b) => a.stop - b.stop);
-    
-    // Build gradient string
-    const colorStops = colorStopPairs.map(pair => 
-      `${pair.color} ${pair.stop}%`
-    ).join(', ');
-    
-    if (grad.type === 'radial') {
-      const posX = (grad.position && grad.position.x !== undefined) ? grad.position.x : 50;
-      const posY = (grad.position && grad.position.y !== undefined) ? grad.position.y : 50;
-      return `radial-gradient(circle at ${posX}% ${posY}%, ${colorStops})`;
-    } else {
-      // Linear gradient (default)
-      const angle = (grad.angle !== undefined && grad.angle !== null) ? grad.angle : 90;
-      return `linear-gradient(${angle}deg, ${colorStops})`;
-    }
-  }, []);
-
-  // Get canvas-compatible gradient for export
-  const getCanvasGradient = useCallback((ctx, element) => {
-    if (!element || element.fillType !== 'gradient' || !element.gradient) {
-      return element.fill || '#3b82f6';
-    }
-    
-    const grad = element.gradient;
-    
-    // Validate gradient data
-    if (!grad.colors || !Array.isArray(grad.colors) || grad.colors.length === 0) {
-      return element.fill || '#3b82f6';
-    }
-    
-    // Validate and filter colors
-    const validColors = grad.colors.filter(color => 
-      color && typeof color === 'string' && /^#([0-9A-F]{3}){1,2}$/i.test(color)
-    );
-    
-    if (validColors.length === 0) {
-      return element.fill || '#3b82f6';
-    }
-    
-    // Ensure we have valid stops
-    const validStops = grad.stops || [];
-    const stops = [];
-    
-    for (let i = 0; i < validColors.length; i++) {
-      if (validStops[i] !== undefined && validStops[i] !== null) {
-        stops[i] = Math.max(0, Math.min(100, parseInt(validStops[i]) || 0)) / 100;
-      } else {
-        if (validColors.length === 1) {
-          stops[i] = 0;
-        } else {
-          stops[i] = i === 0 ? 0 : (i === validColors.length - 1 ? 1 : i / (validColors.length - 1));
-        }
-      }
-    }
-    
-    let canvasGradient;
-    
-    if (grad.type === 'radial') {
-      const centerX = element.x + element.width / 2;
-      const centerY = element.y + element.height / 2;
-      const radius = Math.max(element.width, element.height) / 2;
-      
-      canvasGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
-    } else {
-      // Linear gradient
-      const angle = (grad.angle !== undefined && grad.angle !== null) ? grad.angle : 90;
-      const angleRad = (angle - 90) * Math.PI / 180;
-      
-      const centerX = element.x + element.width / 2;
-      const centerY = element.y + element.height / 2;
-      const length = Math.max(element.width, element.height);
-      
-      const x1 = centerX - Math.cos(angleRad) * length / 2;
-      const y1 = centerY - Math.sin(angleRad) * length / 2;
-      const x2 = centerX + Math.cos(angleRad) * length / 2;
-      const y2 = centerY + Math.sin(angleRad) * length / 2;
-      
-      canvasGradient = ctx.createLinearGradient(x1, y1, x2, y2);
-    }
-    
-    // Add color stops
-    validColors.forEach((color, i) => {
-      canvasGradient.addColorStop(stops[i], color);
-    });
-    
-    return canvasGradient;
-  }, []);
-
-  // NEW: Get canvas-compatible effects
-  const getCanvasEffects = useCallback((element) => {
-    const effects = {
-      shadow: {},
-      filters: ''
-    };
-    
-    // Text effects for canvas
-    if (element.type === 'text' && element.textEffect && element.textEffect !== 'none') {
-      switch(element.textEffect) {
-        case 'shadow':
-          effects.shadow = {
-            color: 'rgba(0,0,0,0.5)',
-            blur: 4,
-            offsetX: 2,
-            offsetY: 2
-          };
-          break;
-        case 'lift':
-          effects.shadow = {
-            color: 'rgba(0,0,0,0.3)',
-            blur: 8,
-            offsetX: 0,
-            offsetY: 4
-          };
-          break;
-        case 'neon':
-          effects.shadow = {
-            color: '#ff00de',
-            blur: 10,
-            offsetX: 0,
-            offsetY: 0
-          };
-          break;
-        // Add other text effects...
-      }
-    }
-    
-    // Image effects for canvas
-    if (element.type === 'image' && element.imageEffect && element.imageEffect !== 'none') {
-      const effect = imageEffects[element.imageEffect];
-      if (effect && effect.filter) {
-        effects.filters += ' ' + effect.filter;
-      }
-    }
-    
-    // Shape effects for canvas
-    if (['rectangle', 'circle', 'triangle', 'star', 'hexagon'].includes(element.type) && 
-        element.shapeEffect && element.shapeEffect !== 'none') {
-      switch(element.shapeEffect) {
-        case 'shadow':
-          effects.shadow = {
-            color: 'rgba(0,0,0,0.3)',
-            blur: 8,
-            offsetX: 4,
-            offsetY: 4
-          };
-          break;
-        case 'glow':
-          effects.shadow = {
-            color: 'rgba(255,255,255,0.8)',
-            blur: 10,
-            offsetX: 0,
-            offsetY: 0
-          };
-          break;
-        // Add other shape effects...
-      }
-    }
-    
-    return effects;
-  }, [imageEffects]);
-
-  // Get effect CSS for an element
-  const getEffectCSS = useCallback((element) => {
-    let effectCSS = '';
-    
-    // Text effects
-    if (element.type === 'text' && element.textEffect && element.textEffect !== 'none') {
-      effectCSS += textEffects[element.textEffect]?.css || '';
-    }
-    
-    // Image effects
-    if (element.type === 'image' && element.imageEffect && element.imageEffect !== 'none') {
-      effectCSS += imageEffects[element.imageEffect]?.filter ? `filter: ${imageEffects[element.imageEffect].filter};` : '';
-    }
-    
-    // Shape effects
-    if (['rectangle', 'circle', 'triangle', 'star', 'hexagon'].includes(element.type) && 
-        element.shapeEffect && element.shapeEffect !== 'none') {
-      effectCSS += shapeEffects[element.shapeEffect]?.css || '';
-    }
-    
-    // Special effects for all elements
-    if (element.specialEffect && element.specialEffect !== 'none') {
-      effectCSS += specialEffects[element.specialEffect]?.css || '';
-    }
-    
-    return effectCSS;
-  }, []);
-
-  // Group selected elements
-  const groupElements = useCallback(() => {
-    const currentElements = getCurrentPageElements();
-    if (selectedElements.size < 2) return;
-    
-    const groupId = generateId();
-    const selectedIds = Array.from(selectedElements);
-    const selectedEls = currentElements.filter(el => selectedIds.includes(el.id));
-    
-    const minX = Math.min(...selectedEls.map(el => el.x));
-    const minY = Math.min(...selectedEls.map(el => el.y));
-    const maxX = Math.max(...selectedEls.map(el => el.x + el.width));
-    const maxY = Math.max(...selectedEls.map(el => el.y + el.height));
-    
-    const group = {
-      id: groupId,
-      type: 'group',
-      x: minX,
-      y: minY,
-      width: maxX - minX,
-      height: maxY - minY,
-      rotation: 0,
-      children: selectedIds,
-      zIndex: currentElements.length,
-      fill: 'transparent',
-      stroke: '#8b5cf6',
-      strokeWidth: 2,
-      strokeDasharray: '5,5'
-    };
-    
-    const updatedElements = currentElements.map(el => {
-      if (selectedIds.includes(el.id)) {
-        return {
-          ...el,
-          groupId,
-          relativeX: el.x - minX,
-          relativeY: el.y - minY,
-          relativeRotation: el.rotation || 0
-        };
-      }
-      return el;
-    });
-    
-    const newElements = [...updatedElements, group];
-    setCurrentPageElements(newElements);
-    setSelectedElement(groupId);
-    setSelectedElements(new Set([groupId]));
-    saveToHistory(newElements);
-  }, [getCurrentPageElements, selectedElements, setCurrentPageElements, saveToHistory]);
-
-  // Ungroup elements
-  const ungroupElements = useCallback((groupId) => {
-    const currentElements = getCurrentPageElements();
-    const group = currentElements.find(el => el.id === groupId);
-    if (!group || group.type !== 'group') return;
-    
-    const updatedElements = currentElements.map(el => {
-      if (el.groupId === groupId) {
-        const { groupId: _, relativeX, relativeY, relativeRotation, ...rest } = el;
-        return {
-          ...rest,
-          x: group.x + (relativeX || 0),
-          y: group.y + (relativeY || 0),
-          rotation: (group.rotation || 0) + (relativeRotation || 0)
-        };
-      }
-      return el;
-    }).filter(el => el.id !== groupId);
-    
-    setCurrentPageElements(updatedElements);
-    setSelectedElement(null);
-    setSelectedElements(new Set());
-    saveToHistory(updatedElements);
-  }, [getCurrentPageElements, setCurrentPageElements, saveToHistory]);
-
-  // Change element z-index
-  const changeZIndex = useCallback((id, direction) => {
-    if (lockedElements.has(id)) return;
-    
-    const currentElements = getCurrentPageElements();
-    const elementIndex = currentElements.findIndex(el => el.id === id);
-    if (elementIndex === -1) return;
-    
-    let newIndex;
-    if (direction === 'front') {
-      newIndex = currentElements.length - 1;
-    } else if (direction === 'forward') {
-      newIndex = Math.min(elementIndex + 1, currentElements.length - 1);
-    } else if (direction === 'backward') {
-      newIndex = Math.max(elementIndex - 1, 0);
-    } else if (direction === 'back') {
-      newIndex = 0;
-    } else {
-      return;
-    }
-    
-    const newElements = [...currentElements];
-    const [element] = newElements.splice(elementIndex, 1);
-    newElements.splice(newIndex, 0, element);
-    
-    const updatedElements = newElements.map((el, idx) => ({
-      ...el,
-      zIndex: idx
-    }));
-    
-    setCurrentPageElements(updatedElements);
-    saveToHistory(updatedElements);
-  }, [lockedElements, getCurrentPageElements, setCurrentPageElements, saveToHistory]);
+  // Calculate selectedElementData (now that getCurrentPageElements is available)
+  const selectedElementData = getCurrentPageElements().find(el => el.id === selectedElement);
 
   // Calculate alignment lines
   const calculateAlignmentLines = useCallback((movingElement) => {
@@ -1873,743 +1296,89 @@ const Sowntra = () => {
     );
   }, [getCurrentPageElements]);
 
-  // Enhanced drawElementToCanvas function with effects support - FIXED VERSION
+  // Wrapper for drawElementToCanvas from canvasExport utility with imageEffects
   const drawElementToCanvas = useCallback((ctx, element, time, elementIndex) => {
-    ctx.save();
-    
-    let translateX = 0;
-    let translateY = 0;
-    let scale = 1;
-    let rotation = element.rotation || 0;
-    let opacity = 1;
-    
-    if (element.animation && time !== undefined) {
-      const staggeredTime = Math.max(0, time - (elementIndex * 0.2));
-      const animTime = Math.min(Math.max(staggeredTime, 0), 1);
-      
-      if (animTime > 0 && animTime <= 1) {
-        switch (element.animation) {
-          case 'rise':
-            translateY = -100 * (1 - animTime);
-            opacity = animTime;
-            break;
-          case 'pan':
-            translateX = -100 * (1 - animTime);
-            opacity = animTime;
-            break;
-          case 'fade':
-            opacity = animTime;
-            break;
-          case 'bounce':
-            translateY = -50 * Math.sin(animTime * Math.PI * 2);
-            opacity = animTime;
-            break;
-          case 'zoomIn':
-            scale = 0.3 + 0.7 * animTime;
-            opacity = animTime;
-            break;
-          case 'zoomOut':
-            scale = 2 - 1 * animTime;
-            opacity = animTime;
-            break;
-          case 'slideInLeft':
-            translateX = -200 * (1 - animTime);
-            opacity = animTime;
-            break;
-          case 'slideInRight':
-            translateX = 200 * (1 - animTime);
-            opacity = animTime;
-            break;
-          case 'slideInUp':
-            translateY = -200 * (1 - animTime);
-            opacity = animTime;
-            break;
-          case 'slideInDown':
-            translateY = 200 * (1 - animTime);
-            opacity = animTime;
-            break;
-          case 'spin':
-            rotation += 360 * animTime;
-            opacity = animTime;
-            break;
-          case 'pulse':
-            scale = 1 + 0.2 * Math.sin(animTime * Math.PI * 4);
-            opacity = animTime;
-            break;
-          case 'typewriter':
-            opacity = animTime;
-            break;
-          case 'tumble':
-            rotation = 180 * (1 - animTime);
-            scale = animTime;
-            opacity = animTime;
-            break;
-          case 'wipe':
-            opacity = animTime;
-            break;
-          case 'pop':
-            scale = animTime < 0.8 ? (0.3 + 0.7 * (animTime / 0.8) * 1.2) : (1 - (animTime - 0.8) / 0.2 * 0.2);
-            opacity = animTime;
-            break;
-          case 'flip':
-            rotation = 90 * (1 - animTime);
-            opacity = animTime;
-            break;
-          case 'flash':
-            opacity = Math.sin(animTime * Math.PI * 4) > 0 ? 1 : 0.3;
-            break;
-          case 'glitch':
-            translateX = (Math.sin(animTime * Math.PI * 8) * 5);
-            translateY = (Math.cos(animTime * Math.PI * 6) * 3);
-            break;
-          case 'heartbeat':
-            scale = 1 + 0.1 * Math.sin(animTime * Math.PI * 6);
-            opacity = animTime;
-            break;
-          case 'wiggle':
-            rotation = 5 * Math.sin(animTime * Math.PI * 4);
-            opacity = animTime;
-            break;
-          case 'jiggle':
-            translateX = 2 * Math.sin(animTime * Math.PI * 8);
-            translateY = 2 * Math.cos(animTime * Math.PI * 6);
-            opacity = animTime;
-            break;
-          case 'shake':
-            translateX = 10 * Math.sin(animTime * Math.PI * 10);
-            opacity = animTime;
-            break;
-          case 'fadeOut':
-            opacity = 1 - animTime;
-            break;
-          case 'slideOutLeft':
-            translateX = -200 * animTime;
-            opacity = 1 - animTime;
-            break;
-          case 'slideOutRight':
-            translateX = 200 * animTime;
-            opacity = 1 - animTime;
-            break;
-          case 'blurIn':
-            opacity = animTime;
-            break;
-          case 'flicker':
-            opacity = 0.3 + 0.7 * Math.sin(animTime * Math.PI * 8);
-            break;
-          case 'rotate':
-            rotation = 360 * animTime;
-            opacity = animTime;
-            break;
-          default:
-            opacity = animTime;
-            break;
-        }
-      } else {
-        if (staggeredTime < 0) {
-          opacity = 0;
-        } else if (staggeredTime > 1) {
-          opacity = 1;
-        }
-      }
-    }
-    
-    const centerX = element.x + element.width / 2;
-    const centerY = element.y + element.height / 2;
-    
-    ctx.translate(centerX, centerY);
-    ctx.rotate((rotation * Math.PI) / 180);
-    ctx.scale(scale, scale);
-    ctx.translate(-centerX, -centerY);
-    ctx.translate(translateX, translateY);
-    
-    // Apply canvas effects
-    const canvasEffects = getCanvasEffects(element);
-    
-    // Apply shadow effects
-    if (canvasEffects.shadow && Object.keys(canvasEffects.shadow).length > 0) {
-      ctx.shadowColor = canvasEffects.shadow.color;
-      ctx.shadowBlur = canvasEffects.shadow.blur || 0;
-      ctx.shadowOffsetX = canvasEffects.shadow.offsetX || 0;
-      ctx.shadowOffsetY = canvasEffects.shadow.offsetY || 0;
-    }
-    
-    // Apply filters
-    if (element.filters) {
-      const filterCSS = getFilterCSS(element.filters);
-      if (filterCSS) {
-        ctx.filter = filterCSS;
-      }
-    }
-    
-    // Add image effect filters
-    if (canvasEffects.filters) {
-      ctx.filter += ' ' + canvasEffects.filters;
-    }
-    
-    ctx.globalAlpha = opacity;
-    
-    const backgroundStyle = getCanvasGradient(ctx, element);
-    
-    // FIXED: Rectangle with proper border radius handling
-    if (element.type === 'rectangle') {
-      ctx.fillStyle = backgroundStyle;
-      ctx.strokeStyle = element.stroke;
-      ctx.lineWidth = element.strokeWidth;
-      
-      const borderRadius = element.borderRadius || 0;
-      
-      if (borderRadius > 0) {
-        // Use roundRect for browsers that support it
-        if (ctx.roundRect) {
-          ctx.beginPath();
-          ctx.roundRect(element.x, element.y, element.width, element.height, borderRadius);
-          ctx.fill();
-          if (element.strokeWidth > 0) ctx.stroke();
-        } else {
-          // Fallback for browsers without roundRect
-          ctx.beginPath();
-          ctx.moveTo(element.x + borderRadius, element.y);
-          ctx.lineTo(element.x + element.width - borderRadius, element.y);
-          ctx.arcTo(element.x + element.width, element.y, element.x + element.width, element.y + borderRadius, borderRadius);
-          ctx.lineTo(element.x + element.width, element.y + element.height - borderRadius);
-          ctx.arcTo(element.x + element.width, element.y + element.height, element.x + element.width - borderRadius, element.y + element.height, borderRadius);
-          ctx.lineTo(element.x + borderRadius, element.y + element.height);
-          ctx.arcTo(element.x, element.y + element.height, element.x, element.y + element.height - borderRadius, borderRadius);
-          ctx.lineTo(element.x, element.y + borderRadius);
-          ctx.arcTo(element.x, element.y, element.x + borderRadius, element.y, borderRadius);
-          ctx.closePath();
-          ctx.fill();
-          if (element.strokeWidth > 0) ctx.stroke();
-        }
-      } else {
-        // No border radius
-        ctx.fillRect(element.x, element.y, element.width, element.height);
-        if (element.strokeWidth > 0) {
-          ctx.strokeRect(element.x, element.y, element.width, element.height);
-        }
-      }
-    } else if (element.type === 'circle') {
-      ctx.fillStyle = backgroundStyle;
-      ctx.strokeStyle = element.stroke;
-      ctx.lineWidth = element.strokeWidth;
-      ctx.beginPath();
-      ctx.arc(element.x + element.width / 2, element.y + element.height / 2, element.width / 2, 0, Math.PI * 2);
-      ctx.fill();
-      if (element.strokeWidth > 0) ctx.stroke();
-    } else if (element.type === 'triangle') {
-      ctx.fillStyle = backgroundStyle;
-      ctx.strokeStyle = element.stroke;
-      ctx.lineWidth = element.strokeWidth;
-      ctx.beginPath();
-      ctx.moveTo(element.x + element.width / 2, element.y);
-      ctx.lineTo(element.x + element.width, element.y + element.height);
-      ctx.lineTo(element.x, element.y + element.height);
-      ctx.closePath();
-      ctx.fill();
-      if (element.strokeWidth > 0) ctx.stroke();
-    } else if (element.type === 'text') {
-      ctx.font = `${element.fontWeight} ${element.fontSize}px ${element.fontFamily}`;
-      ctx.fillStyle = element.color;
-      ctx.textAlign = element.textAlign;
-      ctx.textBaseline = 'top'; // Add this for better text positioning
-      
-      let textX = element.x;
-      if (element.textAlign === 'center') {
-        textX = element.x + element.width / 2;
-      } else if (element.textAlign === 'right') {
-        textX = element.x + element.width;
-      }
-      
-      let displayText = element.content;
-      if (element.animation === 'typewriter' && time !== undefined) {
-        const staggeredTime = Math.max(0, time - (elementIndex * 0.2));
-        const animTime = Math.min(Math.max(staggeredTime, 0), 1);
-        const charsToShow = Math.floor(element.content.length * animTime);
-        displayText = element.content.substring(0, charsToShow);
-      }
-      
-      // FIXED: Handle text wrapping for canvas
-      const words = displayText.split(' ');
-      const lineHeight = element.fontSize * 1.2;
-      let line = '';
-      let y = element.y;
-      
-      for (let n = 0; n < words.length; n++) {
-        const testLine = line + words[n] + ' ';
-        const metrics = ctx.measureText(testLine);
-        const testWidth = metrics.width;
-        
-        if (testWidth > element.width && n > 0) {
-          ctx.fillText(line, textX, y);
-          line = words[n] + ' ';
-          y += lineHeight;
-          
-          // Stop if we exceed the element height
-          if (y > element.y + element.height - lineHeight) {
-            break;
-          }
-        } else {
-          line = testLine;
-        }
-      }
-      ctx.fillText(line, textX, y);
-      
-      // Reset shadow for text
-      ctx.shadowColor = 'transparent';
-      ctx.shadowBlur = 0;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 0;
-    } else if (element.type === 'image') {
-      const img = new window.Image();
-      img.src = element.src;
-      
-      // Handle border radius for images - FIXED: Remove stroke unless explicitly set
-      const borderRadius = element.borderRadius || 0;
-      
-      if (borderRadius > 0) {
-        // Create rounded clipping path
-        ctx.save();
-        ctx.beginPath();
-        
-        if (ctx.roundRect) {
-          ctx.roundRect(element.x, element.y, element.width, element.height, borderRadius);
-        } else {
-          // Fallback for browsers without roundRect
-          ctx.moveTo(element.x + borderRadius, element.y);
-          ctx.lineTo(element.x + element.width - borderRadius, element.y);
-          ctx.arcTo(element.x + element.width, element.y, element.x + element.width, element.y + borderRadius, borderRadius);
-          ctx.lineTo(element.x + element.width, element.y + element.height - borderRadius);
-          ctx.arcTo(element.x + element.width, element.y + element.height, element.x + element.width - borderRadius, element.y + element.height, borderRadius);
-          ctx.lineTo(element.x + borderRadius, element.y + element.height);
-          ctx.arcTo(element.x, element.y + element.height, element.x, element.y + element.height - borderRadius, borderRadius);
-          ctx.lineTo(element.x, element.y + borderRadius);
-          ctx.arcTo(element.x, element.y, element.x + borderRadius, element.y, borderRadius);
-        }
-        
-        ctx.closePath();
-        ctx.clip();
-        
-        ctx.drawImage(img, element.x, element.y, element.width, element.height);
-        ctx.restore();
-        
-        // ONLY draw border if strokeWidth is explicitly set and greater than 0
-        if (element.strokeWidth > 0 && element.stroke && element.stroke !== 'transparent') {
-          ctx.strokeStyle = element.stroke;
-          ctx.lineWidth = element.strokeWidth;
-          ctx.beginPath();
-          
-          if (ctx.roundRect) {
-            ctx.roundRect(element.x, element.y, element.width, element.height, borderRadius);
-          } else {
-            ctx.moveTo(element.x + borderRadius, element.y);
-            ctx.lineTo(element.x + element.width - borderRadius, element.y);
-            ctx.arcTo(element.x + element.width, element.y, element.x + element.width, element.y + borderRadius, borderRadius);
-            ctx.lineTo(element.x + element.width, element.y + element.height - borderRadius);
-            ctx.arcTo(element.x + element.width, element.y + element.height, element.x + element.width - borderRadius, element.y + element.height, borderRadius);
-            ctx.lineTo(element.x + borderRadius, element.y + element.height);
-            ctx.arcTo(element.x, element.y + element.height, element.x, element.y + element.height - borderRadius, borderRadius);
-            ctx.lineTo(element.x, element.y + borderRadius);
-            ctx.arcTo(element.x, element.y, element.x + borderRadius, element.y, borderRadius);
-          }
-          
-          ctx.closePath();
-          ctx.stroke();
-        }
-      } else {
-        // No border radius - simple draw
-        ctx.drawImage(img, element.x, element.y, element.width, element.height);
-        
-        // ONLY draw border if strokeWidth is explicitly set and greater than 0
-        if (element.strokeWidth > 0 && element.stroke && element.stroke !== 'transparent') {
-          ctx.strokeStyle = element.stroke;
-          ctx.lineWidth = element.strokeWidth;
-          ctx.strokeRect(element.x, element.y, element.width, element.height);
-        }
-      }
-    } else if (element.type === 'line') {
-      ctx.strokeStyle = element.stroke;
-      ctx.lineWidth = element.strokeWidth;
-      ctx.beginPath();
-      ctx.moveTo(element.x, element.y);
-      ctx.lineTo(element.x + element.width, element.y + element.height);
-      ctx.stroke();
-    } else if (element.type === 'arrow') {
-      ctx.strokeStyle = element.stroke;
-      ctx.lineWidth = element.strokeWidth;
-      ctx.beginPath();
-      ctx.moveTo(element.x, element.y + element.height / 2);
-      ctx.lineTo(element.x + element.width - 10, element.y + element.height / 2);
-      ctx.stroke();
-      
-      ctx.fillStyle = element.stroke;
-      ctx.beginPath();
-      ctx.moveTo(element.x + element.width - 10, element.y + element.height / 2);
-      ctx.lineTo(element.x + element.width - 20, element.y + element.height / 2 - 5);
-      ctx.lineTo(element.x + element.width - 20, element.y + element.height / 2 + 5);
-      ctx.closePath();
-      ctx.fill();
-    } else if (element.type === 'star') {
-      const points = element.points || 5;
-      const outerRadius = Math.min(element.width, element.height) / 2;
-      const innerRadius = outerRadius / 2;
-      const centerX = element.x + element.width / 2;
-      const centerY = element.y + element.height / 2;
-      
-      ctx.fillStyle = backgroundStyle;
-      ctx.strokeStyle = element.stroke;
-      ctx.lineWidth = element.strokeWidth;
-      ctx.beginPath();
-      
-      for (let i = 0; i < points * 2; i++) {
-        const radius = i % 2 === 0 ? outerRadius : innerRadius;
-        const angle = (Math.PI * 2 * i) / (points * 2) - Math.PI / 2;
-        const x = centerX + radius * Math.cos(angle);
-        const y = centerY + radius * Math.sin(angle);
-        
-        if (i === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
-      }
-      
-      ctx.closePath();
-      ctx.fill();
-      if (element.strokeWidth > 0) ctx.stroke();
-    } else if (element.type === 'hexagon') {
-      const centerX = element.x + element.width / 2;
-      const centerY = element.y + element.height / 2;
-      const radius = Math.min(element.width, element.height) / 2;
-      
-      ctx.fillStyle = backgroundStyle;
-      ctx.strokeStyle = element.stroke;
-      ctx.lineWidth = element.strokeWidth;
-      ctx.beginPath();
-      
-      for (let i = 0; i < 6; i++) {
-        const angle = (Math.PI * 2 * i) / 6 - Math.PI / 6;
-        const x = centerX + radius * Math.cos(angle);
-        const y = centerY + radius * Math.sin(angle);
-        
-        if (i === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
-      }
-      
-      ctx.closePath();
-      ctx.fill();
-      if (element.strokeWidth > 0) ctx.stroke();
-    } else if (element.type === 'drawing' && element.path.length > 1) {
-      ctx.strokeStyle = element.stroke;
-      ctx.lineWidth = element.strokeWidth;
-      ctx.beginPath();
-      ctx.moveTo(element.path[0].x, element.path[0].y);
-      
-      for (let i = 1; i < element.path.length; i++) {
-        ctx.lineTo(element.path[i].x, element.path[i].y);
-      }
-      
-      ctx.stroke();
-    } else if (element.type === 'sticker') {
-      ctx.fillStyle = backgroundStyle;
-      ctx.beginPath();
-      ctx.arc(element.x + element.width / 2, element.y + element.height / 2, element.width / 2, 0, Math.PI * 2);
-      ctx.fill();
-      
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 40px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      
-      let iconChar = '⭐';
-      if (element.sticker === 'smile') iconChar = '😊';
-      else if (element.sticker === 'heart') iconChar = '❤️';
-      else if (element.sticker === 'star') iconChar = '⭐';
-      else if (element.sticker === 'flower') iconChar = '🌸';
-      else if (element.sticker === 'sun') iconChar = '☀️';
-      else if (element.sticker === 'moon') iconChar = '🌙';
-      else if (element.sticker === 'cloud') iconChar = '☁️';
-      else if (element.sticker === 'coffee') iconChar = '☕';
-      else if (element.sticker === 'music') iconChar = '🎵';
-      else if (element.sticker === 'camera') iconChar = '📷';
-      else if (element.sticker === 'rocket') iconChar = '🚀';
-      else if (element.sticker === 'car') iconChar = '🚗';
-      
-      ctx.fillText(iconChar, element.x + element.width / 2, element.y + element.height / 2);
-    }
-    
-    ctx.restore();
-  }, [getFilterCSS, getCanvasGradient, getCanvasEffects, imageEffects]);
+    return drawElementToCanvasUtil(ctx, element, time, elementIndex, imageEffects);
+  }, [imageEffects]);
 
-  // Export as SVG
+  // Export functions - wrappers that provide current elements and state
   const exportAsSVG = useCallback(() => {
     const currentElements = getCurrentPageElements();
-    
-    let svgContent = `<?xml version="1.0" encoding="UTF-8"?>
-<svg width="${canvasSize.width}" height="${canvasSize.height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-  <rect width="100%" height="100%" fill="white"/>
-  <defs>`;
-    
-    // Add gradient definitions
-    currentElements.forEach((element, idx) => {
-      if (element.fillType === 'gradient' && element.gradient) {
-        const grad = element.gradient;
-        if (grad.type === 'linear') {
-          svgContent += `
-    <linearGradient id="gradient-${idx}" x1="0%" y1="0%" x2="100%" y2="0%" gradientTransform="rotate(${grad.angle || 90} 0.5 0.5)">`;
-          grad.colors.forEach((color, i) => {
-            svgContent += `
-      <stop offset="${grad.stops[i]}%" style="stop-color:${color};stop-opacity:1" />`;
-          });
-          svgContent += `
-    </linearGradient>`;
-        } else {
-          svgContent += `
-    <radialGradient id="gradient-${idx}" cx="${grad.position?.x || 50}%" cy="${grad.position?.y || 50}%">`;
-          grad.colors.forEach((color, i) => {
-            svgContent += `
-      <stop offset="${grad.stops[i]}%" style="stop-color:${color};stop-opacity:1" />`;
-          });
-          svgContent += `
-    </radialGradient>`;
-        }
-      }
-    });
-    
-    svgContent += `
-  </defs>
-  `;
-    
-    // Add elements
-    currentElements.forEach((element, idx) => {
-      const transform = `rotate(${element.rotation || 0} ${element.x + element.width/2} ${element.y + element.height/2})`;
-      const fill = element.fillType === 'gradient' ? `url(#gradient-${idx})` : element.fill;
-      
-      if (element.type === 'rectangle') {
-        svgContent += `
-  <rect x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}" 
-        fill="${fill}" stroke="${element.stroke}" stroke-width="${element.strokeWidth}" 
-        rx="${element.borderRadius || 0}" transform="${transform}"/>`;
-      } else if (element.type === 'circle') {
-        svgContent += `
-  <circle cx="${element.x + element.width/2}" cy="${element.y + element.height/2}" r="${element.width/2}" 
-          fill="${fill}" stroke="${element.stroke}" stroke-width="${element.strokeWidth}" 
-          transform="${transform}"/>`;
-      } else if (element.type === 'text') {
-        svgContent += `
-  <text x="${element.x}" y="${element.y + element.fontSize}" 
-        font-family="${element.fontFamily}" font-size="${element.fontSize}" 
-        fill="${element.color}" text-anchor="${element.textAlign === 'center' ? 'middle' : element.textAlign === 'right' ? 'end' : 'start'}" 
-        transform="${transform}">${element.content}</text>`;
-      }
-    });
-    
-    svgContent += `
-</svg>`;
-    
-    const blob = new Blob([svgContent], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `sowntra-design.svg`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [canvasSize, getCurrentPageElements, getBackgroundStyle]);
+    return exportAsSVGUtil(currentElements, canvasSize);
+  }, [getCurrentPageElements, canvasSize]);
 
-  // Export as image - FIXED VERSION with proper zIndex sorting
   const exportAsImage = useCallback((format) => {
-    // Handle SVG export separately
     if (format === 'svg') {
       exportAsSVG();
       return;
     }
-    
-    const canvas = document.createElement('canvas');
-    canvas.width = canvasSize.width;
-    canvas.height = canvasSize.height;
-    const ctx = canvas.getContext('2d');
-    
-    if (!ctx) {
-      console.error('Could not get canvas context');
-      alert('Error: Could not create canvas context');
-      return;
-    }
-    
-    // Set white background
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
-    
-    // FIXED: Use the proper sorting function for correct zIndex layering
-    const sortedElements = getSortedElementsForExport();
-    
-    const imageElements = sortedElements.filter(el => el.type === 'image');
-    
-    if (imageElements.length > 0) {
-      let loadedImages = 0;
-      const totalImages = imageElements.length;
-      
-      const drawAllElements = () => {
-        try {
-          // Clear and redraw background
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
-          
-          // Draw ALL elements in correct zIndex order
-          sortedElements.forEach((element, index) => {
-            try {
-              drawElementToCanvas(ctx, element, undefined, index);
-            } catch (elementError) {
-              console.error(`Error drawing element ${element.id}:`, elementError);
-            }
-          });
-          
-          // Export the final canvas
-          const dataUrl = canvas.toDataURL(`image/${format}`, 0.95);
-          const a = document.createElement('a');
-          a.href = dataUrl;
-          a.download = `sowntra-design.${format}`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-        } catch (error) {
-          console.error('Error in drawAllElements:', error);
-          alert('Error exporting image. Please try again.');
-        }
-      };
-      
-      const checkAllLoaded = () => {
-        loadedImages++;
-        if (loadedImages === totalImages) {
-          drawAllElements();
-        }
-      };
-      
-      imageElements.forEach(element => {
-        const img = new window.Image();
-        img.crossOrigin = 'anonymous';
-        img.src = element.src;
-        img.onload = () => {
-          checkAllLoaded();
-        };
-        img.onerror = () => {
-          console.error('Failed to load image:', element.src);
-          checkAllLoaded(); // Continue even if some images fail
-        };
-      });
-    } else {
-      // No images, draw all elements directly in correct order
-      try {
-        sortedElements.forEach((element, index) => {
-          drawElementToCanvas(ctx, element, undefined, index);
-        });
-        
-        const dataUrl = canvas.toDataURL(`image/${format}`, 0.95);
-        const a = document.createElement('a');
-        a.href = dataUrl;
-        a.download = `sowntra-design.${format}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      } catch (error) {
-        console.error('Error exporting canvas:', error);
-        alert('Error exporting image. Please try again.');
-      }
-    }
-  }, [canvasSize, getSortedElementsForExport, drawElementToCanvas, exportAsSVG]);
+    const currentElements = getCurrentPageElements();
+    return exportAsImageUtil(currentElements, canvasSize, format, imageEffects);
+  }, [getCurrentPageElements, canvasSize, imageEffects, exportAsSVG]);
 
-  // Export as PDF - FIXED VERSION with proper zIndex sorting
   const exportAsPDF = useCallback(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = canvasSize.width;
-    canvas.height = canvasSize.height;
-    const ctx = canvas.getContext('2d');
-    
-    if (!ctx) {
-      console.error('Could not get canvas context');
-      alert('Error: Could not create canvas context');
+    const currentElements = getCurrentPageElements();
+    return exportAsPDFUtil(currentElements, canvasSize, imageEffects);
+  }, [getCurrentPageElements, canvasSize, imageEffects]);
+
+  // Wrapper functions for imported helpers that need access to state
+  const getEffectCSSWrapper = useCallback((element) => {
+    return getEffectCSS(element, textEffects, imageEffects, shapeEffects, specialEffects);
+  }, []);
+  
+  const getCanvasEffectsWrapper = useCallback((element) => {
+    return getCanvasEffects(element, imageEffects);
+  }, [imageEffects]);
+
+  // Apply template function with proper centering and auto-zoom
+  const applyTemplate = useCallback((platform) => {
+    if (platform === 'custom') {
+      setShowCustomTemplateModal(true);
       return;
     }
     
-    // Set white background
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
-    
-    // FIXED: Use the proper sorting function for correct zIndex layering
-    const sortedElements = getSortedElementsForExport();
-    
-    const imageElements = sortedElements.filter(el => el.type === 'image');
-    
-    const generatePDF = () => {
-      try {
-        const imgData = canvas.toDataURL('image/png');
-        
-        // Create PDF with canvas dimensions (convert pixels to mm, 96 DPI)
-        const pdfWidth = canvasSize.width * 0.264583; // Convert px to mm
-        const pdfHeight = canvasSize.height * 0.264583;
-        
-        const pdf = new jsPDF({
-          orientation: pdfWidth > pdfHeight ? 'landscape' : 'portrait',
-          unit: 'mm',
-          format: [pdfWidth, pdfHeight]
-        });
-        
-        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-        pdf.save('sowntra-design.pdf');
-      } catch (error) {
-        console.error('Error exporting PDF:', error);
-        alert('Error exporting PDF. Please try again.');
-      }
-    };
-    
-    if (imageElements.length > 0) {
-      let loadedImages = 0;
-      const totalImages = imageElements.length;
+    const template = socialMediaTemplates[platform];
+    if (template) {
+      // Set the new canvas size
+      setCanvasSize({ width: template.width, height: template.height });
       
-      const drawAllElements = () => {
-        // Clear and redraw background
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
-        
-        // Draw ALL elements in correct zIndex order
-        sortedElements.forEach((element, index) => {
-          drawElementToCanvas(ctx, element, undefined, index);
-        });
-        generatePDF();
-      };
+      // Center and zoom to fit after a short delay for DOM update
+      setTimeout(() => {
+        centerCanvas();
+      }, 100);
       
-      const checkAllLoaded = () => {
-        loadedImages++;
-        if (loadedImages === totalImages) {
-          drawAllElements();
-        }
-      };
-      
-      imageElements.forEach(element => {
-        const img = new window.Image();
-        img.crossOrigin = 'anonymous';
-        img.src = element.src;
-        img.onload = () => {
-          checkAllLoaded();
-        };
-        img.onerror = () => {
-          console.error('Failed to load image:', element.src);
-          checkAllLoaded();
-        };
-      });
-    } else {
-      // No images, draw all elements directly in correct order
-      // Clear and redraw background
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
-      
-      sortedElements.forEach((element, index) => {
-        drawElementToCanvas(ctx, element, undefined, index);
-      });
-      generatePDF();
+      setShowTemplates(false);
     }
-  }, [canvasSize, getSortedElementsForExport, drawElementToCanvas]);
+  }, [centerCanvas]);
+
+  // Create custom template
+  const createCustomTemplate = useCallback(() => {
+    if (customTemplateSize.width > 0 && customTemplateSize.height > 0) {
+      setCanvasSize({
+        width: customTemplateSize.width,
+        height: customTemplateSize.height
+      });
+      
+      setTimeout(() => {
+        centerCanvas();
+      }, 100);
+      
+      setShowCustomTemplateModal(false);
+      setShowTemplates(false);
+    }
+  }, [customTemplateSize, centerCanvas]);
+
+  // Handle image upload
+  const handleImageUpload = useCallback((event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        addElement('image', { src: e.target.result });
+      };
+      reader.readAsDataURL(file);
+    }
+  }, [addElement]);
 
   // Logout handler
   const handleLogout = useCallback(async () => {
@@ -3149,400 +1918,58 @@ const Sowntra = () => {
   // CustomTemplateModal is now imported from components
 
   // Render element with enhanced selection handles and effects - FIXED VERSION
+  // Wrapper function to render elements using CanvasElement component
   const renderElement = useCallback((element) => {
-    const isSelected = selectedElements.has(element.id);
-    const isEditing = textEditing === element.id;
-    const isLocked = lockedElements.has(element.id);
-    const needsComplexScript = ['hi', 'ta', 'te', 'bn', 'mr', 'gu', 'kn', 'ml', 'pa', 'or', 'ur', 'ar', 'he'].includes(currentLanguage);
-    const isRTL = textDirection === 'rtl';
-    
-    // Handle group element rendering
-    if (element.type === 'group') {
-      const style = {
-        position: 'absolute',
-        left: element.x,
-        top: element.y,
-        width: element.width,
-        height: element.height,
-        transform: `rotate(${element.rotation || 0}deg)`,
-        zIndex: element.zIndex,
-        cursor: 'move',
-        border: `${element.strokeWidth}px dashed ${element.stroke}`,
-        pointerEvents: 'none'
-      };
-
-      return (
-        <div key={element.id}>
-          {/* Group outline */}
-          <div
-            style={style}
-            onMouseDown={(e) => {
-              e.stopPropagation();
-              handleSelectElement(e, element.id);
-            }}
-          />
-          
-          {/* Render group children */}
-          {getCurrentPageElements()
-            .filter(el => el.groupId === element.id)
-            .map(renderElement)}
-          
-          {/* Selection handles for the group */}
-          {isSelected && currentTool === 'select' && !isLocked && (
-            renderSelectionHandles(element)
-          )}
-        </div>
-      );
-    }
-
-    const style = {
-      position: 'absolute',
-      left: element.x,
-      top: element.y,
-      width: element.width,
-      height: element.height,
-      transform: `rotate(${element.rotation || 0}deg)`,
-      zIndex: element.zIndex,
-      cursor: isLocked ? 'not-allowed' : (currentTool === 'select' ? 'move' : 'default'),
-      filter: element.filters ? getFilterCSS(element.filters) : 'none',
-      opacity: element.filters?.opacity ? element.filters.opacity.value / 100 : 1
-    };
-
-    // Apply effects CSS
-    const effectCSS = getEffectCSS(element);
-    if (effectCSS) {
-      Object.assign(style, parseCSS(effectCSS));
-    }
-
-    let content;
-    if (element.type === 'text') {
-      const textElementStyle = {
-        ...style,
-        fontSize: element.fontSize,
-        fontFamily: needsComplexScript ? supportedLanguages[currentLanguage]?.font : element.fontFamily,
-        fontWeight: element.fontWeight,
-        fontStyle: element.fontStyle,
-        textDecoration: element.textDecoration,
-        color: element.color,
-        textAlign: isRTL ? 'right' : element.textAlign,
-        display: 'flex',
-        alignItems: 'flex-start',
-        cursor: isLocked ? 'not-allowed' : (isEditing ? 'text' : 'move'),
-        outline: 'none',
-        userSelect: isEditing ? 'text' : 'none',
-        minHeight: element.height,
-        minWidth: element.width,
-        padding: '4px',
-        wordWrap: 'break-word',
-        whiteSpace: 'pre-wrap',
-        overflow: 'hidden',
-        wordBreak: 'break-word'
-      };
-      
-      content = (
-        <div
-          id={`element-${element.id}`}
-          style={textElementStyle}
-          className={`${styles.textElement || ''} text-element ${needsComplexScript ? 'complex-script' : ''} ${element.fillType === 'gradient' ? 'gradient-fix' : ''}`}
-          contentEditable={!isLocked && isEditing}
-          suppressContentEditableWarning={true}
-          onBlur={(e) => {
-            const newContent = e.target.textContent || '';
-            updateElement(element.id, { content: newContent });
-            setTextEditing(null);
-          }}
-          onInput={(e) => {
-            // Auto-adjust height based on content
-            if (isEditing) {
-              const newHeight = Math.max(element.fontSize * 2, e.target.scrollHeight);
-              updateElement(element.id, { height: newHeight });
-            }
-          }}
-          onKeyDown={(e) => {
-            // Prevent deletion of the entire element
-            if (e.key === 'Backspace' && e.target.textContent === '') {
-              e.preventDefault();
-            }
-          }}
-          onDoubleClick={(e) => {
-            if (!isLocked) {
-              e.stopPropagation();
-              handleTextEdit(e, element.id);
-            }
-          }}
-          onMouseDown={(e) => {
-            if (!isLocked && !isEditing) {
-              e.stopPropagation();
-              handleMouseDown(e, element.id);
-            }
-          }}
-        >
-          {element.content}
-        </div>
-      );
-    } else if (element.type === 'rectangle') {
-      const rectangleStyle = {
-        ...style,
-        backgroundColor: element.fillType === 'solid' ? element.fill : 'transparent',
-        background: element.fillType === 'gradient' ? getBackgroundStyle(element) : 'none',
-        border: `${element.strokeWidth}px solid ${element.stroke}`,
-        borderRadius: element.borderRadius,
-      };
-      
-      content = (
-        <div
-          id={`element-${element.id}`}
-          className={`${styles.shapeElement || ''} ${element.fillType === 'gradient' ? 'gradient-fix' : ''}`}
-          style={rectangleStyle}
-          onMouseDown={(e) => !isLocked && handleMouseDown(e, element.id)}
-        />
-      );
-    } else if (element.type === 'circle') {
-      const circleStyle = {
-        ...style,
-        backgroundColor: element.fillType === 'solid' ? element.fill : 'transparent',
-        background: element.fillType === 'gradient' ? getBackgroundStyle(element) : 'none',
-        border: `${element.strokeWidth}px solid ${element.stroke}`,
-        borderRadius: '50%',
-      };
-      
-      content = (
-        <div
-          id={`element-${element.id}`}
-          className={`${styles.shapeElement || ''} ${element.fillType === 'gradient' ? 'gradient-fix' : ''}`}
-          style={circleStyle}
-          onMouseDown={(e) => !isLocked && handleMouseDown(e, element.id)}
-        />
-      );
-    } else if (element.type === 'triangle') {
-      const triangleStyle = {
-        ...style,
-        width: 0,
-        height: 0,
-        borderLeft: `${element.width/2}px solid transparent`,
-        borderRight: `${element.width/2}px solid transparent`,
-        borderBottom: `${element.height}px solid ${element.fillType === 'solid' ? element.fill : getBackgroundStyle(element)}`,
-        borderTop: 'none',
-        background: element.fillType === 'gradient' ? getBackgroundStyle(element) : 'none'
-      };
-      
-      content = (
-        <div
-          id={`element-${element.id}`}
-          className={`${styles.shapeElement || ''} ${element.fillType === 'gradient' ? 'gradient-fix' : ''}`}
-          style={triangleStyle}
-          onMouseDown={(e) => !isLocked && handleMouseDown(e, element.id)}
-        />
-      );
-    } else if (element.type === 'image') {
-      const imageStyle = {
-        ...style,
-        objectFit: 'cover',
-        borderRadius: element.borderRadius,
-      };
-      
-      content = (
-        <img
-          id={`element-${element.id}`}
-          src={element.src}
-          alt=""
-          className={styles.imageElement || ''}
-          style={imageStyle}
-          onMouseDown={(e) => !isLocked && handleMouseDown(e, element.id)}
-          draggable={false}
-        />
-      );
-    } else if (element.type === 'line') {
-      content = (
-        <svg
-          id={`element-${element.id}`}
-          style={{...style}}
-          onMouseDown={(e) => !isLocked && handleMouseDown(e, element.id)}
-        >
-          <line
-            x1={0}
-            y1={0}
-            x2={element.width}
-            y2={element.height}
-            stroke={element.stroke}
-            strokeWidth={element.strokeWidth}
-          />
-        </svg>
-      );
-    } else if (element.type === 'arrow') {
-      content = (
-        <svg
-          id={`element-${element.id}`}
-          style={{...style}}
-          onMouseDown={(e) => !isLocked && handleMouseDown(e, element.id)}
-        >
-          <defs>
-            <marker
-              id={`arrowhead-${element.id}`}
-              markerWidth="10"
-              markerHeight="7"
-              refX="9"
-              refY="3.5"
-              orient="auto"
-            >
-              <polygon points="0 0, 10 3.5, 0 7" fill={element.stroke} />
-            </marker>
-          </defs>
-          <line
-            x1={0}
-            y1={element.height / 2}
-            x2={element.width - 10}
-            y2={element.height / 2}
-            stroke={element.stroke}
-            strokeWidth={element.strokeWidth}
-            markerEnd={`url(#arrowhead-${element.id})`}
-          />
-        </svg>
-      );
-    } else if (element.type === 'star') {
-      const points = element.points || 5;
-      const outerRadius = Math.min(element.width, element.height) / 2;
-      const innerRadius = outerRadius / 2;
-      const centerX = element.width / 2;
-      const centerY = element.height / 2;
-      
-      let path = '';
-      for (let i = 0; i < points * 2; i++) {
-        const radius = i % 2 === 0 ? outerRadius : innerRadius;
-        const angle = (Math.PI * 2 * i) / (points * 2) - Math.PI / 2;
-        const x = centerX + radius * Math.cos(angle);
-        const y = centerY + radius * Math.sin(angle);
-        path += (i === 0 ? 'M' : 'L') + x + ',' + y;
-      }
-      path += 'Z';
-      
-      content = (
-        <svg
-          id={`element-${element.id}`}
-          style={{...style}}
-          onMouseDown={(e) => !isLocked && handleMouseDown(e, element.id)}
-        >
-          <path
-            d={path}
-            fill={getBackgroundStyle(element)}
-            stroke={element.stroke}
-            strokeWidth={element.strokeWidth}
-          />
-        </svg>
-      );
-    } else if (element.type === 'hexagon') {
-      const centerX = element.width / 2;
-      const centerY = element.height / 2;
-      const radius = Math.min(element.width, element.height) / 2;
-      
-      let path = '';
-      for (let i = 0; i < 6; i++) {
-        const angle = (Math.PI * 2 * i) / 6 - Math.PI / 6;
-        const x = centerX + radius * Math.cos(angle);
-        const y = centerY + radius * Math.sin(angle);
-        path += (i === 0 ? 'M' : 'L') + x + ',' + y;
-      }
-      path += 'Z';
-      
-      content = (
-        <svg
-          id={`element-${element.id}`}
-          style={{...style}}
-          onMouseDown={(e) => !isLocked && handleMouseDown(e, element.id)}
-        >
-          <path
-            d={path}
-            fill={getBackgroundStyle(element)}
-            stroke={element.stroke}
-            strokeWidth={element.strokeWidth}
-          />
-        </svg>
-      );
-    } else if (element.type === 'drawing' && element.path.length > 1) {
-      if (element.path.length < 2) return null;
-      
-      let pathData = 'M ' + element.path[0].x + ' ' + element.path[0].y;
-      for (let i = 1; i < element.path.length; i++) {
-        pathData += ' L ' + element.path[i].x + ' ' + element.path[i].y;
-      }
-      
-      content = (
-        <svg
-          id={`element-${element.id}`}
-          style={{...style}}
-          onMouseDown={(e) => !isLocked && handleMouseDown(e, element.id)}
-        >
-          <path
-            d={pathData}
-            fill="none"
-            stroke={element.stroke}
-            strokeWidth={element.strokeWidth}
-          />
-        </svg>
-      );
-    } else if (element.type === 'sticker') {
-      content = (
-        <div
-          id={`element-${element.id}`}
-          className={element.fillType === 'gradient' ? 'gradient-fix' : ''}
-          style={{
-            ...style,
-            backgroundColor: element.fillType === 'solid' ? element.fill : 'transparent',
-            background: element.fillType === 'gradient' ? getBackgroundStyle(element) : 'none',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '40px',
-          }}
-          onMouseDown={(e) => !isLocked && handleMouseDown(e, element.id)}
-        >
-          {stickerOptions.find(s => s.name === element.sticker)?.icon || '😊'}
-        </div>
-      );
-    }
-
     return (
-      <React.Fragment key={element.id}>
-        {content}
-        {isSelected && currentTool === 'select' && !isLocked && (
-          renderSelectionHandles(element)
-        )}
-        {isLocked && (
-          <div
-            style={{
-              position: 'absolute',
-              left: element.x,
-              top: element.y,
-              width: element.width,
-              height: element.height,
-              backgroundColor: 'rgba(0,0,0,0.1)',
-              pointerEvents: 'none',
-              zIndex: element.zIndex + 500,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <Lock size={20} color="#666" />
-          </div>
-        )}
-      </React.Fragment>
+      <CanvasElement
+        key={element.id}
+        element={element}
+        selectedElements={selectedElements}
+        textEditing={textEditing}
+        lockedElements={lockedElements}
+        currentTool={currentTool}
+        currentLanguage={currentLanguage}
+        textDirection={textDirection}
+        fontFamilies={fontFamilies}
+        supportedLanguages={supportedLanguages}
+        stickerOptions={stickerOptions}
+        handleMouseDown={handleMouseDown}
+        handleSelectElement={handleSelectElement}
+        updateElement={updateElement}
+        setTextEditing={setTextEditing}
+        getCurrentPageElements={getCurrentPageElements}
+        getBackgroundStyle={getBackgroundStyle}
+        getFilterCSS={getFilterCSS}
+        getEffectCSS={getEffectCSSWrapper}
+        parseCSS={parseCSS}
+        renderSelectionHandles={renderSelectionHandles}
+        handleTextEdit={handleTextEdit}
+      />
     );
-  }, [selectedElements, textEditing, lockedElements, currentTool, getFilterCSS, handleTextEdit, handleMouseDown, currentLanguage, textDirection, getBackgroundStyle, renderSelectionHandles, updateElement, getEffectCSS, getCurrentPageElements, handleSelectElement]);
+  }, [
+    selectedElements,
+    textEditing,
+    lockedElements,
+    currentTool,
+    currentLanguage,
+    textDirection,
+    fontFamilies,
+    supportedLanguages,
+    stickerOptions,
+    handleMouseDown,
+    handleSelectElement,
+    updateElement,
+    setTextEditing,
+    getCurrentPageElements,
+    getBackgroundStyle,
+    getFilterCSS,
+    getEffectCSSWrapper,
+    parseCSS,
+    renderSelectionHandles,
+    handleTextEdit
+  ]);
 
-  // Helper function to parse CSS string to object
-  const parseCSS = (cssString) => {
-    const style = {};
-    const declarations = cssString.split(';');
-    declarations.forEach(decl => {
-      const [property, value] = decl.split(':').map(s => s.trim());
-      if (property && value) {
-        style[property] = value;
-      }
-    });
-    return style;
-  };
+
 
   // Render drawing path in progress
   const renderDrawingPath = useCallback(() => {
@@ -5159,527 +3586,39 @@ const Sowntra = () => {
           </div>
 
           {/* Right Properties Panel - Hidden on mobile */}
-          <div className="properties-panel hidden md:block">
-            {/* Properties Section */}
-            <div className="mb-6">
-              <h2 className="text-lg font-bold mb-4">{t('properties.title')}</h2>
-              
-              {selectedElementData ? (
-                <div>
-                  {/* Animation Selection */}
-                  <div className="mb-3">
-                    <label className="block text-sm font-medium mb-1">{t('properties.animation')}</label>
-                    <select
-                      value={selectedElementData.animation || ''}
-                      onChange={(e) => updateElement(selectedElement, { animation: e.target.value || null })}
-                      className="w-full p-2 border rounded text-sm"
-                    >
-                      <option value="">{t('effects.none')}</option>
-                      {Object.entries(animations).map(([key, anim]) => (
-                        <option key={key} value={key}>
-                          {anim.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Effects Quick Access */}
-                  <div className="mb-3">
-                    <label className="block text-sm font-medium mb-1">{t('properties.quickEffects')}</label>
-                    <button
-                      onClick={() => setShowEffectsPanel(!showEffectsPanel)}
-                      className="w-full p-2 bg-purple-100 text-purple-600 rounded text-sm hover:bg-purple-200 flex items-center justify-center"
-                    >
-                      <Sparkles size={14} className="mr-1" />
-                      {t('properties.openEffectsPanel')}
-                    </button>
-                  </div>
-
-                  {/* Position and Size */}
-                  <div className="grid grid-cols-2 gap-2 mb-3">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">{t('properties.x')}</label>
-                      <input
-                        type="number"
-                        value={selectedElementData.x}
-                        onChange={(e) => updateElement(selectedElement, { x: parseInt(e.target.value) })}
-                        className="w-full p-2 border rounded text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">{t('properties.y')}</label>
-                      <input
-                        type="number"
-                        value={selectedElementData.y}
-                        onChange={(e) => updateElement(selectedElement, { y: parseInt(e.target.value) })}
-                        className="w-full p-2 border rounded text-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 mb-3">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">{t('properties.width')}</label>
-                      <input
-                        type="number"
-                        value={selectedElementData.width}
-                        onChange={(e) => updateElement(selectedElement, { width: parseInt(e.target.value) })}
-                        className="w-full p-2 border rounded text-sm"
-                        min="1"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">{t('properties.height')}</label>
-                      <input
-                        type="number"
-                        value={selectedElementData.height}
-                        onChange={(e) => updateElement(selectedElement, { height: parseInt(e.target.value) })}
-                        className="w-full p-2 border rounded text-sm"
-                        min="1"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mb-3">
-                    <label className="block text-sm font-medium mb-1">{t('properties.rotation')}</label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="360"
-                      value={selectedElementData.rotation || 0}
-                      onChange={(e) => updateElement(selectedElement, { rotation: parseInt(e.target.value) })}
-                      className="w-full"
-                    />
-                    <div className="text-xs text-center">{selectedElementData.rotation || 0}°</div>
-                  </div>
-
-                  {/* Filters */}
-                  <div className="mb-3">
-                    <label className="block text-sm font-medium mb-1">Filters</label>
-                    {Object.entries(selectedElementData.filters || filterOptions).map(([key, filter]) => (
-                      <div key={key} className="filter-slider">
-                        <label>{filter.name}</label>
-                        <input
-                          type="range"
-                          min="0"
-                          max={filter.max}
-                          value={filter.value}
-                          onChange={(e) => updateFilter(selectedElement, key, parseInt(e.target.value))}
-                          className="w-full"
-                        />
-                        <div className="filter-value">{filter.value}{filter.unit}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Fill Type Selection */}
-                  {['rectangle', 'circle', 'triangle', 'star', 'hexagon', 'sticker'].includes(selectedElementData.type) && (
-                    <>
-                      <div className="mb-3">
-                        <label className="block text-sm font-medium mb-1">Fill Type</label>
-                        <div className="flex space-x-2 mb-3">
-                          <button
-                            onClick={() => updateElement(selectedElement, { fillType: 'solid' })}
-                            className={`p-2 rounded text-xs flex-1 ${
-                              selectedElementData.fillType === 'solid' ? 'bg-blue-100 text-blue-600 border border-blue-300' : 'bg-gray-100 border border-gray-300'
-                            }`}
-                          >
-                            Solid Color
-                          </button>
-                          <button
-                            onClick={() => updateElement(selectedElement, { fillType: 'gradient' })}
-                            className={`p-2 rounded text-xs flex-1 ${
-                              selectedElementData.fillType === 'gradient' ? 'bg-blue-100 text-blue-600 border border-blue-300' : 'bg-gray-100 border border-gray-300'
-                            }`}
-                          >
-                            Gradient
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* SOLID COLOR PICKER */}
-                      {selectedElementData.fillType === 'solid' && (
-                        <div className="mb-3">
-                          <label className="block text-sm font-medium mb-1">Fill Color</label>
-                          <input
-                            type="color"
-                            value={selectedElementData.fill}
-                            onChange={(e) => updateElement(selectedElement, { fill: e.target.value })}
-                            className="w-full p-2 border rounded text-sm h-10 cursor-pointer"
-                          />
-                        </div>
-                      )}
-
-                      {/* GRADIENT PICKER - NOW FULLY WORKING */}
-                      {selectedElementData.fillType === 'gradient' && (
-                        <GradientPicker
-                          key={gradientPickerKey}
-                          gradient={selectedElementData.gradient}
-                          onGradientChange={(gradient) => updateElement(selectedElement, { gradient })}
-                        />
-                      )}
-                    </>
-                  )}
-
-                  {/* Text Properties */}
-                  {selectedElementData.type === 'text' && (
-                    <>
-                      <div className="mb-3">
-                        <label className="block text-sm font-medium mb-1">{t('text.fontSize')}</label>
-                        <input
-                          type="number"
-                          value={selectedElementData.fontSize}
-                          onChange={(e) => updateElement(selectedElement, { fontSize: parseInt(e.target.value) })}
-                          className="w-full p-2 border rounded text-sm"
-                          min="8"
-                          max="72"
-                        />
-                      </div>
-                      <div className="mb-3">
-                        <label className="block text-sm font-medium mb-1">{t('text.fontFamily')}</label>
-                        <select
-                          value={selectedElementData.fontFamily}
-                          onChange={(e) => updateElement(selectedElement, { fontFamily: e.target.value })}
-                          className="w-full p-2 border rounded text-sm"
-                        >
-                          {fontFamilies.map(font => (
-                            <option key={font} value={font}>{font}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="mb-3">
-                        <label className="block text-sm font-medium mb-1">{t('text.color')}</label>
-                        <input
-                          type="color"
-                          value={selectedElementData.color}
-                          onChange={(e) => updateElement(selectedElement, { color: e.target.value })}
-                          className="w-full p-2 border rounded text-sm h-10"
-                        />
-                      </div>
-                      <div className="mb-3">
-                        <label className="block text-sm font-medium mb-1">{t('text.textAlign')}</label>
-                        <div className="flex space-x-1">
-                          <button
-                            onClick={() => updateElement(selectedElement, { textAlign: 'left' })}
-                            className={`p-2 rounded ${selectedElementData.textAlign === 'left' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100'}`}
-                            title={t('text.left')}
-                          >
-                            <AlignLeft size={16} />
-                          </button>
-                          <button
-                            onClick={() => updateElement(selectedElement, { textAlign: 'center' })}
-                            className={`p-2 rounded ${selectedElementData.textAlign === 'center' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100'}`}
-                            title={t('text.center')}
-                          >
-                            <AlignCenter size={16} />
-                          </button>
-                          <button
-                            onClick={() => updateElement(selectedElement, { textAlign: 'right' })}
-                            className={`p-2 rounded ${selectedElementData.textAlign === 'right' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100'}`}
-                            title={t('text.right')}
-                          >
-                            <AlignRight size={16} />
-                          </button>
-                        </div>
-                      </div>
-                      <div className="mb-3">
-                        <label className="block text-sm font-medium mb-1">{t('text.textStyle')}</label>
-                        <div className="flex space-x-1">
-                          <button
-                            onClick={() => updateElement(selectedElement, { 
-                              fontWeight: selectedElementData.fontWeight === 'bold' ? 'normal' : 'bold' 
-                            })}
-                            className={`p-2 rounded ${selectedElementData.fontWeight === 'bold' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100'}`}
-                            title={t('text.bold')}
-                          >
-                            <Bold size={16} />
-                          </button>
-                          <button
-                            onClick={() => updateElement(selectedElement, { 
-                              fontStyle: selectedElementData.fontStyle === 'italic' ? 'normal' : 'italic' 
-                            })}
-                            className={`p-2 rounded ${selectedElementData.fontStyle === 'italic' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100'}`}
-                            title={t('text.italic')}
-                          >
-                            <Italic size={16} />
-                          </button>
-                          <button
-                            onClick={() => updateElement(selectedElement, { 
-                              textDecoration: selectedElementData.textDecoration === 'underline' ? 'none' : 'underline' 
-                            })}
-                            className={`p-2 rounded ${selectedElementData.textDecoration === 'underline' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100'}`}
-                            title={t('text.underline')}
-                          >
-                            <Underline size={16} />
-                          </button>
-                        </div>
-                      </div>
-                      <TransliterationToggle />
-                    </>
-                  )}
-
-                  {/* Shape Properties */}
-                  {['rectangle', 'circle', 'triangle', 'star', 'hexagon'].includes(selectedElementData.type) && (
-                    <>
-                      <div className="mb-3">
-                        <label className="block text-sm font-medium mb-1">Stroke Color</label>
-                        <input
-                          type="color"
-                          value={selectedElementData.stroke}
-                          onChange={(e) => updateElement(selectedElement, { stroke: e.target.value })}
-                          className="w-full p-2 border rounded text-sm h-10 cursor-pointer"
-                        />
-                      </div>
-                      <div className="mb-3">
-                        <label className="block text-sm font-medium mb-1">Stroke Width</label>
-                        <input
-                          type="number"
-                          value={selectedElementData.strokeWidth}
-                          onChange={(e) => updateElement(selectedElement, { strokeWidth: parseInt(e.target.value) })}
-                          className="w-full p-2 border rounded text-sm"
-                          min="0"
-                        />
-                      </div>
-                      {selectedElementData.type === 'rectangle' && (
-                        <div className="mb-3">
-                          <label className="block text-sm font-medium mb-1">Border Radius</label>
-                          <input
-                            type="number"
-                            value={selectedElementData.borderRadius}
-                            onChange={(e) => updateElement(selectedElement, { borderRadius: parseInt(e.target.value) })}
-                            className="w-full p-2 border rounded text-sm"
-                            min="0"
-                          />
-                        </div>
-                      )}
-                      {selectedElementData.type === 'star' && (
-                        <div className="mb-3">
-                          <label className="block text-sm font-medium mb-1">Points</label>
-                          <input
-                            type="number"
-                            value={selectedElementData.points || 5}
-                            onChange={(e) => updateElement(selectedElement, { points: parseInt(e.target.value) })}
-                            className="w-full p-2 border rounded text-sm"
-                            min="3"
-                            max="20"
-                          />
-                        </div>
-                      )}
-                    </>
-                  )}
-
-                  {/* Image Properties */}
-                  {selectedElementData.type === 'image' && (
-                    <div className="mb-3">
-                      <label className="block text-sm font-medium mb-1">Border Radius</label>
-                      <input
-                        type="number"
-                        value={selectedElementData.borderRadius}
-                        onChange={(e) => updateElement(selectedElement, { borderRadius: parseInt(e.target.value) })}
-                        className="w-full p-2 border rounded text-sm"
-                        min="0"
-                      />
-                    </div>
-                  )}
-
-                  {/* Sticker Properties */}
-                  {selectedElementData.type === 'sticker' && (
-                    <>
-                      <div className="mb-3">
-                        <label className="block text-sm font-medium mb-1">Sticker</label>
-                        <div className="sticker-grid">
-                          {stickerOptions.map(sticker => (
-                            <button
-                              key={sticker.name}
-                              onClick={() => updateElement(selectedElement, { sticker: sticker.name })}
-                              className={`sticker-button ${selectedElementData.sticker === sticker.name ? 'bg-blue-100 border-blue-300' : ''}`}
-                            >
-                              {sticker.icon}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Action Buttons */}
-                  <div className="grid grid-cols-2 gap-2 mb-3">
-                    <button
-                      onClick={() => duplicateElement(selectedElement)}
-                      className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center"
-                      disabled={lockedElements.has(selectedElement)}
-                    >
-                      <Copy size={14} className="mr-1" />
-                      Duplicate
-                    </button>
-                    <button
-                      onClick={() => toggleElementLock(selectedElement)}
-                      className={`p-2 rounded text-sm flex items-center justify-center ${
-                        lockedElements.has(selectedElement) 
-                          ? 'bg-green-100 text-green-600 hover:bg-green-200' 
-                          : 'bg-gray-100 hover:bg-gray-200'
-                      }`}
-                    >
-                      {lockedElements.has(selectedElement) ? (
-                        <>
-                          <Unlock size={14} className="mr-1" />
-                          Unlock
-                        </>
-                      ) : (
-                        <>
-                          <Lock size={14} className="mr-1" />
-                          Lock
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 mb-3">
-                    <button
-                      onClick={() => changeZIndex(selectedElement, 'backward')}
-                      className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center"
-                      disabled={lockedElements.has(selectedElement)}
-                    >
-                      <MinusCircle size={14} className="mr-1" />
-                      Backward
-                    </button>
-                    <button
-                      onClick={() => changeZIndex(selectedElement, 'forward')}
-                      className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center"
-                      disabled={lockedElements.has(selectedElement)}
-                    >
-                      <PlusCircle size={14} className="mr-1" />
-                      Forward
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 mb-3">
-                    <button
-                      onClick={() => changeZIndex(selectedElement, 'back')}
-                      className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center"
-                      disabled={lockedElements.has(selectedElement)}
-                    >
-                      To Back
-                    </button>
-                    <button
-                      onClick={() => changeZIndex(selectedElement, 'front')}
-                      className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center"
-                      disabled={lockedElements.has(selectedElement)}
-                    >
-                      To Front
-                    </button>
-                  </div>
-
-                  <button
-                    onClick={() => deleteElement(selectedElement)}
-                    className="w-full p-2 bg-red-100 text-red-600 rounded text-sm hover:bg-red-200 flex items-center justify-center"
-                    disabled={lockedElements.has(selectedElement)}
-                  >
-                    <Trash2 size={14} className="mr-1" />
-                    {t('properties.delete')}
-                  </button>
-                </div>
-              ) : (
-                <p className="text-gray-500 text-sm">{t('properties.selectElement')}</p>
-              )}
-            </div>
-
-            {/* Export Section */}
-            <div className="mb-6">
-              <h2 className="text-lg font-bold mb-4 text-gray-700">{t('export.title')}</h2>
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                <button
-                  onClick={() => exportAsImage('png')}
-                  className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center text-gray-700"
-                >
-                  <Download size={14} className="mr-1" />
-                  PNG
-                </button>
-                <button
-                  onClick={() => exportAsImage('jpeg')}
-                  className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center text-gray-700"
-                >
-                  <Download size={14} className="mr-1" />
-                  JPEG
-                </button>
-              </div>
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                <button
-                  onClick={() => exportAsImage('webp')}
-                  className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center text-gray-700"
-                >
-                  <Download size={14} className="mr-1" />
-                  WebP
-                </button>
-                <button
-                  onClick={() => exportAsImage('svg')}
-                  className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center text-gray-700"
-                >
-                  <Download size={14} className="mr-1" />
-                  SVG
-                </button>
-              </div>
-              <div className="grid grid-cols-1 gap-2 mb-3">
-                <button
-                  onClick={exportAsPDF}
-                  className="p-2 bg-blue-100 rounded text-sm hover:bg-blue-200 flex items-center justify-center text-blue-700 font-medium"
-                >
-                  <Download size={14} className="mr-1" />
-                  PDF
-                </button>
-              </div>
-              
-              {/* Video Export Settings */}
-              <VideoSettings />
-              
-              {!recording ? (
-                <button
-                  onClick={startRecording}
-                  className="w-full p-2 rounded text-sm flex items-center justify-center bg-blue-500 text-white hover:bg-blue-600"
-                >
-                  <Film size={14} className="mr-1" />
-                  {t('export.exportVideo')}
-                </button>
-              ) : (
-                <div className="space-y-2">
-                  <div className="w-full p-2 bg-red-50 border border-red-200 rounded text-sm flex items-center justify-center text-red-600">
-                    <div className="flex items-center">
-                      <div className="w-2 h-2 bg-red-500 rounded-full mr-2 animate-pulse"></div>
-                      {t('recording.recording')}: {Math.floor(recordingTimeElapsed / 60)}:{(recordingTimeElapsed % 60).toString().padStart(2, '0')}
-                    </div>
-                  </div>
-                  <button
-                    onClick={stopRecording}
-                    className="w-full p-2 rounded text-sm flex items-center justify-center bg-red-500 text-white hover:bg-red-600"
-                  >
-                    <Square size={14} className="mr-1" />
-                    {t('recording.stop')}
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Project Actions */}
-            <div>
-              <h2 className="text-lg font-bold mb-4 text-gray-700">{t('project.title')}</h2>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={handleSaveClick}
-                  className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center text-gray-700"
-                >
-                  <Save size={14} className="mr-1" />
-                  {t('project.save')}
-                </button>
-                <button
-                  onClick={loadProject}
-                  className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center text-gray-700"
-                >
-                  <FolderOpen size={14} className="mr-1" />
-                  {t('project.load')}
-                </button>
-              </div>
-            </div>
-          </div>
+          <PropertiesPanel
+            selectedElement={selectedElement}
+            selectedElementData={selectedElementData}
+            animations={animations}
+            filterOptions={filterOptions}
+            fontFamilies={fontFamilies}
+            stickerOptions={stickerOptions}
+            showEffectsPanel={showEffectsPanel}
+            setShowEffectsPanel={setShowEffectsPanel}
+            gradientPickerKey={gradientPickerKey}
+            lockedElements={lockedElements}
+            updateElement={updateElement}
+            updateFilter={updateFilter}
+            duplicateElement={duplicateElement}
+            deleteElement={deleteElement}
+            toggleElementLock={toggleElementLock}
+            changeZIndex={changeZIndex}
+            exportAsImage={exportAsImage}
+            exportAsPDF={exportAsPDF}
+            handleSaveClick={handleSaveClick}
+            loadProject={loadProject}
+            TransliterationToggle={TransliterationToggle}
+            recording={recording}
+            startRecording={startRecording}
+            stopRecording={stopRecording}
+            recordingTimeElapsed={recordingTimeElapsed}
+            videoFormat={videoFormat}
+            setVideoFormat={setVideoFormat}
+            videoQuality={videoQuality}
+            setVideoQuality={setVideoQuality}
+            recordingDuration={recordingDuration}
+            setRecordingDuration={setRecordingDuration}
+          />
         </div>
 
         {/* Effects Panel */}
@@ -5820,301 +3759,53 @@ const Sowntra = () => {
         )}
 
         {/* Mobile Floating Action Buttons */}
-        <div className="md:hidden fixed bottom-4 right-4 flex flex-col gap-3 z-40">
-          {/* Zoom In Button */}
-          <button
-            onClick={() => zoom('in')}
-            className="w-12 h-12 bg-gray-700 hover:bg-gray-800 text-white rounded-full shadow-lg flex items-center justify-center touch-manipulation"
-            title="Zoom In"
-          >
-            <ZoomIn size={20} />
-          </button>
-          
-          {/* Zoom Out Button */}
-          <button
-            onClick={() => zoom('out')}
-            className="w-12 h-12 bg-gray-700 hover:bg-gray-800 text-white rounded-full shadow-lg flex items-center justify-center touch-manipulation"
-            title="Zoom Out"
-          >
-            <ZoomOut size={20} />
-          </button>
-          
-          {/* Fit to Screen Button */}
-          <button
-            onClick={centerCanvas}
-            className="w-12 h-12 bg-gray-700 hover:bg-gray-800 text-white rounded-full shadow-lg flex items-center justify-center touch-manipulation"
-            title="Fit to Screen"
-          >
-            <Maximize size={20} />
-          </button>
-          
-          <button
-            onClick={() => {
-              setShowMobileTools(true);
-              setShowMobileProperties(false);
-            }}
-            className="w-14 h-14 bg-purple-500 hover:bg-purple-600 text-white rounded-full shadow-lg flex items-center justify-center touch-manipulation"
-            title="Tools"
-          >
-            <Layers size={24} />
-          </button>
-          
-          {selectedElement && (
-            <button
-              onClick={() => {
-                setShowMobileProperties(true);
-                setShowMobileTools(false);
-              }}
-              className="w-14 h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center touch-manipulation"
-              title="Properties"
-            >
-              <Settings size={24} />
-            </button>
-          )}
-        </div>
+        <MobileFABButtons
+          zoom={zoom}
+          centerCanvas={centerCanvas}
+          setShowMobileTools={setShowMobileTools}
+          setShowMobileProperties={setShowMobileProperties}
+          selectedElement={selectedElement}
+        />
 
         {/* Mobile Tools Drawer */}
-        {showMobileTools && (
-          <>
-            <div 
-              className="md:hidden fixed inset-0 bg-black/50 z-50"
-              onClick={() => setShowMobileTools(false)}
-            />
-            <div className="md:hidden fixed left-0 top-0 bottom-0 w-72 bg-white shadow-2xl z-50 overflow-y-auto">
-              <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between">
-                <h2 className="text-lg font-bold">{t('tools.title')}</h2>
-                <button
-                  onClick={() => setShowMobileTools(false)}
-                  className="p-3 rounded-lg hover:bg-gray-100 text-2xl leading-none touch-manipulation min-h-[44px] min-w-[44px]"
-                >
-                  ×
-                </button>
-              </div>
-              
-              <div className="p-4 space-y-2">
-                {/* Recording & Playback Controls */}
-                <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-3 rounded-lg mb-3">
-                  <h3 className="text-xs font-semibold text-gray-600 mb-2">RECORDING & PLAYBACK</h3>
-                  {!recording ? (
-                    <button onClick={() => { startRecording(); setShowMobileTools(false); }} className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-blue-500 text-white hover:bg-blue-600 touch-manipulation mb-2">
-                      <Film size={20} /> <span className="font-medium">Start Recording</span>
-                    </button>
-                  ) : (
-                    <button onClick={() => { stopRecording(); setShowMobileTools(false); }} className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-red-500 text-white hover:bg-red-600 touch-manipulation mb-2">
-                      <Square size={20} /> <span className="font-medium">Stop Recording ({Math.floor(recordingTimeElapsed / 60)}:{(recordingTimeElapsed % 60).toString().padStart(2, '0')})</span>
-                    </button>
-                  )}
-                  <div className="grid grid-cols-2 gap-2">
-                    <button onClick={() => { playAnimations(); setShowMobileTools(false); }} disabled={isPlaying} className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-green-500 text-white hover:bg-green-600 disabled:opacity-50 touch-manipulation">
-                      <Play size={18} /> <span>Play</span>
-                    </button>
-                    <button onClick={() => { resetAnimations(); setShowMobileTools(false); }} className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-orange-500 text-white hover:bg-orange-600 touch-manipulation">
-                      <Pause size={18} /> <span>Reset</span>
-                    </button>
-                  </div>
-                </div>
-                
-                {/* Templates & Effects */}
-                <button onClick={() => { setShowTemplates(!showTemplates); setShowMobileTools(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-purple-50 hover:bg-purple-100 touch-manipulation">
-                  <Layers size={20} className="text-purple-600" /> <span className="font-medium">Templates</span>
-                </button>
-                
-                <button onClick={() => { setShowEffectsPanel(!showEffectsPanel); setShowMobileTools(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-indigo-50 hover:bg-indigo-100 touch-manipulation">
-                  <Sparkles size={20} className="text-indigo-600" /> <span className="font-medium">Effects</span>
-                </button>
-                
-                <div className="border-t my-3" />
-                
-                {/* Add Elements */}
-                <h3 className="text-xs font-semibold text-gray-500 mb-2">ADD ELEMENTS</h3>
-                <button onClick={() => { setCurrentTool('select'); setShowMobileTools(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg touch-manipulation ${currentTool === 'select' ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100'}`}>
-                  <MousePointer size={20} /> <span>Select</span>
-                </button>
-                <button onClick={() => { addElement('text'); setShowMobileTools(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 touch-manipulation">
-                  <Type size={20} /> <span>Add Text</span>
-                </button>
-                <button onClick={() => { addElement('rectangle'); setShowMobileTools(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 touch-manipulation">
-                  <Square size={20} /> <span>Rectangle</span>
-                </button>
-                <button onClick={() => { addElement('circle'); setShowMobileTools(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 touch-manipulation">
-                  <Circle size={20} /> <span>Circle</span>
-                </button>
-                <button onClick={() => { addElement('triangle'); setShowMobileTools(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 touch-manipulation">
-                  <Triangle size={20} /> <span>Triangle</span>
-                </button>
-                <button onClick={() => { addElement('star'); setShowMobileTools(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 touch-manipulation">
-                  <Star size={20} /> <span>Star</span>
-                </button>
-                <button onClick={() => { fileInputRef.current?.click(); setShowMobileTools(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 touch-manipulation">
-                  <Image size={20} /> <span>Add Image</span>
-                </button>
-                
-                <div className="border-t my-3" />
-                
-                {/* Zoom Controls */}
-                <h3 className="text-xs font-semibold text-gray-500 mb-2">VIEW</h3>
-                <div className="flex gap-2">
-                  <button onClick={() => { zoom('in'); }} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg hover:bg-gray-100 touch-manipulation">
-                    <ZoomIn size={20} /> <span>Zoom In</span>
-                  </button>
-                  <button onClick={() => { zoom('out'); }} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg hover:bg-gray-100 touch-manipulation">
-                    <ZoomOut size={20} /> <span>Zoom Out</span>
-                  </button>
-                </div>
-                
-                <div className="border-t my-3" />
-                
-                {/* Undo/Redo & Save */}
-                <h3 className="text-xs font-semibold text-gray-500 mb-2">ACTIONS</h3>
-                <div className="flex gap-2">
-                  <button onClick={undo} disabled={historyIndex <= 0} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg hover:bg-gray-100 disabled:opacity-50 touch-manipulation">
-                    <Undo size={20} /> <span>Undo</span>
-                  </button>
-                  <button onClick={redo} disabled={historyIndex >= history.length - 1} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg hover:bg-gray-100 disabled:opacity-50 touch-manipulation">
-                    <Redo size={20} /> <span>Redo</span>
-                  </button>
-                </div>
-                
-                <button onClick={() => { handleSaveClick(); setShowMobileTools(false); }} className="w-full flex items-center gap-3 px-4 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 touch-manipulation">
-                  <Save size={20} /> <span>Save Project</span>
-                </button>
-              </div>
-            </div>
-          </>
-        )}
+        <MobileToolsDrawer
+          showMobileTools={showMobileTools}
+          setShowMobileTools={setShowMobileTools}
+          currentTool={currentTool}
+          setCurrentTool={setCurrentTool}
+          addElement={addElement}
+          fileInputRef={fileInputRef}
+          setShowTemplates={setShowTemplates}
+          showTemplates={showTemplates}
+          zoom={zoom}
+          undo={undo}
+          redo={redo}
+          historyIndex={historyIndex}
+          history={history}
+          handleSaveClick={handleSaveClick}
+          recording={recording}
+          recordingTimeElapsed={recordingTimeElapsed}
+          startRecording={startRecording}
+          stopRecording={stopRecording}
+          playAnimations={playAnimations}
+          resetAnimations={resetAnimations}
+          isPlaying={isPlaying}
+          setShowEffectsPanel={setShowEffectsPanel}
+          showEffectsPanel={showEffectsPanel}
+        />
 
         {/* Mobile Properties Drawer */}
-        {showMobileProperties && selectedElementData && (
-          <>
-            <div 
-              className="md:hidden fixed inset-0 bg-black/50 z-50"
-              onClick={() => setShowMobileProperties(false)}
-            />
-            <div className="md:hidden fixed right-0 top-0 bottom-0 w-80 max-w-full bg-white shadow-2xl z-50 overflow-y-auto">
-              <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between">
-                <h2 className="text-lg font-bold">{t('properties.title')}</h2>
-                <button onClick={() => setShowMobileProperties(false)} className="p-3 rounded-lg hover:bg-gray-100 text-2xl leading-none touch-manipulation min-h-[44px] min-w-[44px]">
-                  ×
-                </button>
-              </div>
-              
-              <div className="p-4 space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium mb-2">X</label>
-                    <input type="number" value={Math.round(selectedElementData.x)} onChange={(e) => updateElement(selectedElement, { x: parseInt(e.target.value) })} className="w-full px-3 py-3 text-base border rounded-lg touch-manipulation" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-2">Y</label>
-                    <input type="number" value={Math.round(selectedElementData.y)} onChange={(e) => updateElement(selectedElement, { y: parseInt(e.target.value) })} className="w-full px-3 py-3 text-base border rounded-lg touch-manipulation" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-2">Width</label>
-                    <input type="number" value={Math.round(selectedElementData.width)} onChange={(e) => updateElement(selectedElement, { width: parseInt(e.target.value) })} className="w-full px-3 py-3 text-base border rounded-lg touch-manipulation" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-2">Height</label>
-                    <input type="number" value={Math.round(selectedElementData.height)} onChange={(e) => updateElement(selectedElement, { height: parseInt(e.target.value) })} className="w-full px-3 py-3 text-base border rounded-lg touch-manipulation" />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium mb-2">Rotation</label>
-                  <div className="flex items-center gap-3">
-                    <input type="range" min="0" max="360" value={selectedElementData.rotation || 0} onChange={(e) => updateElement(selectedElement, { rotation: parseInt(e.target.value) })} className="flex-1 h-8 touch-manipulation" />
-                    <span className="text-base font-medium min-w-[50px]">{selectedElementData.rotation || 0}°</span>
-                  </div>
-                </div>
-
-                {/* Animation Selection for Mobile */}
-                <div>
-                  <label className="block text-xs font-medium mb-2">Animation</label>
-                  <select
-                    value={selectedElementData.animation || ''}
-                    onChange={(e) => updateElement(selectedElement, { animation: e.target.value || null })}
-                    className="w-full px-3 py-3 text-base border rounded-lg touch-manipulation"
-                  >
-                    <option value="">None</option>
-                    {Object.entries(animations).map(([key, anim]) => (
-                      <option key={key} value={key}>
-                        {anim.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {selectedElementData.type === 'text' && (
-                  <>
-                    <div>
-                      <label className="block text-xs font-medium mb-2">Font Size</label>
-                      <input type="number" value={selectedElementData.fontSize} onChange={(e) => updateElement(selectedElement, { fontSize: parseInt(e.target.value) })} className="w-full px-3 py-3 text-base border rounded-lg touch-manipulation" min="8" max="200" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium mb-2">Color</label>
-                      <input type="color" value={selectedElementData.color} onChange={(e) => updateElement(selectedElement, { color: e.target.value })} className="w-full h-12 rounded-lg cursor-pointer touch-manipulation" />
-                    </div>
-                  </>
-                )}
-
-                {['rectangle', 'circle', 'triangle', 'star', 'hexagon'].includes(selectedElementData.type) && (
-                  <>
-                    {/* Fill Type Selection for Mobile */}
-                    <div>
-                      <label className="block text-xs font-medium mb-2">Fill Type</label>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => updateElement(selectedElement, { fillType: 'solid' })}
-                          className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium touch-manipulation ${
-                            selectedElementData.fillType === 'solid' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'
-                          }`}
-                        >
-                          Solid Color
-                        </button>
-                        <button
-                          onClick={() => updateElement(selectedElement, { fillType: 'gradient' })}
-                          className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium touch-manipulation ${
-                            selectedElementData.fillType === 'gradient' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'
-                          }`}
-                        >
-                          Gradient
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Solid Color Picker for Mobile */}
-                    {selectedElementData.fillType === 'solid' && (
-                      <div>
-                        <label className="block text-xs font-medium mb-2">Fill Color</label>
-                        <input type="color" value={selectedElementData.fill} onChange={(e) => updateElement(selectedElement, { fill: e.target.value })} className="w-full h-12 rounded-lg cursor-pointer touch-manipulation" />
-                      </div>
-                    )}
-
-                    {/* Gradient Picker for Mobile */}
-                    {selectedElementData.fillType === 'gradient' && (
-                      <div>
-                        <label className="block text-xs font-medium mb-2">Gradient Fill</label>
-                        <GradientPicker
-                          key={gradientPickerKey}
-                          gradient={selectedElementData.gradient}
-                          onGradientChange={(gradient) => updateElement(selectedElement, { gradient })}
-                        />
-                      </div>
-                    )}
-                  </>
-                )}
-
-                <div className="border-t pt-4 flex gap-2">
-                  <button onClick={() => { duplicateElement(selectedElement); setShowMobileProperties(false); }} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-blue-100 text-blue-600 rounded-lg touch-manipulation">
-                    <Copy size={18} /> <span>Duplicate</span>
-                  </button>
-                  <button onClick={() => { deleteElement(selectedElement); setShowMobileProperties(false); }} className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-red-100 text-red-600 rounded-lg touch-manipulation">
-                    <Trash2 size={18} /> <span>Delete</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
+        <MobilePropertiesDrawer
+          showMobileProperties={showMobileProperties}
+          setShowMobileProperties={setShowMobileProperties}
+          selectedElementData={selectedElementData}
+          selectedElement={selectedElement}
+          updateElement={updateElement}
+          duplicateElement={duplicateElement}
+          deleteElement={deleteElement}
+          animations={animations}
+          gradientPickerKey={gradientPickerKey}
+        />
 
         {/* Save Project Dialog */}
         <SaveDialog 

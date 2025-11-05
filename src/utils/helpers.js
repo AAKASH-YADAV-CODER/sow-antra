@@ -150,7 +150,7 @@ export const parseCSS = (cssString) => {
 };
 
 // Get canvas effects for an element
-export const getCanvasEffects = (element, imageEffects) => {
+export const getCanvasEffects = (element, imageEffects = {}) => {
   const effects = {
     shadow: {},
     filters: ''
@@ -222,7 +222,7 @@ export const getCanvasEffects = (element, imageEffects) => {
 };
 
 // Get effect CSS for an element
-export const getEffectCSS = (element, textEffects, imageEffects, shapeEffects, specialEffects) => {
+export const getEffectCSS = (element, textEffects = {}, imageEffects = {}, shapeEffects = {}, specialEffects = {}) => {
   let effectCSS = '';
   
   if (element.type === 'text' && element.textEffect && element.textEffect !== 'none') {

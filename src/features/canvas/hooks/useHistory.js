@@ -1,103 +1,57 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 
 /**
- * Custom hook for managing undo/redo history
- * @param {*} initialState - Initial state value
- * @param {number} maxHistory - Maximum number of history entries (default: 50)
- * @returns {object} - { state, setState, undo, redo, canUndo, canRedo, clearHistory }
+ * useHistory Hook
+ * Manages undo/redo history for canvas elements
+ * Uses JSON serialization to store element states
+ * 
+ * @param {Function} setCurrentPageElements - Function to update current page elements
+ * @returns {object} - { history, historyIndex, saveToHistory, undo, redo, canUndo, canRedo }
  */
-const useHistory = (initialState, maxHistory = 50) => {
-  const [state, setStateInternal] = useState(initialState);
-  const [history, setHistory] = useState([initialState]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  
-  // Track if we're currently applying history (to prevent adding to history)
-  const isApplyingHistory = useRef(false);
+const useHistory = (setCurrentPageElements) => {
+  const [history, setHistory] = useState([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
 
-  // Set state and add to history
-  const setState = useCallback((newState) => {
-    if (isApplyingHistory.current) {
-      // Don't add to history if we're applying undo/redo
-      setStateInternal(newState);
-      return;
-    }
-
-    setStateInternal(newState);
-    setHistory((prev) => {
-      // Remove any "future" history if we're not at the end
-      const newHistory = prev.slice(0, currentIndex + 1);
-      // Add new state
-      newHistory.push(newState);
-      // Limit history size
-      if (newHistory.length > maxHistory) {
-        return newHistory.slice(newHistory.length - maxHistory);
-      }
-      return newHistory;
-    });
-    setCurrentIndex((prev) => {
-      const newIndex = prev + 1;
-      return newIndex >= maxHistory ? maxHistory - 1 : newIndex;
-    });
-  }, [currentIndex, maxHistory]);
+  // Save current state to history
+  const saveToHistory = useCallback((newElements) => {
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(JSON.stringify(newElements));
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+  }, [history, historyIndex]);
 
   // Undo to previous state
   const undo = useCallback(() => {
-    if (currentIndex > 0) {
-      isApplyingHistory.current = true;
-      const newIndex = currentIndex - 1;
-      setCurrentIndex(newIndex);
-      setStateInternal(history[newIndex]);
-      // Reset flag after state update
-      setTimeout(() => {
-        isApplyingHistory.current = false;
-      }, 0);
+    if (historyIndex > 0) {
+      const prevElements = JSON.parse(history[historyIndex - 1]);
+      setCurrentPageElements(prevElements);
+      setHistoryIndex(historyIndex - 1);
     }
-  }, [currentIndex, history]);
+  }, [history, historyIndex, setCurrentPageElements]);
 
   // Redo to next state
   const redo = useCallback(() => {
-    if (currentIndex < history.length - 1) {
-      isApplyingHistory.current = true;
-      const newIndex = currentIndex + 1;
-      setCurrentIndex(newIndex);
-      setStateInternal(history[newIndex]);
-      // Reset flag after state update
-      setTimeout(() => {
-        isApplyingHistory.current = false;
-      }, 0);
+    if (historyIndex < history.length - 1) {
+      const nextElements = JSON.parse(history[historyIndex + 1]);
+      setCurrentPageElements(nextElements);
+      setHistoryIndex(historyIndex + 1);
     }
-  }, [currentIndex, history]);
+  }, [history, historyIndex, setCurrentPageElements]);
 
   // Check if undo is available
-  const canUndo = currentIndex > 0;
+  const canUndo = historyIndex > 0;
 
   // Check if redo is available
-  const canRedo = currentIndex < history.length - 1;
-
-  // Clear all history and reset to current state
-  const clearHistory = useCallback(() => {
-    setHistory([state]);
-    setCurrentIndex(0);
-  }, [state]);
-
-  // Reset to a specific state and clear history
-  const resetHistory = useCallback((newState) => {
-    setStateInternal(newState);
-    setHistory([newState]);
-    setCurrentIndex(0);
-  }, []);
+  const canRedo = historyIndex < history.length - 1;
 
   return {
-    state,
-    setState,
+    history,
+    historyIndex,
+    saveToHistory,
     undo,
     redo,
     canUndo,
-    canRedo,
-    clearHistory,
-    resetHistory,
-    historyLength: history.length,
-    currentIndex,
+    canRedo
   };
 };
 

@@ -2,10 +2,11 @@ import React from 'react';
 import {
   Copy, Trash2, Lock, Unlock, MinusCircle, PlusCircle,
   Download, Sparkles, AlignLeft, AlignCenter, AlignRight,
-  Bold, Italic, Underline
+  Bold, Italic, Underline, Film, Square, Save, FolderOpen
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import GradientPicker from './GradientPicker';
+import VideoSettings from './VideoSettings';
 
 /**
  * Properties Panel Component
@@ -30,7 +31,19 @@ const PropertiesPanel = ({
   changeZIndex,
   exportAsImage,
   exportAsPDF,
-  saveProject,
+  handleSaveClick,
+  loadProject,
+  TransliterationToggle,
+  recording,
+  startRecording,
+  stopRecording,
+  recordingTimeElapsed,
+  videoFormat,
+  setVideoFormat,
+  videoQuality,
+  setVideoQuality,
+  recordingDuration,
+  setRecordingDuration,
 }) => {
   const { t } = useTranslation();
 
@@ -304,6 +317,57 @@ const PropertiesPanel = ({
                 </button>
               </div>
             </div>
+            <TransliterationToggle />
+          </>
+        )}
+
+        {/* Shape Properties */}
+        {['rectangle', 'circle', 'triangle', 'star', 'hexagon'].includes(selectedElementData.type) && (
+          <>
+            <div className="mb-3">
+              <label className="block text-sm font-medium mb-1">Stroke Color</label>
+              <input
+                type="color"
+                value={selectedElementData.stroke}
+                onChange={(e) => updateElement(selectedElement, { stroke: e.target.value })}
+                className="w-full p-2 border rounded text-sm h-10 cursor-pointer"
+              />
+            </div>
+            <div className="mb-3">
+              <label className="block text-sm font-medium mb-1">Stroke Width</label>
+              <input
+                type="number"
+                value={selectedElementData.strokeWidth}
+                onChange={(e) => updateElement(selectedElement, { strokeWidth: parseInt(e.target.value) })}
+                className="w-full p-2 border rounded text-sm"
+                min="0"
+              />
+            </div>
+            {selectedElementData.type === 'rectangle' && (
+              <div className="mb-3">
+                <label className="block text-sm font-medium mb-1">Border Radius</label>
+                <input
+                  type="number"
+                  value={selectedElementData.borderRadius}
+                  onChange={(e) => updateElement(selectedElement, { borderRadius: parseInt(e.target.value) })}
+                  className="w-full p-2 border rounded text-sm"
+                  min="0"
+                />
+              </div>
+            )}
+            {selectedElementData.type === 'star' && (
+              <div className="mb-3">
+                <label className="block text-sm font-medium mb-1">Points</label>
+                <input
+                  type="number"
+                  value={selectedElementData.points || 5}
+                  onChange={(e) => updateElement(selectedElement, { points: parseInt(e.target.value) })}
+                  className="w-full p-2 border rounded text-sm"
+                  min="3"
+                  max="20"
+                />
+              </div>
+            )}
           </>
         )}
 
@@ -312,14 +376,12 @@ const PropertiesPanel = ({
           <div className="mb-3">
             <label className="block text-sm font-medium mb-1">Border Radius</label>
             <input
-              type="range"
-              min="0"
-              max="50"
-              value={selectedElementData.borderRadius || 0}
+              type="number"
+              value={selectedElementData.borderRadius}
               onChange={(e) => updateElement(selectedElement, { borderRadius: parseInt(e.target.value) })}
-              className="w-full"
+              className="w-full p-2 border rounded text-sm"
+              min="0"
             />
-            <div className="text-xs text-center">{selectedElementData.borderRadius || 0}px</div>
           </div>
         )}
 
@@ -463,17 +525,63 @@ const PropertiesPanel = ({
             PDF
           </button>
         </div>
+        
+        {/* Video Export Settings */}
+        <VideoSettings 
+          videoFormat={videoFormat}
+          videoQuality={videoQuality}
+          recordingDuration={recordingDuration}
+          onFormatChange={setVideoFormat}
+          onQualityChange={setVideoQuality}
+          onDurationChange={setRecordingDuration}
+        />
+        
+        {!recording ? (
+          <button
+            onClick={startRecording}
+            className="w-full p-2 rounded text-sm flex items-center justify-center bg-blue-500 text-white hover:bg-blue-600"
+          >
+            <Film size={14} className="mr-1" />
+            {t('export.exportVideo')}
+          </button>
+        ) : (
+          <div className="space-y-2">
+            <div className="w-full p-2 bg-red-50 border border-red-200 rounded text-sm flex items-center justify-center text-red-600">
+              <div className="flex items-center">
+                <div className="w-2 h-2 bg-red-500 rounded-full mr-2 animate-pulse"></div>
+                {t('recording.recording')}: {Math.floor(recordingTimeElapsed / 60)}:{(recordingTimeElapsed % 60).toString().padStart(2, '0')}
+              </div>
+            </div>
+            <button
+              onClick={stopRecording}
+              className="w-full p-2 rounded text-sm flex items-center justify-center bg-red-500 text-white hover:bg-red-600"
+            >
+              <Square size={14} className="mr-1" />
+              {t('recording.stop')}
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Project Save Section */}
-      <div className="mb-6">
-        <button
-          onClick={saveProject}
-          className="w-full p-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 flex items-center justify-center font-medium"
-        >
-          <Download size={16} className="mr-2" />
-          {t('toolbar.save')}
-        </button>
+      {/* Project Actions */}
+      <div>
+        <h2 className="text-lg font-bold mb-4 text-gray-700">{t('project.title')}</h2>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={handleSaveClick}
+            className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center text-gray-700"
+          >
+            <Save size={14} className="mr-1" />
+            {t('project.save')}
+          </button>
+          <button
+            onClick={loadProject}
+            className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center text-gray-700"
+          >
+            <FolderOpen size={14} className="mr-1" />
+            {t('project.load')}
+          </button>
+        </div>
       </div>
     </div>
   );

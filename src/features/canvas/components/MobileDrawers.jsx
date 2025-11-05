@@ -4,6 +4,7 @@ import {
   ZoomIn, ZoomOut, Undo, Redo, Save, Film, Play, Pause, Sparkles, Copy, Trash2
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import GradientPicker from './GradientPicker';
 
 const MobileToolsDrawer = ({
   showMobileTools,
@@ -151,7 +152,9 @@ const MobilePropertiesDrawer = ({
   selectedElement,
   updateElement,
   duplicateElement,
-  deleteElement
+  deleteElement,
+  animations,
+  gradientPickerKey
 }) => {
   const { t } = useTranslation();
 
@@ -199,6 +202,23 @@ const MobilePropertiesDrawer = ({
             </div>
           </div>
 
+          {/* Animation Selection for Mobile */}
+          <div>
+            <label className="block text-xs font-medium mb-2">Animation</label>
+            <select
+              value={selectedElementData.animation || ''}
+              onChange={(e) => updateElement(selectedElement, { animation: e.target.value || null })}
+              className="w-full px-3 py-3 text-base border rounded-lg touch-manipulation"
+            >
+              <option value="">None</option>
+              {Object.entries(animations).map(([key, anim]) => (
+                <option key={key} value={key}>
+                  {anim.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {selectedElementData.type === 'text' && (
             <>
               <div>
@@ -213,10 +233,50 @@ const MobilePropertiesDrawer = ({
           )}
 
           {['rectangle', 'circle', 'triangle', 'star', 'hexagon'].includes(selectedElementData.type) && (
-            <div>
-              <label className="block text-xs font-medium mb-2">Fill Color</label>
-              <input type="color" value={selectedElementData.fill} onChange={(e) => updateElement(selectedElement, { fill: e.target.value })} className="w-full h-12 rounded-lg cursor-pointer touch-manipulation" />
-            </div>
+            <>
+              {/* Fill Type Selection for Mobile */}
+              <div>
+                <label className="block text-xs font-medium mb-2">Fill Type</label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => updateElement(selectedElement, { fillType: 'solid' })}
+                    className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium touch-manipulation ${
+                      selectedElementData.fillType === 'solid' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'
+                    }`}
+                  >
+                    Solid Color
+                  </button>
+                  <button
+                    onClick={() => updateElement(selectedElement, { fillType: 'gradient' })}
+                    className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium touch-manipulation ${
+                      selectedElementData.fillType === 'gradient' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'
+                    }`}
+                  >
+                    Gradient
+                  </button>
+                </div>
+              </div>
+
+              {/* Solid Color Picker for Mobile */}
+              {selectedElementData.fillType === 'solid' && (
+                <div>
+                  <label className="block text-xs font-medium mb-2">Fill Color</label>
+                  <input type="color" value={selectedElementData.fill} onChange={(e) => updateElement(selectedElement, { fill: e.target.value })} className="w-full h-12 rounded-lg cursor-pointer touch-manipulation" />
+                </div>
+              )}
+
+              {/* Gradient Picker for Mobile */}
+              {selectedElementData.fillType === 'gradient' && (
+                <div>
+                  <label className="block text-xs font-medium mb-2">Gradient Fill</label>
+                  <GradientPicker
+                    key={gradientPickerKey}
+                    gradient={selectedElementData.gradient}
+                    onGradientChange={(gradient) => updateElement(selectedElement, { gradient })}
+                  />
+                </div>
+              )}
+            </>
           )}
 
           <div className="border-t pt-4 flex gap-2">
