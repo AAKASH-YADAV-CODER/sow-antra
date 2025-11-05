@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, Sparkles } from 'lucide-react';
-import { socialMediaTemplates } from '../../../utils/constants';
+import { socialMediaTemplates } from '../../../../utils/constants';
 
 const TemplatesModal = ({ show, onClose, onApplyTemplate }) => {
   if (!show) return null;

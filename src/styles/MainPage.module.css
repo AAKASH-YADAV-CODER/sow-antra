@@ -58,11 +58,6 @@
   pointer-events: auto;
 }
 
-.canvasElement.selected {
-  outline: 2px solid #3b82f6;
-  outline-offset: 2px;
-}
-
 .canvasElement.multiSelected {
   outline: 2px dashed #8b5cf6;
   outline-offset: 2px;
@@ -137,8 +132,7 @@
 .selectionBox {
   position: absolute;
   pointer-events: none;
-  border: 2px solid #3b82f6;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5);
+  /* Wrapper for selection handles and border */
 }
 
 .resizeHandle {

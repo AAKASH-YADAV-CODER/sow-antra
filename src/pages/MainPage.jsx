@@ -21,6 +21,16 @@ import { useAuth } from '../contexts/AuthContext';
 import ShareButton from '../components/common/ShareButton';
 import jsPDF from 'jspdf';
 import { projectAPI } from '../services/api';
+// Component imports
+import SaveDialog from '../features/canvas/components/modals/SaveDialog';
+import TemplatesModal from '../features/canvas/components/modals/TemplatesModal';
+import CustomTemplateModal from '../features/canvas/components/modals/CustomTemplateModal';
+import LanguageHelpModal from '../features/canvas/components/modals/LanguageHelpModal';
+import RecordingStatus from '../features/canvas/components/RecordingStatus';
+import EffectsPanel from '../features/canvas/components/EffectsPanel';
+import GradientPicker from '../features/canvas/components/GradientPicker';
+import SelectionHandles from '../features/canvas/components/SelectionHandles';
+import { MobileToolsDrawer, MobilePropertiesDrawer } from '../features/canvas/components/MobileDrawers';
 // Style imports
 import styles from '../styles/MainPage.module.css';
 import * as styleHelpers from '../utils/styleHelpers';
@@ -790,426 +800,7 @@ const Sowntra = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, [centerCanvas]);
 
-  // Fixed Gradient Picker Component
-  const GradientPicker = ({ gradient, onGradientChange }) => {
-    const [localGradient, setLocalGradient] = useState(() => {
-      // Ensure we have a valid gradient structure
-      const defaultGradient = {
-        type: 'linear',
-        colors: ['#3b82f6', '#ef4444'],
-        stops: [0, 100],
-        angle: 90,
-        position: { x: 50, y: 50 }
-      };
-      
-      return gradient ? { ...defaultGradient, ...gradient } : defaultGradient;
-    });
-
-    // Sync with parent component's gradient - with validation
-    useEffect(() => {
-      if (gradient) {
-        const validatedGradient = {
-          type: gradient.type || 'linear',
-          colors: (gradient.colors && Array.isArray(gradient.colors) && gradient.colors.length > 0) 
-            ? gradient.colors.filter(color => color && typeof color === 'string') 
-            : ['#3b82f6', '#ef4444'],
-          stops: (gradient.stops && Array.isArray(gradient.stops)) 
-            ? gradient.stops.map(stop => Math.max(0, Math.min(100, stop || 0)))
-            : [0, 100],
-          angle: gradient.angle || 90,
-          position: gradient.position || { x: 50, y: 50 }
-        };
-        
-        setLocalGradient(validatedGradient);
-      }
-    }, [gradient]);
-
-    const updateGradient = (updates) => {
-      const newGradient = { ...localGradient, ...updates };
-      setLocalGradient(newGradient);
-      onGradientChange(newGradient);
-    };
-
-    // eslint-disable-next-line no-unused-vars
-    const addColorStop = () => {
-      if (localGradient.colors.length >= 5) return;
-      
-      const newColor = `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`;
-      const newColors = [...localGradient.colors, newColor];
-      
-      // Calculate new stop position more reliably
-      const newStops = [...localGradient.stops];
-      if (newStops.length === 0) {
-        newStops.push(0, 100);
-      } else if (newStops.length === 1) {
-        newStops.push(50, 100);
-      } else {
-        // Find the largest gap and insert in the middle
-        let maxGap = 0;
-        let insertIndex = 0;
-        
-        for (let i = 0; i < newStops.length - 1; i++) {
-          const gap = newStops[i + 1] - newStops[i];
-          if (gap > maxGap) {
-            maxGap = gap;
-            insertIndex = i + 1;
-          }
-        }
-        
-        const newStop = newStops[insertIndex - 1] + Math.floor(maxGap / 2);
-        newStops.splice(insertIndex, 0, newStop);
-      }
-      
-      updateGradient({ colors: newColors, stops: newStops });
-    };
-
-    const removeColorStop = (index) => {
-      if (localGradient.colors.length <= 2) return;
-      const newColors = localGradient.colors.filter((_, i) => i !== index);
-      const newStops = localGradient.stops.filter((_, i) => i !== index);
-      updateGradient({ colors: newColors, stops: newStops });
-    };
-
-    const updateColorStop = (index, color) => {
-      const newColors = [...localGradient.colors];
-      newColors[index] = color;
-      updateGradient({ colors: newColors });
-    };
-
-    const updateStopPosition = (index, position) => {
-      const newStops = [...localGradient.stops];
-      newStops[index] = Math.max(0, Math.min(100, parseInt(position) || 0));
-      
-      // Sort stops and colors together
-      const sortedPairs = newStops.map((stop, i) => ({
-        stop,
-        color: localGradient.colors[i]
-      })).sort((a, b) => a.stop - b.stop);
-      
-      const sortedStops = sortedPairs.map(pair => pair.stop);
-      const sortedColors = sortedPairs.map(pair => pair.color);
-      
-      updateGradient({ stops: sortedStops, colors: sortedColors });
-    };
-
-    const getGradientString = () => {
-      if (!localGradient.colors || localGradient.colors.length === 0) {
-        return 'linear-gradient(90deg, #3b82f6 0%, #ef4444 100%)';
-      }
-      
-      const colorStops = localGradient.colors.map((color, i) => 
-        `${color} ${localGradient.stops[i]}%`
-      ).join(', ');
-      
-      if (localGradient.type === 'linear') {
-        return `linear-gradient(${localGradient.angle || 0}deg, ${colorStops})`;
-      } else {
-        return `radial-gradient(circle at ${localGradient.position?.x || 50}% ${localGradient.position?.y || 50}%, ${colorStops})`;
-      }
-    };
-
-    const gradientPresets = [
-      // Linear gradients with multiple color stops
-      { 
-        colors: ['#ff6b6b', '#ff8e8e', '#4ecdc4'], 
-        stops: [0, 50, 100], 
-        angle: 90, 
-        type: 'linear',
-        name: 'Coral Sunset'
-      },
-      { 
-        colors: ['#667eea', '#764ba2', '#f093fb'], 
-        stops: [0, 60, 100], 
-        angle: 135, 
-        type: 'linear',
-        name: 'Purple Dream'
-      },
-      { 
-        colors: ['#f093fb', '#f5576c', '#ff9a9e'], 
-        stops: [0, 40, 100], 
-        angle: 45, 
-        type: 'linear',
-        name: 'Pink Blush'
-      },
-      { 
-        colors: ['#4facfe', '#00f2fe', '#43e97b'], 
-        stops: [0, 70, 100], 
-        angle: 180, 
-        type: 'linear',
-        name: 'Ocean Breeze'
-      },
-      { 
-        colors: ['#43e97b', '#38f9d7', '#a8edea'], 
-        stops: [0, 50, 100], 
-        angle: 270, 
-        type: 'linear',
-        name: 'Mint Fresh'
-      },
-      { 
-        colors: ['#fa709a', '#fee140', '#ff9a9e'], 
-        stops: [0, 30, 100], 
-        angle: 0, 
-        type: 'linear',
-        name: 'Sunset Glow'
-      },
-      { 
-        colors: ['#30cfd0', '#330867', '#667eea'], 
-        stops: [0, 80, 100], 
-        angle: 225, 
-        type: 'linear',
-        name: 'Deep Ocean'
-      },
-      { 
-        colors: ['#a8edea', '#fed6e3', '#f093fb'], 
-        stops: [0, 60, 100], 
-        angle: 315, 
-        type: 'linear',
-        name: 'Soft Pastel'
-      },
-      { 
-        colors: ['#5ee7df', '#b490ca', '#f093fb'], 
-        stops: [0, 40, 100], 
-        angle: 90, 
-        type: 'linear',
-        name: 'Lavender Mist'
-      },
-      // Radial gradients with multiple color stops
-      { 
-        colors: ['#ff6b6b', '#ff8e8e', '#4ecdc4', '#a8edea'], 
-        stops: [0, 30, 70, 100], 
-        angle: 0, 
-        type: 'radial',
-        position: { x: 50, y: 50 },
-        name: 'Radial Coral'
-      },
-      { 
-        colors: ['#667eea', '#764ba2', '#f093fb', '#ff9a9e'], 
-        stops: [0, 25, 60, 100], 
-        angle: 0, 
-        type: 'radial',
-        position: { x: 30, y: 30 },
-        name: 'Radial Purple'
-      },
-      { 
-        colors: ['#4facfe', '#00f2fe', '#43e97b', '#38f9d7'], 
-        stops: [0, 40, 80, 100], 
-        angle: 0, 
-        type: 'radial',
-        position: { x: 70, y: 70 },
-        name: 'Radial Ocean'
-      }
-    ];
-
-    const applyPreset = useCallback((preset) => {
-      // Create a fresh gradient object with all preset properties
-      const newGradient = {
-        type: preset.type,
-        colors: preset.colors.slice(),
-        stops: preset.stops.slice(),
-        angle: preset.angle !== undefined ? preset.angle : 90,
-        position: preset.position ? { ...preset.position } : { x: 50, y: 50 }
-      };
-      
-      // Update local state immediately for instant visual feedback
-      setLocalGradient(newGradient);
-      
-      // Notify parent component to update the element on canvas
-      if (onGradientChange) {
-        onGradientChange(newGradient);
-      }
-    }, [onGradientChange]);
-
-    return (
-      <div 
-        key={gradientPickerKey} 
-        className={`${styles.gradientPicker || ''} gradient-picker mt-3 p-3 bg-gray-50 rounded border`}
-        style={{ position: 'relative', zIndex: 1, pointerEvents: 'auto' }}
-      >
-        <div className="mb-3">
-          <div 
-            className={`${styles.gradientPreview || ''} w-full h-8 rounded border border-gray-300 mb-2 gradient-fix`}
-            style={{ background: getGradientString() }}
-          />
-          <div className="text-xs text-gray-500 text-center">
-            {localGradient.colors.length} color stops
-          </div>
-        </div>
-
-        {localGradient.type === 'linear' && (
-          <div className="mb-3">
-            <label className="block text-sm font-medium mb-1">
-              Angle: {localGradient.angle || 0}°
-            </label>
-            <div className="relative">
-            <input
-              type="range"
-              min="0"
-              max="360"
-                step="1"
-              value={localGradient.angle || 0}
-              onChange={(e) => updateGradient({ angle: parseInt(e.target.value) || 0 })}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                style={{
-                  background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(localGradient.angle || 0) / 360 * 100}%, #e5e7eb ${(localGradient.angle || 0) / 360 * 100}%, #e5e7eb 100%)`
-                }}
-              />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>0°</span>
-                <span>90°</span>
-                <span>180°</span>
-                <span>270°</span>
-                <span>360°</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {localGradient.type === 'radial' && (
-          <div className="mb-3">
-            <label className="block text-sm font-medium mb-1">Radial Center Position</label>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs block mb-1 text-gray-600">X: {localGradient.position?.x || 50}%</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={localGradient.position?.x || 50}
-                  onChange={(e) => updateGradient({ 
-                    position: { 
-                      ...localGradient.position, 
-                      x: parseInt(e.target.value) || 50 
-                    }
-                  })}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                />
-                <div className="flex justify-between text-xs text-gray-400 mt-1">
-                  <span>0%</span>
-                  <span>50%</span>
-                  <span>100%</span>
-                </div>
-              </div>
-              <div>
-                <label className="text-xs block mb-1 text-gray-600">Y: {localGradient.position?.y || 50}%</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={localGradient.position?.y || 50}
-                  onChange={(e) => updateGradient({ 
-                    position: { 
-                      ...localGradient.position, 
-                      y: parseInt(e.target.value) || 50 
-                    }
-                  })}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                />
-                <div className="flex justify-between text-xs text-gray-400 mt-1">
-                  <span>0%</span>
-                  <span>50%</span>
-                  <span>100%</span>
-              </div>
-              </div>
-            </div>
-            <div className="mt-2 text-xs text-gray-500 text-center">
-              Center: ({localGradient.position?.x || 50}%, {localGradient.position?.y || 50}%)
-            </div>
-          </div>
-        )}
-
-        <div className="mb-3">
-          <div className="text-xs text-gray-500 mb-2">
-            {localGradient.colors.length}/5 color stops
-          </div>
-          
-          <div className="space-y-3">
-            {localGradient.colors.map((color, index) => (
-              <div key={index} className="flex items-center space-x-3 p-2 bg-gray-50 rounded border">
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="color"
-                    value={color}
-                    onChange={(e) => updateColorStop(index, e.target.value)}
-                    className="w-8 h-8 cursor-pointer rounded border-2 border-gray-300 hover:border-blue-400 transition-colors"
-                  />
-                  <span className="text-xs w-12 font-mono text-gray-600">{localGradient.stops[index]}%</span>
-                </div>
-                
-                <div className="flex-1">
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="1"
-                    value={localGradient.stops[index]}
-                    onChange={(e) => updateStopPosition(index, e.target.value)}
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                    style={{
-                      background: `linear-gradient(to right, #e5e7eb 0%, #e5e7eb ${localGradient.stops[index]}%, #3b82f6 ${localGradient.stops[index]}%, #3b82f6 100%)`
-                    }}
-                  />
-                </div>
-                
-                <button
-                  onClick={() => removeColorStop(index)}
-                  disabled={localGradient.colors.length <= 2}
-                  className="p-1 text-red-500 hover:text-red-700 disabled:opacity-30 transition-colors hover:bg-red-50 rounded"
-                  title="Remove color stop"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="mb-3">
-          <label className="block text-sm font-medium mb-2">Quick Presets</label>
-          <div className="grid grid-cols-4 gap-2">
-            {gradientPresets.map((preset, index) => {
-              // Generate the actual gradient string for this preset
-              const colorStops = preset.colors.map((color, i) => 
-                `${color} ${preset.stops[i]}%`
-              ).join(', ');
-              
-              const gradientString = preset.type === 'linear'
-                ? `linear-gradient(${preset.angle}deg, ${colorStops})`
-                : `radial-gradient(circle at ${preset.position?.x || 50}% ${preset.position?.y || 50}%, ${colorStops})`;
-
-              return (
-                <div
-                  key={`preset-${index}`}
-                  onMouseUp={(e) => {
-                    e.stopPropagation();
-                    applyPreset(preset);
-                  }}
-                  className="h-10 rounded border-2 border-gray-300 hover:border-blue-500 hover:scale-105 transition-all duration-200 gradient-fix cursor-pointer relative"
-                  style={{
-                    background: gradientString,
-                    pointerEvents: 'auto',
-                    userSelect: 'none'
-                  }}
-                  title={`${preset.name} (${preset.type === 'radial' ? 'Radial' : 'Linear'})`}
-                >
-                  <div 
-                    className="absolute bottom-0 right-0 text-xs bg-black bg-opacity-60 text-white px-1 rounded-tl pointer-events-none"
-                    style={{ pointerEvents: 'none' }}
-                  >
-                    {preset.type === 'radial' ? 'R' : 'L'}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="text-xs text-gray-500 mt-1 text-center">
-            Click any preset to apply • L = Linear, R = Radial
-          </div>
-        </div>
-      </div>
-    );
-  };
+  // GradientPicker is now imported from components
 
   // Handle image upload
   const handleImageUpload = useCallback((event) => {
@@ -1842,7 +1433,8 @@ const Sowntra = () => {
       width: element.width,
       height: element.height,
       border: `2px dashed ${connectionLineColor}`,
-      borderRadius: '2px'
+      borderRadius: '2px',
+      pointerEvents: 'none'
     };
 
     return (
@@ -3548,299 +3140,15 @@ const Sowntra = () => {
     </div>
   ), [videoFormat, videoQuality, recordingDuration, t]);
 
-  // Recording Status Component
-  const RecordingStatus = useCallback(() => {
-    if (!recording) return null;
-    
-    const formatTime = (seconds) => {
-      const mins = Math.floor(seconds / 60);
-      const secs = seconds % 60;
-      return mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}s`;
-    };
-    
-    return (
-      <div className="fixed top-4 right-4 bg-red-500 text-white px-3 py-2 rounded-lg shadow-lg z-50">
-        <div className="flex items-center">
-          <div className="w-3 h-3 bg-white rounded-full mr-2 animate-pulse"></div>
-          <span>Recording... {formatTime(recordingTimeElapsed)}</span>
-        </div>
-      </div>
-    );
-  }, [recording, recordingTimeElapsed]);
+  // RecordingStatus is now imported from components
 
   // Language Help Modal
-  const LanguageHelpModal = useCallback(() => {
-    if (!showLanguageHelp) return null;
-    
-    const getLanguageInstructions = () => {
-      switch(currentLanguage) {
-        case 'ta':
-          return (
-            <div>
-              <h3 className="font-bold mb-2">Typing in Tamil</h3>
-              <p className="text-sm mb-2">You can type Tamil using either:</p>
-              <ul className="list-disc list-inside text-sm space-y-1">
-                <li><strong>Virtual Keyboard:</strong> Click on the Tamil characters shown on the screen keyboard</li>
-                <li><strong>Transliteration:</strong> Enable transliteration and type English letters that sound like Tamil words</li>
-                <li><strong>System Keyboard:</strong> Set up Tamil input on your operating system</li>
-              </ul>
-              <div className="mt-4 p-2 bg-gray-100 rounded">
-                <p className="text-sm font-semibold">Common transliterations:</p>
-                <p className="text-sm">nandri = நன்றி (Thank you)</p>
-                <p className="text-sm">vanakkam = வணக்கம் (Hello)</p>
-                <p className="text-sm">tamil = தமிழ் (Tamil)</p>
-              </div>
-            </div>
-          );
-        case 'hi':
-          return (
-            <div>
-              <h3 className="font-bold mb-2">Typing in Hindi</h3>
-              <p className="text-sm mb-2">You can type Hindi using either:</p>
-              <ul className="list-disc list-inside text-sm space-y-1">
-                <li><strong>Virtual Keyboard:</strong> Click on the Devanagari characters shown on the screen keyboard</li>
-                <li><strong>Transliteration:</strong> Enable transliteration and type English letters that sound like Hindi words</li>
-                <li><strong>System Keyboard:</strong> Set up Hindi input on your operating system</li>
-              </ul>
-              <div className="mt-4 p-2 bg-gray-100 rounded">
-                <p className="text-sm font-semibold">Common transliterations:</p>
-                <p className="text-sm">dhanyavaad = धन्यवाद (Thank you)</p>
-                <p className="text-sm">namaste = नमस्ते (Hello)</p>
-                <p className="text-sm">bhaarat = भारत (India)</p>
-              </div>
-            </div>
-          );
-        default:
-          return <p className="text-sm">Select an Indian language to see typing instructions.</p>;
-      }
-    };
-    
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white p-6 rounded-lg max-w-md">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">Typing Help - {supportedLanguages[currentLanguage]?.name}</h2>
-            <button 
-              onClick={() => setShowLanguageHelp(false)}
-              className="p-1 rounded hover:bg-gray-200"
-            >
-              ×
-            </button>
-          </div>
-          {getLanguageInstructions()}
-          <button 
-            onClick={() => setShowLanguageHelp(false)}
-            className="mt-4 w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    );
-  }, [showLanguageHelp, currentLanguage]);
+  // LanguageHelpModal is now imported from components
 
-  // Effects Panel Component
-  const EffectsPanel = useCallback(() => {
-    if (!showEffectsPanel || !selectedElementData) return null;
-    
-    return (
-      <div className="fixed md:right-80 md:top-20 right-0 top-0 bottom-0 md:bottom-auto bg-white shadow-lg rounded-lg md:rounded-lg md:p-4 p-2 md:w-80 w-full md:max-w-sm max-w-full z-50 overflow-y-auto">
-        <div className="flex justify-between items-center mb-4 sticky top-0 bg-white pb-2 border-b md:border-0">
-          <h3 className="font-bold text-lg">Effects</h3>
-          <button 
-            onClick={() => setShowEffectsPanel(false)}
-            className="p-2 rounded hover:bg-gray-200 touch-manipulation min-h-[44px] min-w-[44px] text-xl"
-          >
-            ×
-          </button>
-        </div>
-        
-        {/* Text Effects */}
-        {selectedElementData.type === 'text' && (
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">Text Effects</label>
-            <div className="grid grid-cols-2 gap-2 md:gap-2 gap-3">
-              {Object.entries(textEffects).map(([key, effect]) => (
-                <button
-                  key={key}
-                  onClick={() => updateElement(selectedElement, { textEffect: key })}
-                  className={`md:p-2 p-3 rounded md:text-xs text-sm touch-manipulation min-h-[48px] ${
-                    selectedElementData.textEffect === key 
-                      ? 'bg-blue-100 text-blue-600 border border-blue-300' 
-                      : 'bg-gray-100 border border-gray-300 hover:bg-gray-200'
-                  }`}
-                >
-                  {effect.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        
-        {/* Image Effects */}
-        {selectedElementData.type === 'image' && (
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">Image Effects</label>
-            <div className="grid grid-cols-2 gap-2 md:gap-2 gap-3">
-              {Object.entries(imageEffects).map(([key, effect]) => (
-                <button
-                  key={key}
-                  onClick={() => updateElement(selectedElement, { imageEffect: key })}
-                  className={`md:p-2 p-3 rounded md:text-xs text-sm touch-manipulation min-h-[48px] ${
-                    selectedElementData.imageEffect === key 
-                      ? 'bg-blue-100 text-blue-600 border border-blue-300' 
-                      : 'bg-gray-100 border border-gray-300 hover:bg-gray-200'
-                  }`}
-                >
-                  {effect.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        
-        {/* Shape Effects */}
-        {['rectangle', 'circle', 'triangle', 'star', 'hexagon'].includes(selectedElementData.type) && (
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">Shape Effects</label>
-            <div className="grid grid-cols-2 gap-2 md:gap-2 gap-3">
-              {Object.entries(shapeEffects).map(([key, effect]) => (
-                <button
-                  key={key}
-                  onClick={() => updateElement(selectedElement, { shapeEffect: key })}
-                  className={`md:p-2 p-3 rounded md:text-xs text-sm touch-manipulation min-h-[48px] ${
-                    selectedElementData.shapeEffect === key 
-                      ? 'bg-blue-100 text-blue-600 border border-blue-300' 
-                      : 'bg-gray-100 border border-gray-300 hover:bg-gray-200'
-                  }`}
-                >
-                  {effect.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        
-        {/* Special Effects for All Elements */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-2">Special Effects</label>
-          <div className="grid grid-cols-2 gap-2 md:gap-2 gap-3">
-            {Object.entries(specialEffects).map(([key, effect]) => (
-              <button
-                key={key}
-                onClick={() => updateElement(selectedElement, { specialEffect: key })}
-                className={`md:p-2 p-3 rounded md:text-xs text-sm touch-manipulation min-h-[48px] ${
-                  selectedElementData.specialEffect === key 
-                    ? 'bg-blue-100 text-blue-600 border border-blue-300' 
-                    : 'bg-gray-100 border border-gray-300 hover:bg-gray-200'
-                }`}
-              >
-                {effect.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }, [showEffectsPanel, selectedElementData, selectedElement, updateElement]);
+  // EffectsPanel is now imported from components
 
   // Custom Template Modal Component
-  const CustomTemplateModal = useCallback(() => {
-    if (!showCustomTemplateModal) return null;
-
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white p-6 rounded-lg max-w-md w-full">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">Custom Template Size</h2>
-            <button 
-              onClick={() => setShowCustomTemplateModal(false)}
-              className="p-1 rounded hover:bg-gray-200"
-            >
-              ×
-            </button>
-          </div>
-          
-          <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-4">
-              <div className="col-span-2">
-                <label className="block text-sm font-medium mb-1">Width</label>
-                <input
-                  type="number"
-                  value={customTemplateSize.width}
-                  onChange={(e) => setCustomTemplateSize(prev => ({
-                    ...prev,
-                    width: parseInt(e.target.value) || 800
-                  }))}
-                  className="w-full p-2 border rounded"
-                  min="100"
-                  max="10000"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Unit</label>
-                <select
-                  value={customTemplateSize.unit}
-                  onChange={(e) => setCustomTemplateSize(prev => ({
-                    ...prev,
-                    unit: e.target.value
-                  }))}
-                  className="w-full p-2 border rounded"
-                >
-                  <option value="px">px</option>
-                  <option value="in">in</option>
-                  <option value="mm">mm</option>
-                  <option value="cm">cm</option>
-                </select>
-              </div>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium mb-1">Height</label>
-              <input
-                type="number"
-                value={customTemplateSize.height}
-                onChange={(e) => setCustomTemplateSize(prev => ({
-                  ...prev,
-                  height: parseInt(e.target.value) || 600
-                }))}
-                className="w-full p-2 border rounded"
-                min="100"
-                max="10000"
-              />
-            </div>
-            
-            <div className="bg-gray-50 p-3 rounded">
-              <p className="text-sm text-gray-600">
-                <strong>Preview:</strong> {customTemplateSize.width} × {customTemplateSize.height} {customTemplateSize.unit}
-                <br />
-                {customTemplateSize.unit !== 'px' && (
-                  <span className="text-xs">
-                    Approximately: {Math.round(customTemplateSize.width * (customTemplateSize.unit === 'in' ? 96 : customTemplateSize.unit === 'mm' ? 3.78 : 37.8))} × {Math.round(customTemplateSize.height * (customTemplateSize.unit === 'in' ? 96 : customTemplateSize.unit === 'mm' ? 3.78 : 37.8))} pixels
-                  </span>
-                )}
-              </p>
-            </div>
-            
-            <div className="flex space-x-2">
-              <button
-                onClick={() => setShowCustomTemplateModal(false)}
-                className="flex-1 p-2 bg-gray-200 rounded hover:bg-gray-300"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={createCustomTemplate}
-                className="flex-1 p-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-              >
-                Create Design
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }, [showCustomTemplateModal, customTemplateSize, createCustomTemplate]);
+  // CustomTemplateModal is now imported from components
 
   // Render element with enhanced selection handles and effects - FIXED VERSION
   const renderElement = useCallback((element) => {
@@ -4197,7 +3505,7 @@ const Sowntra = () => {
     }
 
     return (
-      <div key={element.id}>
+      <React.Fragment key={element.id}>
         {content}
         {isSelected && currentTool === 'select' && !isLocked && (
           renderSelectionHandles(element)
@@ -4221,7 +3529,7 @@ const Sowntra = () => {
             <Lock size={20} color="#666" />
           </div>
         )}
-      </div>
+      </React.Fragment>
     );
   }, [selectedElements, textEditing, lockedElements, currentTool, getFilterCSS, handleTextEdit, handleMouseDown, currentLanguage, textDirection, getBackgroundStyle, renderSelectionHandles, updateElement, getEffectCSS, getCurrentPageElements, handleSelectElement]);
 
@@ -5465,45 +4773,20 @@ const Sowntra = () => {
         </div>
 
         {/* Template Selector - Responsive */}
-        {showTemplates && (
-          <div className="bg-white shadow-sm p-4 border-b md:p-3">
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="font-semibold text-base md:text-base">Select Template</h3>
-              <button 
-                onClick={() => setShowTemplates(false)}
-                className="p-2 rounded-lg hover:bg-gray-100 text-2xl leading-none min-h-[44px] min-w-[44px] touch-manipulation"
-              >
-                ×
-              </button>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-3 md:gap-2">
-              {/* Custom Template Option */}
-              <button
-                onClick={() => applyTemplate('custom')}
-                className="template-button min-h-[120px] md:min-h-[100px] flex flex-col items-center justify-center p-3"
-              >
-                <div className="mb-2"><Plus size={24} className="md:w-5 md:h-5" /></div>
-                <div className="text-sm md:text-xs text-center font-medium">Custom</div>
-                <div className="text-xs text-gray-500 mt-1">Your size</div>
-              </button>
-              
-              {Object.entries(socialMediaTemplates).map(([key, template]) => (
-                <button
-                  key={key}
-                  onClick={() => applyTemplate(key)}
-                  className="template-button min-h-[120px] md:min-h-[100px] flex flex-col items-center justify-center p-3"
-                >
-                  <div className="mb-2 text-2xl md:text-xl">{template.icon}</div>
-                  <div className="text-sm md:text-xs text-center font-medium leading-tight mb-1">{template.name}</div>
-                  <div className="text-xs text-gray-500">{template.width}×{template.height}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        <TemplatesModal 
+          show={showTemplates}
+          onClose={() => setShowTemplates(false)}
+          onApplyTemplate={applyTemplate}
+        />
 
         {/* Custom Template Modal */}
-        <CustomTemplateModal />
+        <CustomTemplateModal 
+          show={showCustomTemplateModal}
+          templateSize={customTemplateSize}
+          onSizeChange={setCustomTemplateSize}
+          onCreate={createCustomTemplate}
+          onCancel={() => setShowCustomTemplateModal(false)}
+        />
 
         {/* Pages Navigation - Responsive */}
         <div className="bg-white shadow-sm p-2 border-b flex items-center space-x-2 overflow-x-auto md:p-2 sm:p-1.5">
@@ -6402,7 +5685,13 @@ const Sowntra = () => {
         </div>
 
         {/* Effects Panel */}
-        <EffectsPanel />
+        <EffectsPanel 
+          show={showEffectsPanel}
+          selectedElement={selectedElement}
+          selectedElementData={selectedElementData}
+          onUpdateElement={updateElement}
+          onClose={() => setShowEffectsPanel(false)}
+        />
 
         {/* Floating Toolbar for Selected Elements */}
         {selectedElements.size > 0 && (
@@ -6504,10 +5793,17 @@ const Sowntra = () => {
         )}
 
         {/* Language Help Modal */}
-        <LanguageHelpModal />
+        <LanguageHelpModal 
+          show={showLanguageHelp}
+          currentLanguage={currentLanguage}
+          onClose={() => setShowLanguageHelp(false)}
+        />
 
         {/* Recording Status */}
-        <RecordingStatus />
+        <RecordingStatus 
+          recording={recording}
+          recordingTimeElapsed={recordingTimeElapsed}
+        />
 
         {/* Mobile Zoom Indicator - Auto-hides after 10 seconds */}
         {showZoomIndicator && (
@@ -6729,6 +6025,23 @@ const Sowntra = () => {
                   </div>
                 </div>
 
+                {/* Animation Selection for Mobile */}
+                <div>
+                  <label className="block text-xs font-medium mb-2">Animation</label>
+                  <select
+                    value={selectedElementData.animation || ''}
+                    onChange={(e) => updateElement(selectedElement, { animation: e.target.value || null })}
+                    className="w-full px-3 py-3 text-base border rounded-lg touch-manipulation"
+                  >
+                    <option value="">None</option>
+                    {Object.entries(animations).map(([key, anim]) => (
+                      <option key={key} value={key}>
+                        {anim.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 {selectedElementData.type === 'text' && (
                   <>
                     <div>
@@ -6743,10 +6056,50 @@ const Sowntra = () => {
                 )}
 
                 {['rectangle', 'circle', 'triangle', 'star', 'hexagon'].includes(selectedElementData.type) && (
-                  <div>
-                    <label className="block text-xs font-medium mb-2">Fill Color</label>
-                    <input type="color" value={selectedElementData.fill} onChange={(e) => updateElement(selectedElement, { fill: e.target.value })} className="w-full h-12 rounded-lg cursor-pointer touch-manipulation" />
-                  </div>
+                  <>
+                    {/* Fill Type Selection for Mobile */}
+                    <div>
+                      <label className="block text-xs font-medium mb-2">Fill Type</label>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => updateElement(selectedElement, { fillType: 'solid' })}
+                          className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium touch-manipulation ${
+                            selectedElementData.fillType === 'solid' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'
+                          }`}
+                        >
+                          Solid Color
+                        </button>
+                        <button
+                          onClick={() => updateElement(selectedElement, { fillType: 'gradient' })}
+                          className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium touch-manipulation ${
+                            selectedElementData.fillType === 'gradient' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'
+                          }`}
+                        >
+                          Gradient
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Solid Color Picker for Mobile */}
+                    {selectedElementData.fillType === 'solid' && (
+                      <div>
+                        <label className="block text-xs font-medium mb-2">Fill Color</label>
+                        <input type="color" value={selectedElementData.fill} onChange={(e) => updateElement(selectedElement, { fill: e.target.value })} className="w-full h-12 rounded-lg cursor-pointer touch-manipulation" />
+                      </div>
+                    )}
+
+                    {/* Gradient Picker for Mobile */}
+                    {selectedElementData.fillType === 'gradient' && (
+                      <div>
+                        <label className="block text-xs font-medium mb-2">Gradient Fill</label>
+                        <GradientPicker
+                          key={gradientPickerKey}
+                          gradient={selectedElementData.gradient}
+                          onGradientChange={(gradient) => updateElement(selectedElement, { gradient })}
+                        />
+                      </div>
+                    )}
+                  </>
                 )}
 
                 <div className="border-t pt-4 flex gap-2">
@@ -6763,45 +6116,13 @@ const Sowntra = () => {
         )}
 
         {/* Save Project Dialog */}
-        {showSaveDialog && (
-          <div className={`${styles.modalOverlay || ''} fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50`}>
-            <div className={`${styles.modalContent || ''} bg-white rounded-lg p-6 w-full max-w-md mx-4`}>
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Save Project</h3>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Project Name
-                </label>
-                <input
-                  type="text"
-                  value={projectName}
-                  onChange={(e) => setProjectName(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                  placeholder="Enter project name..."
-                  autoFocus
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      confirmSave();
-                    }
-                  }}
-                />
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowSaveDialog(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmSave}
-                  className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
-                >
-                  Save Project
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <SaveDialog 
+          show={showSaveDialog}
+          projectName={projectName}
+          onProjectNameChange={setProjectName}
+          onSave={confirmSave}
+          onCancel={() => setShowSaveDialog(false)}
+        />
       </div>
     </>
   );

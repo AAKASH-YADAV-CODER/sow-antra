@@ -1,6 +1,6 @@
 import React from 'react';
 import { X } from 'lucide-react';
-import { supportedLanguages } from '../../../utils/constants';
+import { supportedLanguages } from '../../../../utils/constants';
 
 const LanguageHelpModal = ({ show, currentLanguage, onClose }) => {
   if (!show) return null;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { X } from 'lucide-react';
-import { textEffects, imageEffects, shapeEffects, specialEffects } from '../../utils/constants';
+import { textEffects, imageEffects, shapeEffects, specialEffects } from '../../../utils/constants';
 
 const EffectsPanel = ({ 
   show, 
