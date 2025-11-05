@@ -313,7 +313,7 @@ export const getEffectCardStyle = (isActive = false) => ({
   textAlign: 'center',
 });
 
-export default {
+const styleHelpers = {
   getCanvasElementStyle,
   getTextElementStyle,
   getShapeElementStyle,
@@ -332,3 +332,5 @@ export default {
   getMobileSidebarStyle,
   getEffectCardStyle,
 };
+
+export default styleHelpers;

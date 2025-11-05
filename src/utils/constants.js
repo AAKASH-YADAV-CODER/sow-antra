@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  Square, Circle, Triangle, Type, Image, Smartphone, MessageCircle, 
+  Square, Type, Image, Smartphone, MessageCircle, 
   Monitor, Film, FileText, Printer, Heart, Music, Zap, CreditCard, 
   Tv, Megaphone, Users, BookOpen 
 } from 'lucide-react';

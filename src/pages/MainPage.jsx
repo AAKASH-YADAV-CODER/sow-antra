@@ -29,8 +29,6 @@ import LanguageHelpModal from '../features/canvas/components/modals/LanguageHelp
 import RecordingStatus from '../features/canvas/components/RecordingStatus';
 import EffectsPanel from '../features/canvas/components/EffectsPanel';
 import GradientPicker from '../features/canvas/components/GradientPicker';
-import SelectionHandles from '../features/canvas/components/SelectionHandles';
-import { MobileToolsDrawer, MobilePropertiesDrawer } from '../features/canvas/components/MobileDrawers';
 // Style imports
 import styles from '../styles/MainPage.module.css';
 import * as styleHelpers from '../utils/styleHelpers';
@@ -2854,7 +2852,7 @@ const Sowntra = () => {
       const frameDuration = 1000 / 30;
       let lastFrameTime = 0;
       // eslint-disable-next-line no-unused-vars
-      let animationId = null;
+      let animationId;
       
       const drawAnimationFrame = (timestamp) => {
         if (!startTime) startTime = timestamp;
@@ -5697,8 +5695,11 @@ const Sowntra = () => {
         {selectedElements.size > 0 && (
           <div
             ref={floatingToolbarRef}
-            className={`${styles.toolbar || ''} fixed left-1/2 bottom-4 transform -translate-x-1/2 floating-toolbar`}
-            style={{ zIndex: 1000 }}
+            className={`${styles.toolbar || ''} fixed left-1/2 transform -translate-x-1/2 floating-toolbar transition-all duration-300`}
+            style={{ 
+              zIndex: 1000,
+              bottom: (showMobileTools || showMobileProperties) ? '-100px' : '1rem' // Hide below when drawers open
+            }}
           >
             <button
               onClick={() => {
