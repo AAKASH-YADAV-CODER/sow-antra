@@ -4674,7 +4674,14 @@ const Sowntra = () => {
         </div>
 
         {/* Effects Panel */}
-        <EffectsPanel />
+        <EffectsPanel
+          showEffectsPanel={showEffectsPanel}
+          selectedElementData={selectedElementData}
+          selectedElement={selectedElement}
+          updateElement={updateElement}
+          setShowEffectsPanel={setShowEffectsPanel}
+          t={t}
+          />
 
         {/* Floating Toolbar for Selected Elements */}
         {selectedElements.size > 0 && (
