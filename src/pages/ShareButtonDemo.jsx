@@ -1,5 +1,7 @@
-import React from "react";
-import ShareButton from "../components/ShareButton";
+
+import React from 'react';
+import ShareButton from '../components/common/ShareButton';
+
 
 const ShareButtonDemo = () => {
   return (

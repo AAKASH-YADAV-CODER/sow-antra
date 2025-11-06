@@ -13,48 +13,93 @@ import {  Square,
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import ShareButton from '../components/ShareButton';
+import ShareButton from '../components/common/ShareButton';
 import jsPDF from 'jspdf';
 import { projectAPI } from '../services/api';
-import Header from './../components/Header';
-import TemplateSelector from '../components/TemplateSelector.jsx';
-import LeftToolsPanel from '../components/LeftToolsPanel.jsx';
-import Canvas from '../components/Canvas.jsx';
-import FloatingToolbar from '../components/FloatingToolbar.jsx';
-import PagesNav from '../components/PagesNav.jsx';
+
+// Component imports
+import RecordingStatus from '../features/canvas/components/RecordingStatus';
+import ModalsContainer from '../features/canvas/components/ModalsContainer';
+import EffectsPanel from '../features/canvas/components/EffectsPanel';
+import GradientPicker from '../features/canvas/components/GradientPicker';
+import PropertiesPanel from '../features/canvas/components/PropertiesPanel';
+import { MobileToolsDrawer, MobilePropertiesDrawer } from '../features/canvas/components/MobileDrawers';
+import MobileFABButtons from '../features/canvas/components/MobileFABButtons';
+import CanvasElement from '../features/canvas/components/CanvasElement';
+import TopHeader from '../features/canvas/components/TopHeader';
+import ToolsSidebar from '../features/canvas/components/ToolsSidebar';
+import PagesNavigator from '../features/canvas/components/PagesNavigator';
+import CanvasWorkspace from '../features/canvas/components/CanvasWorkspace';
+// Style imports
+import styles from '../styles/MainPage.module.css';
+import '../styles/MainPageAnimations.css';
+import * as styleHelpers from '../utils/styleHelpers';
+// Utility imports
+import { 
+  getFilterCSS, 
+  getBackgroundStyle, 
+  getCanvasGradient, 
+  getCanvasEffects, 
+  getEffectCSS,
+  parseCSS 
+} from '../utils/helpers';
+import { 
+  drawElementToCanvas as drawElementToCanvasUtil,
+  exportAsImage as exportAsImageUtil,
+  exportAsPDF as exportAsPDFUtil,
+  exportAsSVG as exportAsSVGUtil,
+  getSortedElementsForExport
+} from '../utils/canvasExport';
+// Custom hooks
+import useElements from '../features/canvas/hooks/useElements';
+import useHistory from '../features/canvas/hooks/useHistory';
+import { useCanvasInteraction } from '../features/canvas/hooks/useCanvasInteraction';
+import { useRecording } from '../features/canvas/hooks/useRecording';
+import { useCanvasUtils } from '../features/canvas/hooks/useCanvasUtils';
+import { useExport } from '../features/canvas/hooks/useExport';
+import { useProjectManager } from '../features/canvas/hooks/useProjectManager';
+import { useTemplates } from '../features/canvas/hooks/useTemplates';
+import { useKeyboardShortcuts } from '../features/canvas/hooks/useKeyboardShortcuts';
+import { useHelpers } from '../features/canvas/hooks/useHelpers';
+// UI Helper Components
+import TransliterationToggle from '../features/canvas/components/TransliterationToggle';
+import VideoSettings from '../features/canvas/components/VideoSettings';
+// Constants imports
+import { 
+  fontFamilies,
+  supportedLanguages,
+  textEffects,
+  imageEffects,
+  shapeEffects,
+  specialEffects,
+  socialMediaTemplates,
+  stickerOptions,
+  animations,
+  filterOptions
+} from '../utils/constants';
+
 
 const Sowntra = () => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { logout } = useAuth();
+  const { logout, currentUser } = useAuth();
   const currentProjectId = searchParams.get('project');
   const [selectedElement, setSelectedElement] = useState(null);
   const [selectedElements, setSelectedElements] = useState(new Set());
-  const [isDragging, setIsDragging] = useState(false);
-  const [isResizing, setIsResizing] = useState(false);
-  const [isRotating, setIsRotating] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  // isDragging, isResizing, isRotating, isPanning, dragStart, showAlignmentLines, alignmentLines now managed by useCanvasInteraction hook
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
   const [isPlaying, setIsPlaying] = useState(false);
-  const [showAlignmentLines, setShowAlignmentLines] = useState(false);
-  const [alignmentLines, setAlignmentLines] = useState({ vertical: [], horizontal: [] });
   const [currentTool, setCurrentTool] = useState('select');
   const [zoomLevel, setZoomLevel] = useState(1);
   const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
-  const [isPanning, setIsPanning] = useState(false);
-  const [history, setHistory] = useState([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
+  // history and historyIndex now managed by useHistory hook
   const [showGrid, setShowGrid] = useState(false);
   const [snapToGrid, setSnapToGrid] = useState(false);
-  const [recording, setRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState(null);
-  const [recordingStartTime, setRecordingStartTime] = useState(null);
-  // const [recordedChunks, setRecordedChunks] = useState([]);
-  const [drawingPath, setDrawingPath] = useState([]);
+  // recording, mediaRecorder, recordingStartTime, recordingTimeElapsed now managed by useRecording hook
+  // drawingPath, isDrawing now managed by useCanvasInteraction hook
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [projectName, setProjectName] = useState('');
-  const [isDrawing, setIsDrawing] = useState(false);
   const [textEditing, setTextEditing] = useState(null);
   const [pages, setPages] = useState([{ id: 'page-1', name: 'Page 1', elements: [] }]);
   const [currentPage, setCurrentPage] = useState('page-1');
@@ -70,7 +115,6 @@ const Sowntra = () => {
   const [videoFormat, setVideoFormat] = useState('webm');
   const [videoQuality, setVideoQuality] = useState('high');
   const [recordingDuration, setRecordingDuration] = useState(10);
-  const [recordingTimeElapsed, setRecordingTimeElapsed] = useState(0);
   const [gradientPickerKey, setGradientPickerKey] = useState(0);
   const [showEffectsPanel, setShowEffectsPanel] = useState(false);
   // const [resizeDirection, setResizeDirection] = useState('');
@@ -83,6 +127,16 @@ const Sowntra = () => {
     height: 600,
     unit: 'px'
   });
+  
+  // Mobile panel states
+  const [showMobileTools, setShowMobileTools] = useState(false);
+  const [showMobileProperties, setShowMobileProperties] = useState(false);
+
+  // Mobile touch gesture states
+  const [touchStartDistance, setTouchStartDistance] = useState(0);
+  const [initialZoomLevel, setInitialZoomLevel] = useState(1);
+  const [lastTouchEnd, setLastTouchEnd] = useState(0);
+  const [showZoomIndicator, setShowZoomIndicator] = useState(false);
 
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -90,53 +144,13 @@ const Sowntra = () => {
   const recordingIntervalRef = useRef(null);
   const canvasContainerRef = useRef(null);
   const loadProjectInputRef = useRef(null);
+  const zoomIndicatorTimeoutRef = useRef(null);
 
-  // Get current page elements
-  const getCurrentPageElements = useCallback(() => {
-    const page = pages.find(p => p.id === currentPage);
-    return page ? page.elements : [];
-  }, [pages, currentPage]);
 
-  // Enhanced z-index sorting for exports
-  const getSortedElementsForExport = useCallback(() => {
-    const currentElements = getCurrentPageElements();
-    
-    // Create a copy and sort by zIndex to ensure proper layering
-    const sortedElements = [...currentElements].sort((a, b) => {
-      // Handle groups and their children properly
-      if (a.type === 'group' && b.groupId === a.id) return -1;
-      if (b.type === 'group' && a.groupId === b.id) return 1;
-      
-      // Regular zIndex comparison
-      return a.zIndex - b.zIndex;
-    });
-    
-    return sortedElements;
-  }, [getCurrentPageElements]);
-
-  // Export-ready elements with proper filtering
-  const getExportReadyElements = useCallback(() => {
-    const currentElements = getCurrentPageElements();
-    
-    return [...currentElements]
-      .sort((a, b) => {
-        // First, sort by zIndex
-        if (a.zIndex !== b.zIndex) {
-          return a.zIndex - b.zIndex;
-        }
-        
-        // If same zIndex, maintain original order
-        return currentElements.indexOf(a) - currentElements.indexOf(b);
-      })
-      .filter(element => {
-        // Include all elements except temporary ones
-        return !element.isTemporary;
-      });
-  }, [getCurrentPageElements]);
-
-  // Calculate selectedElementData here at the top level
-  const selectedElementData = getCurrentPageElements().find(el => el.id === selectedElement);
+  // getCurrentPageElements will be provided by useElements hook below
   
+  // All constants (supportedLanguages, textEffects, imageEffects, shapeEffects, specialEffects, etc.) imported from constants.js
+
 
   // Center canvas function - maximizes canvas size while maintaining aspect ratio
   const centerCanvas = useCallback(() => {
@@ -275,1482 +289,169 @@ const Sowntra = () => {
     loadTransliterationData();
   }, [currentLanguage]);
 
-    // Generate unique ID
-  const generateId = () => Math.random().toString(36).substr(2, 9);
 
-  // Set current page elements
+  // Cleanup zoom indicator timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (zoomIndicatorTimeoutRef.current) {
+        clearTimeout(zoomIndicatorTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // socialMediaTemplates, stickerOptions, animations, filterOptions imported from constants.js
+
+ 
+
+  // Helper function for setCurrentPageElements (needed before hooks)
   const setCurrentPageElements = useCallback((newElements) => {
     setPages(pages.map(page => 
       page.id === currentPage ? { ...page, elements: newElements } : page
     ));
   }, [pages, currentPage]);
 
-  // Save to history
-  const saveToHistory = useCallback((newElements) => {
-    const newHistory = history.slice(0, historyIndex + 1);
-    newHistory.push(JSON.stringify(newElements));
-    setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
-  }, [history, historyIndex]);
-
-  // Undo
-  const undo = useCallback(() => {
-    if (historyIndex > 0) {
-      const prevElements = JSON.parse(history[historyIndex - 1]);
-      setCurrentPageElements(prevElements);
-      setHistoryIndex(historyIndex - 1);
-    }
-  }, [history, historyIndex, setCurrentPageElements]);
-
-  // Redo
-  const redo = useCallback(() => {
-    if (historyIndex < history.length - 1) {
-      const nextElements = JSON.parse(history[historyIndex + 1]);
-      setCurrentPageElements(nextElements);
-      setHistoryIndex(historyIndex + 1);
-    }
-  }, [history, historyIndex, setCurrentPageElements]);
-
-  // Add element to canvas
-  const addElement = useCallback((type, properties = {}) => {
-    const currentElements = getCurrentPageElements();
-    const newElement = {
-      id: generateId(),
-      type,
-      x: 100,
-      y: 100,
-      width: type === 'text' ? 300 : type === 'line' ? 150 : 100, // Wider default for text
-      height: type === 'text' ? 100 : type === 'line' ? 2 : 100, // Taller default for text
-      rotation: 0,
-      animation: null,
-      zIndex: currentElements.length,
-      locked: false,
-      filters: JSON.parse(JSON.stringify(filterOptions)),
-      fill: properties.fill || (type === 'rectangle' ? '#3b82f6' : 
-                              type === 'circle' ? '#ef4444' : 
-                              type === 'triangle' ? '#10b981' : 
-                              type === 'star' ? '#f59e0b' : 
-                              type === 'hexagon' ? '#8b5cf6' : '#3b82f6'),
-      stroke: properties.stroke || (type === 'image' ? 'transparent' : '#000000'),
-      strokeWidth: properties.strokeWidth || (type === 'image' ? 0 : 2),
-      fillType: properties.fillType || 'solid',
-      gradient: properties.gradient || {
-        type: 'linear',
-        colors: ['#3b82f6', '#ef4444'],
-        stops: [0, 100],
-        angle: 90,
-        position: { x: 50, y: 50 }
-      },
-      textEffect: 'none',
-      imageEffect: 'none',
-      shapeEffect: 'none',
-      specialEffect: 'none',
-      effectSettings: {},
-      borderRadius: properties.borderRadius || 0, // Ensure borderRadius is included
-      shadow: properties.shadow || null, // Ensure shadow is included
-      ...properties
-    };
-
-    if (type === 'text') {
-      newElement.content = t('text.doubleClickToEdit');
-      newElement.fontSize = 24;
-      newElement.fontFamily = supportedLanguages[currentLanguage]?.font || 'Arial';
-      newElement.fontWeight = 'normal';
-      newElement.fontStyle = 'normal';
-      newElement.textDecoration = 'none';
-      newElement.color = '#000000';
-      newElement.textAlign = textDirection === 'rtl' ? 'right' : 'left';
-    } else if (type === 'rectangle') {
-      newElement.borderRadius = properties.borderRadius || 0;
-    } else if (type === 'image') {
-      newElement.src = properties.src || '';
-      newElement.borderRadius = properties.borderRadius || 0;
-      // Ensure no stroke by default for images
-      newElement.stroke = properties.stroke || 'transparent';
-      newElement.strokeWidth = properties.strokeWidth || 0;
-    } else if (type === 'line') {
-      // Line specific properties
-    } else if (type === 'arrow') {
-      newElement.fill = '#000000';
-    } else if (type === 'star') {
-      newElement.points = 5;
-    } else if (type === 'drawing') {
-      newElement.stroke = '#000000';
-      newElement.strokeWidth = 3;
-      newElement.path = properties.path || [];
-    } else if (type === 'sticker') {
-      newElement.sticker = properties.sticker || 'smile';
-      newElement.fill = properties.fill || '#f59e0b';
-      newElement.width = 80;
-      newElement.height = 80;
-    }
-
-    const newElements = [...currentElements, newElement];
-    setCurrentPageElements(newElements);
-    setSelectedElement(newElement.id);
-    setSelectedElements(new Set([newElement.id]));
-    setCurrentTool('select');
-    saveToHistory(newElements);
-  }, [getCurrentPageElements, setCurrentPageElements, saveToHistory, currentLanguage, textDirection, t]);
-
-  // Apply template function with proper centering and auto-zoom
-  const applyTemplate = useCallback((platform) => {
-    if (platform === 'custom') {
-      setShowCustomTemplateModal(true);
-      return;
-    }
-    
-    const template = socialMediaTemplates[platform];
-    if (template) {
-      // Set the new canvas size
-      setCanvasSize({ width: template.width, height: template.height });
-      
-      // Center and zoom to fit after a short delay for DOM update
-      setTimeout(() => {
-        centerCanvas();
-      }, 100);
-      
-      setShowTemplates(false);
-    }
-  }, [centerCanvas]);
-
-  // Create custom template function with proper centering
-  const createCustomTemplate = useCallback(() => {
-    let width = customTemplateSize.width;
-    let height = customTemplateSize.height;
-    
-    // Convert units to pixels if needed
-    if (customTemplateSize.unit === 'in') {
-      width = Math.round(width * 96); // 96 DPI
-      height = Math.round(height * 96);
-    } else if (customTemplateSize.unit === 'mm') {
-      width = Math.round(width * 3.779527559); // 1mm = 3.78px
-      height = Math.round(height * 3.779527559);
-    } else if (customTemplateSize.unit === 'cm') {
-      width = Math.round(width * 37.79527559); // 1cm = 37.8px
-      height = Math.round(height * 37.79527559);
-    }
-    
-    // Set minimum and maximum limits
-    width = Math.max(100, Math.min(10000, width));
-    height = Math.max(100, Math.min(10000, height));
-    
-    // Set the new canvas size
-    setCanvasSize({ width, height });
-    
-    // Center and zoom to fit after a short delay for DOM update
-    setTimeout(() => {
-      centerCanvas();
-    }, 100);
-    
-    setShowCustomTemplateModal(false);
-    setShowTemplates(false);
-  }, [customTemplateSize, centerCanvas]);
-
-  // Auto-center on window resize
-  useEffect(() => {
-    const handleResize = () => {
-      centerCanvas();
-    };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [centerCanvas]);
-
-  // Fixed Gradient Picker Component
-  const GradientPicker = ({ gradient, onGradientChange }) => {
-    const [localGradient, setLocalGradient] = useState(() => {
-      // Ensure we have a valid gradient structure
-      const defaultGradient = {
-        type: 'linear',
-        colors: ['#3b82f6', '#ef4444'],
-        stops: [0, 100],
-        angle: 90,
-        position: { x: 50, y: 50 }
-      };
-      
-      return gradient ? { ...defaultGradient, ...gradient } : defaultGradient;
-    });
-
-    // Sync with parent component's gradient - with validation
-    useEffect(() => {
-      if (gradient) {
-        const validatedGradient = {
-          type: gradient.type || 'linear',
-          colors: (gradient.colors && Array.isArray(gradient.colors) && gradient.colors.length > 0) 
-            ? gradient.colors.filter(color => color && typeof color === 'string') 
-            : ['#3b82f6', '#ef4444'],
-          stops: (gradient.stops && Array.isArray(gradient.stops)) 
-            ? gradient.stops.map(stop => Math.max(0, Math.min(100, stop || 0)))
-            : [0, 100],
-          angle: gradient.angle || 90,
-          position: gradient.position || { x: 50, y: 50 }
-        };
-        
-        setLocalGradient(validatedGradient);
-      }
-    }, [gradient]);
-
-    const updateGradient = (updates) => {
-      const newGradient = { ...localGradient, ...updates };
-      setLocalGradient(newGradient);
-      onGradientChange(newGradient);
-    };
-
-    const addColorStop = () => {
-      if (localGradient.colors.length >= 5) return;
-      
-      const newColor = `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`;
-      const newColors = [...localGradient.colors, newColor];
-      
-      // Calculate new stop position more reliably
-      const newStops = [...localGradient.stops];
-      if (newStops.length === 0) {
-        newStops.push(0, 100);
-      } else if (newStops.length === 1) {
-        newStops.push(50, 100);
-      } else {
-        // Find the largest gap and insert in the middle
-        let maxGap = 0;
-        let insertIndex = 0;
-        
-        for (let i = 0; i < newStops.length - 1; i++) {
-          const gap = newStops[i + 1] - newStops[i];
-          if (gap > maxGap) {
-            maxGap = gap;
-            insertIndex = i + 1;
-          }
-        }
-        
-        const newStop = newStops[insertIndex - 1] + Math.floor(maxGap / 2);
-        newStops.splice(insertIndex, 0, newStop);
-      }
-      
-      updateGradient({ colors: newColors, stops: newStops });
-    };
-
-    const removeColorStop = (index) => {
-      if (localGradient.colors.length <= 2) return;
-      const newColors = localGradient.colors.filter((_, i) => i !== index);
-      const newStops = localGradient.stops.filter((_, i) => i !== index);
-      updateGradient({ colors: newColors, stops: newStops });
-    };
-
-    const updateColorStop = (index, color) => {
-      const newColors = [...localGradient.colors];
-      newColors[index] = color;
-      updateGradient({ colors: newColors });
-    };
-
-    const updateStopPosition = (index, position) => {
-      const newStops = [...localGradient.stops];
-      newStops[index] = Math.max(0, Math.min(100, parseInt(position) || 0));
-      
-      // Sort stops and colors together
-      const sortedPairs = newStops.map((stop, i) => ({
-        stop,
-        color: localGradient.colors[i]
-      })).sort((a, b) => a.stop - b.stop);
-      
-      const sortedStops = sortedPairs.map(pair => pair.stop);
-      const sortedColors = sortedPairs.map(pair => pair.color);
-      
-      updateGradient({ stops: sortedStops, colors: sortedColors });
-    };
-
-    const getGradientString = () => {
-      if (!localGradient.colors || localGradient.colors.length === 0) {
-        return 'linear-gradient(90deg, #3b82f6 0%, #ef4444 100%)';
-      }
-      
-      const colorStops = localGradient.colors.map((color, i) => 
-        `${color} ${localGradient.stops[i]}%`
-      ).join(', ');
-      
-      if (localGradient.type === 'linear') {
-        return `linear-gradient(${localGradient.angle || 0}deg, ${colorStops})`;
-      } else {
-        return `radial-gradient(circle at ${localGradient.position?.x || 50}% ${localGradient.position?.y || 50}%, ${colorStops})`;
-      }
-    };
-
-    
-
-    const applyPreset = useCallback((preset) => {
-      // Create a fresh gradient object with all preset properties
-      const newGradient = {
-        type: preset.type,
-        colors: preset.colors.slice(),
-        stops: preset.stops.slice(),
-        angle: preset.angle !== undefined ? preset.angle : 90,
-        position: preset.position ? { ...preset.position } : { x: 50, y: 50 }
-      };
-      
-      // Update local state immediately for instant visual feedback
-      setLocalGradient(newGradient);
-      
-      // Notify parent component to update the element on canvas
-      if (onGradientChange) {
-        onGradientChange(newGradient);
-      }
-    }, [onGradientChange]);
-
-    return (
-      <div 
-        key={gradientPickerKey} 
-        className="gradient-picker mt-3 p-3 bg-gray-50 rounded border" 
-        style={{ position: 'relative', zIndex: 1, pointerEvents: 'auto' }}
-      >
-        <div className="mb-3">
-          <div 
-            className="w-full h-8 rounded border border-gray-300 mb-2 gradient-fix"
-            style={{ background: getGradientString() }}
-          />
-          <div className="text-xs text-gray-500 text-center">
-            {localGradient.colors.length} color stops
-          </div>
-        </div>
-
-        {localGradient.type === 'linear' && (
-          <div className="mb-3">
-            <label className="block text-sm font-medium mb-1">
-              Angle: {localGradient.angle || 0}°
-            </label>
-            <div className="relative">
-            <input
-              type="range"
-              min="0"
-              max="360"
-                step="1"
-              value={localGradient.angle || 0}
-              onChange={(e) => updateGradient({ angle: parseInt(e.target.value) || 0 })}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                style={{
-                  background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(localGradient.angle || 0) / 360 * 100}%, #e5e7eb ${(localGradient.angle || 0) / 360 * 100}%, #e5e7eb 100%)`
-                }}
-              />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>0°</span>
-                <span>90°</span>
-                <span>180°</span>
-                <span>270°</span>
-                <span>360°</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {localGradient.type === 'radial' && (
-          <div className="mb-3">
-            <label className="block text-sm font-medium mb-1">Radial Center Position</label>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs block mb-1 text-gray-600">X: {localGradient.position?.x || 50}%</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={localGradient.position?.x || 50}
-                  onChange={(e) => updateGradient({ 
-                    position: { 
-                      ...localGradient.position, 
-                      x: parseInt(e.target.value) || 50 
-                    }
-                  })}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                />
-                <div className="flex justify-between text-xs text-gray-400 mt-1">
-                  <span>0%</span>
-                  <span>50%</span>
-                  <span>100%</span>
-                </div>
-              </div>
-              <div>
-                <label className="text-xs block mb-1 text-gray-600">Y: {localGradient.position?.y || 50}%</label>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={localGradient.position?.y || 50}
-                  onChange={(e) => updateGradient({ 
-                    position: { 
-                      ...localGradient.position, 
-                      y: parseInt(e.target.value) || 50 
-                    }
-                  })}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                />
-                <div className="flex justify-between text-xs text-gray-400 mt-1">
-                  <span>0%</span>
-                  <span>50%</span>
-                  <span>100%</span>
-              </div>
-              </div>
-            </div>
-            <div className="mt-2 text-xs text-gray-500 text-center">
-              Center: ({localGradient.position?.x || 50}%, {localGradient.position?.y || 50}%)
-            </div>
-          </div>
-        )}
-
-        <div className="mb-3">
-          <div className="text-xs text-gray-500 mb-2">
-            {localGradient.colors.length}/5 color stops
-          </div>
-          
-          <div className="space-y-3">
-            {localGradient.colors.map((color, index) => (
-              <div key={index} className="flex items-center space-x-3 p-2 bg-gray-50 rounded border">
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="color"
-                    value={color}
-                    onChange={(e) => updateColorStop(index, e.target.value)}
-                    className="w-8 h-8 cursor-pointer rounded border-2 border-gray-300 hover:border-blue-400 transition-colors"
-                  />
-                  <span className="text-xs w-12 font-mono text-gray-600">{localGradient.stops[index]}%</span>
-                </div>
-                
-                <div className="flex-1">
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="1"
-                    value={localGradient.stops[index]}
-                    onChange={(e) => updateStopPosition(index, e.target.value)}
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                    style={{
-                      background: `linear-gradient(to right, #e5e7eb 0%, #e5e7eb ${localGradient.stops[index]}%, #3b82f6 ${localGradient.stops[index]}%, #3b82f6 100%)`
-                    }}
-                  />
-                </div>
-                
-                <button
-                  onClick={() => removeColorStop(index)}
-                  disabled={localGradient.colors.length <= 2}
-                  className="p-1 text-red-500 hover:text-red-700 disabled:opacity-30 transition-colors hover:bg-red-50 rounded"
-                  title="Remove color stop"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="mb-3">
-          <label className="block text-sm font-medium mb-2">Quick Presets</label>
-          <div className="grid grid-cols-4 gap-2">
-            {gradientPresets.map((preset, index) => {
-              // Generate the actual gradient string for this preset
-              const colorStops = preset.colors.map((color, i) => 
-                `${color} ${preset.stops[i]}%`
-              ).join(', ');
-              
-              const gradientString = preset.type === 'linear'
-                ? `linear-gradient(${preset.angle}deg, ${colorStops})`
-                : `radial-gradient(circle at ${preset.position?.x || 50}% ${preset.position?.y || 50}%, ${colorStops})`;
-
-              return (
-                <div
-                  key={`preset-${index}`}
-                  onMouseUp={(e) => {
-                    e.stopPropagation();
-                    applyPreset(preset);
-                  }}
-                  className="h-10 rounded border-2 border-gray-300 hover:border-blue-500 hover:scale-105 transition-all duration-200 gradient-fix cursor-pointer relative"
-                  style={{
-                    background: gradientString,
-                    pointerEvents: 'auto',
-                    userSelect: 'none'
-                  }}
-                  title={`${preset.name} (${preset.type === 'radial' ? 'Radial' : 'Linear'})`}
-                >
-                  <div 
-                    className="absolute bottom-0 right-0 text-xs bg-black bg-opacity-60 text-white px-1 rounded-tl pointer-events-none"
-                    style={{ pointerEvents: 'none' }}
-                  >
-                    {preset.type === 'radial' ? 'R' : 'L'}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="text-xs text-gray-500 mt-1 text-center">
-            Click any preset to apply • L = Linear, R = Radial
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Handle image upload
-  const handleImageUpload = useCallback((event) => {
-    const file = event.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        addElement('image', { src: e.target.result });
-      };
-      reader.readAsDataURL(file);
-    }
-  }, [addElement]);
-
-  // Update element properties
-  const updateElement = useCallback((id, updates) => {
-    const currentElements = getCurrentPageElements();
-    const newElements = currentElements.map(el => 
-      el.id === id ? { ...el, ...updates } : el
-    );
-    setCurrentPageElements(newElements);
-    saveToHistory(newElements);
-  }, [getCurrentPageElements, setCurrentPageElements, saveToHistory]);
-
-  // Delete element
-  const deleteElement = useCallback((id) => {
-    if (lockedElements.has(id)) return;
-    
-    const currentElements = getCurrentPageElements();
-    const newElements = currentElements.filter(el => el.id !== id);
-    setCurrentPageElements(newElements);
-    if (selectedElement === id) setSelectedElement(null);
-    const newSelected = new Set(selectedElements);
-    newSelected.delete(id);
-    setSelectedElements(newSelected);
-    saveToHistory(newElements);
-  }, [lockedElements, getCurrentPageElements, setCurrentPageElements, selectedElement, selectedElements, saveToHistory]);
-
-  // Duplicate element
-  const duplicateElement = useCallback((id) => {
-    if (lockedElements.has(id)) return;
-    
-    const currentElements = getCurrentPageElements();
-    const element = currentElements.find(el => el.id === id);
-    if (element) {
-      const duplicated = {
-        ...element,
-        id: generateId(),
-        x: element.x + 20,
-        y: element.y + 20,
-        zIndex: currentElements.length
-      };
-      const newElements = [...currentElements, duplicated];
-      setCurrentPageElements(newElements);
-      setSelectedElement(duplicated.id);
-      setSelectedElements(new Set([duplicated.id]));
-      saveToHistory(newElements);
-    }
-  }, [lockedElements, getCurrentPageElements, setCurrentPageElements, saveToHistory]);
-
-  // Toggle element lock
-  const toggleElementLock = useCallback((id) => {
-    const newLocked = new Set(lockedElements);
-    if (newLocked.has(id)) {
-      newLocked.delete(id);
-      updateElement(id, { locked: false });
-    } else {
-      newLocked.add(id);
-      updateElement(id, { locked: true });
-    }
-    setLockedElements(newLocked);
-  }, [lockedElements, updateElement]);
-
-  // Update filter value
-  const updateFilter = useCallback((elementId, filterName, value) => {
-    const currentElements = getCurrentPageElements();
-    const element = currentElements.find(el => el.id === elementId);
-    if (element) {
-      const updatedFilters = { ...element.filters };
-      if (updatedFilters[filterName]) {
-        updatedFilters[filterName] = { ...updatedFilters[filterName], value };
-        updateElement(elementId, { filters: updatedFilters });
-      }
-    }
-  }, [getCurrentPageElements, updateElement]);
-
-  // Get filter CSS string
-  const getFilterCSS = useCallback((filters) => {
-    if (!filters) return '';
-    return Object.entries(filters)
-      .map(([key, filter]) => {
-        if ((filter && filter.value > 0) || (key === 'opacity' && filter.value < 100)) {
-          return `${key}(${filter.value}${filter.unit})`;
-        }
-        return '';
-      })
-      .filter(Boolean)
-      .join(' ');
-  }, []);
-
-  // Fixed getBackgroundStyle function
-  const getBackgroundStyle = useCallback((element) => {
-    if (!element) return '#3b82f6';
-    
-    // If element doesn't have gradient fill type or gradient data, return solid color
-    if (element.fillType !== 'gradient' || !element.gradient) {
-      return element.fill || '#3b82f6';
-    }
-    
-    const grad = element.gradient;
-    
-    // Validate gradient data structure
-    if (!grad.colors || !Array.isArray(grad.colors) || grad.colors.length === 0) {
-      return element.fill || '#3b82f6';
-    }
-    
-    // Validate and filter colors
-    const validColors = grad.colors.filter(color => 
-      color && typeof color === 'string' && /^#([0-9A-F]{3}){1,2}$/i.test(color)
-    );
-    
-    if (validColors.length === 0) {
-      return element.fill || '#3b82f6';
-    }
-    
-    // Ensure we have valid stops
-    const validStops = grad.stops || [];
-    const stops = [];
-    
-    for (let i = 0; i < validColors.length; i++) {
-      if (validStops[i] !== undefined && validStops[i] !== null) {
-        stops[i] = Math.max(0, Math.min(100, parseInt(validStops[i]) || 0));
-      } else {
-        // Auto-generate stops if missing or invalid
-        if (validColors.length === 1) {
-          stops[i] = 0;
-        } else {
-          stops[i] = i === 0 ? 0 : (i === validColors.length - 1 ? 100 : Math.round((i / (validColors.length - 1)) * 100));
-        }
-      }
-    }
-    
-    // Ensure stops are in correct order
-    const colorStopPairs = validColors.map((color, i) => ({
-      color,
-      stop: stops[i] || 0
-    })).sort((a, b) => a.stop - b.stop);
-    
-    // Build gradient string
-    const colorStops = colorStopPairs.map(pair => 
-      `${pair.color} ${pair.stop}%`
-    ).join(', ');
-    
-    if (grad.type === 'radial') {
-      const posX = (grad.position && grad.position.x !== undefined) ? grad.position.x : 50;
-      const posY = (grad.position && grad.position.y !== undefined) ? grad.position.y : 50;
-      return `radial-gradient(circle at ${posX}% ${posY}%, ${colorStops})`;
-    } else {
-      // Linear gradient (default)
-      const angle = (grad.angle !== undefined && grad.angle !== null) ? grad.angle : 90;
-      return `linear-gradient(${angle}deg, ${colorStops})`;
-    }
-  }, []);
-
-  // Get canvas-compatible gradient for export
-  const getCanvasGradient = useCallback((ctx, element) => {
-    if (!element || element.fillType !== 'gradient' || !element.gradient) {
-      return element.fill || '#3b82f6';
-    }
-    
-    const grad = element.gradient;
-    
-    // Validate gradient data
-    if (!grad.colors || !Array.isArray(grad.colors) || grad.colors.length === 0) {
-      return element.fill || '#3b82f6';
-    }
-    
-    // Validate and filter colors
-    const validColors = grad.colors.filter(color => 
-      color && typeof color === 'string' && /^#([0-9A-F]{3}){1,2}$/i.test(color)
-    );
-    
-    if (validColors.length === 0) {
-      return element.fill || '#3b82f6';
-    }
-    
-    // Ensure we have valid stops
-    const validStops = grad.stops || [];
-    const stops = [];
-    
-    for (let i = 0; i < validColors.length; i++) {
-      if (validStops[i] !== undefined && validStops[i] !== null) {
-        stops[i] = Math.max(0, Math.min(100, parseInt(validStops[i]) || 0)) / 100;
-      } else {
-        if (validColors.length === 1) {
-          stops[i] = 0;
-        } else {
-          stops[i] = i === 0 ? 0 : (i === validColors.length - 1 ? 1 : i / (validColors.length - 1));
-        }
-      }
-    }
-    
-    let canvasGradient;
-    
-    if (grad.type === 'radial') {
-      const centerX = element.x + element.width / 2;
-      const centerY = element.y + element.height / 2;
-      const radius = Math.max(element.width, element.height) / 2;
-      
-      canvasGradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
-    } else {
-      // Linear gradient
-      const angle = (grad.angle !== undefined && grad.angle !== null) ? grad.angle : 90;
-      const angleRad = (angle - 90) * Math.PI / 180;
-      
-      const centerX = element.x + element.width / 2;
-      const centerY = element.y + element.height / 2;
-      const length = Math.max(element.width, element.height);
-      
-      const x1 = centerX - Math.cos(angleRad) * length / 2;
-      const y1 = centerY - Math.sin(angleRad) * length / 2;
-      const x2 = centerX + Math.cos(angleRad) * length / 2;
-      const y2 = centerY + Math.sin(angleRad) * length / 2;
-      
-      canvasGradient = ctx.createLinearGradient(x1, y1, x2, y2);
-    }
-    
-    // Add color stops
-    validColors.forEach((color, i) => {
-      canvasGradient.addColorStop(stops[i], color);
-    });
-    
-    return canvasGradient;
-  }, []);
-
-  // NEW: Get canvas-compatible effects
-  const getCanvasEffects = useCallback((element) => {
-    const effects = {
-      shadow: {},
-      filters: ''
-    };
-    
-    // Text effects for canvas
-    if (element.type === 'text' && element.textEffect && element.textEffect !== 'none') {
-      switch(element.textEffects) {
-        case 'shadow':
-          effects.shadow = {
-            color: 'rgba(0,0,0,0.5)',
-            blur: 4,
-            offsetX: 2,
-            offsetY: 2
-          };
-          break;
-        case 'lift':
-          effects.shadow = {
-            color: 'rgba(0,0,0,0.3)',
-            blur: 8,
-            offsetX: 0,
-            offsetY: 4
-          };
-          break;
-        case 'neon':
-          effects.shadow = {
-            color: '#ff00de',
-            blur: 10,
-            offsetX: 0,
-            offsetY: 0
-          };
-          break;
-        default:
-            // optional fallback behavior
-            effects.shadow = undefined; 
-            break;
-          // Add other text effects...
-      }
-    }
-    
-    // Image effects for canvas
-    if (element.type === 'image' && element.imageEffect && element.imageEffect !== 'none') {
-      const effect = imageEffects[element.imageEffect];
-      if (effect && effect.filter) {
-        effects.filters += ' ' + effect.filter;
-      }
-    }
-    
-    // Shape effects for canvas
-    if (['rectangle', 'circle', 'triangle', 'star', 'hexagon'].includes(element.type) && 
-        element.shapeEffect && element.shapeEffect !== 'none') {
-      switch(element.shapeEffects) {
-        case 'shadow':
-          effects.shadow = {
-            color: 'rgba(0,0,0,0.3)',
-            blur: 8,
-            offsetX: 4,
-            offsetY: 4
-          };
-          break;
-        case 'glow':
-          effects.shadow = {
-            color: 'rgba(255,255,255,0.8)',
-            blur: 10,
-            offsetX: 0,
-            offsetY: 0
-          };
-          break;
-          default:
-          // Handle unexpected or unsupported shape effects
-          effects.shadow = undefined;
-          break;
-          // Add other shape effects...
-        }
-    }
-    
-    return effects;
-  }, [imageEffects]);
-
-  // Get effect CSS for an element
-  const getEffectCSS = useCallback((element) => {
-    let effectCSS = '';
-    
-    // Text effects
-    if (element.type === 'text' && element.textEffect && element.textEffect !== 'none') {
-      effectCSS += textEffects[element.textEffect]?.css || '';
-    }
-    
-    // Image effects
-    if (element.type === 'image' && element.imageEffect && element.imageEffect !== 'none') {
-      effectCSS += imageEffects[element.imageEffect]?.filter ? `filter: ${imageEffects[element.imageEffect].filter};` : '';
-    }
-    
-    // Shape effects
-    if (['rectangle', 'circle', 'triangle', 'star', 'hexagon'].includes(element.type) && 
-        element.shapeEffect && element.shapeEffect !== 'none') {
-      effectCSS += shapeEffects[element.shapeEffect]?.css || '';
-    }
-    
-    // Special effects for all elements
-    if (element.specialEffect && element.specialEffect !== 'none') {
-      effectCSS += specialEffects[element.specialEffect]?.css || '';
-    }
-    
-    return effectCSS;
-  }, []);
-
-  // Group selected elements
-  const groupElements = useCallback(() => {
-    const currentElements = getCurrentPageElements();
-    if (selectedElements.size < 2) return;
-    
-    const groupId = generateId();
-    const selectedIds = Array.from(selectedElements);
-    const selectedEls = currentElements.filter(el => selectedIds.includes(el.id));
-    
-    const minX = Math.min(...selectedEls.map(el => el.x));
-    const minY = Math.min(...selectedEls.map(el => el.y));
-    const maxX = Math.max(...selectedEls.map(el => el.x + el.width));
-    const maxY = Math.max(...selectedEls.map(el => el.y + el.height));
-    
-    const group = {
-      id: groupId,
-      type: 'group',
-      x: minX,
-      y: minY,
-      width: maxX - minX,
-      height: maxY - minY,
-      rotation: 0,
-      children: selectedIds,
-      zIndex: currentElements.length,
-      fill: 'transparent',
-      stroke: '#8b5cf6',
-      strokeWidth: 2,
-      strokeDasharray: '5,5'
-    };
-    
-    const updatedElements = currentElements.map(el => {
-      if (selectedIds.includes(el.id)) {
-        return {
-          ...el,
-          groupId,
-          relativeX: el.x - minX,
-          relativeY: el.y - minY,
-          relativeRotation: el.rotation || 0
-        };
-      }
-      return el;
-    });
-    
-    const newElements = [...updatedElements, group];
-    setCurrentPageElements(newElements);
-    setSelectedElement(groupId);
-    setSelectedElements(new Set([groupId]));
-    saveToHistory(newElements);
-  }, [getCurrentPageElements, selectedElements, setCurrentPageElements, saveToHistory]);
-
-  // Ungroup elements
-  const ungroupElements = useCallback((groupId) => {
-    const currentElements = getCurrentPageElements();
-    const group = currentElements.find(el => el.id === groupId);
-    if (!group || group.type !== 'group') return;
-    
-    const updatedElements = currentElements.map(el => {
-      if (el.groupId === groupId) {
-        const { groupId: _, relativeX, relativeY, relativeRotation, ...rest } = el;
-        return {
-          ...rest,
-          x: group.x + (relativeX || 0),
-          y: group.y + (relativeY || 0),
-          rotation: (group.rotation || 0) + (relativeRotation || 0)
-        };
-      }
-      return el;
-    }).filter(el => el.id !== groupId);
-    
-    setCurrentPageElements(updatedElements);
-    setSelectedElement(null);
-    setSelectedElements(new Set());
-    saveToHistory(updatedElements);
-  }, [getCurrentPageElements, setCurrentPageElements, saveToHistory]);
-
-  // Change element z-index
-  const changeZIndex = useCallback((id, direction) => {
-    if (lockedElements.has(id)) return;
-    
-    const currentElements = getCurrentPageElements();
-    const elementIndex = currentElements.findIndex(el => el.id === id);
-    if (elementIndex === -1) return;
-    
-    let newIndex;
-    if (direction === 'front') {
-      newIndex = currentElements.length - 1;
-    } else if (direction === 'forward') {
-      newIndex = Math.min(elementIndex + 1, currentElements.length - 1);
-    } else if (direction === 'backward') {
-      newIndex = Math.max(elementIndex - 1, 0);
-    } else if (direction === 'back') {
-      newIndex = 0;
-    } else {
-      return;
-    }
-    
-    const newElements = [...currentElements];
-    const [element] = newElements.splice(elementIndex, 1);
-    newElements.splice(newIndex, 0, element);
-    
-    const updatedElements = newElements.map((el, idx) => ({
-      ...el,
-      zIndex: idx
-    }));
-    
-    setCurrentPageElements(updatedElements);
-    saveToHistory(updatedElements);
-  }, [lockedElements, getCurrentPageElements, setCurrentPageElements, saveToHistory]);
-
-  // Calculate alignment lines
-  const calculateAlignmentLines = useCallback((movingElement) => {
-    const currentElements = getCurrentPageElements();
-    const lines = { vertical: [], horizontal: [] };
-    const threshold = 5;
-
-    currentElements.forEach(el => {
-      if (el.id === movingElement.id || selectedElements.has(el.id) || lockedElements.has(el.id)) return;
-
-      if (Math.abs(el.x - movingElement.x) < threshold) {
-        lines.vertical.push(el.x);
-      }
-      if (Math.abs(el.x + el.width - movingElement.x) < threshold) {
-        lines.vertical.push(el.x + el.width);
-      }
-      if (Math.abs(el.x - (movingElement.x + movingElement.width)) < threshold) {
-        lines.vertical.push(el.x);
-      }
-
-      if (Math.abs(el.y - movingElement.y) < threshold) {
-        lines.horizontal.push(el.y);
-      }
-      if (Math.abs(el.y + el.height - movingElement.y) < threshold) {
-        lines.horizontal.push(el.y + el.height);
-      }
-      if (Math.abs(el.y - (movingElement.y + movingElement.height)) < threshold) {
-        lines.horizontal.push(el.y);
-      }
-    });
-
-    setAlignmentLines(lines);
-  }, [selectedElements, getCurrentPageElements, lockedElements]);
-
-  // Handle selection
-  const handleSelectElement = useCallback((e, elementId) => {
-    e.stopPropagation();
-    
-    const currentElements = getCurrentPageElements();
-    const element = currentElements.find(el => el.id === elementId);
-    
-    if (!element) return;
-    
-    // If element is in a group, select the group instead
-    if (element.groupId && !selectedElements.has(element.groupId)) {
-      const groupElement = currentElements.find(el => el.id === element.groupId);
-      if (groupElement && !lockedElements.has(groupElement.id)) {
-        // Select the group instead of the individual element
-        if (e.ctrlKey || e.metaKey) {
-          const newSelected = new Set(selectedElements);
-          if (newSelected.has(groupElement.id)) {
-            newSelected.delete(groupElement.id);
-          } else {
-            newSelected.add(groupElement.id);
-          }
-          setSelectedElement(groupElement.id);
-          setSelectedElements(newSelected);
-        } else {
-          setSelectedElement(groupElement.id);
-          setSelectedElements(new Set([groupElement.id]));
-        }
-        return;
-      }
-    }
-    
-    if (lockedElements.has(elementId)) {
-      setSelectedElement(elementId);
-      setSelectedElements(new Set([elementId]));
-      return;
-    }
-    
-    if (e.ctrlKey || e.metaKey) {
-      const newSelected = new Set(selectedElements);
-      if (newSelected.has(elementId)) {
-        newSelected.delete(elementId);
-        if (newSelected.size === 0) {
-          setSelectedElement(null);
-        } else if (selectedElement === elementId) {
-          setSelectedElement(Array.from(newSelected)[0]);
-        }
-      } else {
-        newSelected.add(elementId);
-        setSelectedElement(elementId);
-      }
-      setSelectedElements(newSelected);
-    } else {
-      setSelectedElement(elementId);
-      setSelectedElements(new Set([elementId]));
-    }
-  }, [selectedElements, selectedElement, lockedElements, getCurrentPageElements]);
-
-  // Handle drawing with pen tool
-  const handleDrawing = useCallback((e) => {
-    if (currentTool !== 'pen' || !isDrawing || !canvasRef.current) return;
-    
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = (e.clientX - rect.left - canvasOffset.x) / zoomLevel;
-    const y = (e.clientY - rect.top - canvasOffset.y) / zoomLevel;
-    
-    setDrawingPath(prev => [...prev, { x, y }]);
-  }, [currentTool, isDrawing, zoomLevel, canvasOffset]);
-
-  // Finish drawing and create a path element
-  const finishDrawing = useCallback(() => {
-    if (currentTool !== 'pen' || drawingPath.length === 0) return;
-    
-    addElement('drawing', { path: [...drawingPath] });
-    setDrawingPath([]);
-    setIsDrawing(false);
-  }, [currentTool, drawingPath, addElement]);
-
-  // Enhanced selection handles with corner pointers and center slots - FIXED VERSION
-  const renderSelectionHandles = useCallback((element) => {
-    if (!element || lockedElements.has(element.id)) return null;
-
-    const handleSize = 12;
-    const handleBorder = 2;
-    const slotSize = 8;
-    const connectionLineColor = '#8b5cf6';
-    const handleColor = '#ffffff';
-    const handleBorderColor = '#8b5cf6';
-
-    const handles = [
-      // Corner handles (white circles with purple border)
-      { x: -handleSize/2, y: -handleSize/2, cursor: 'nw-resize', type: 'nw' },
-      { x: element.width - handleSize/2, y: -handleSize/2, cursor: 'ne-resize', type: 'ne' },
-      { x: -handleSize/2, y: element.height - handleSize/2, cursor: 'sw-resize', type: 'sw' },
-      { x: element.width - handleSize/2, y: element.height - handleSize/2, cursor: 'se-resize', type: 'se' },
-      
-      // Center slot handles (purple slots)
-      { x: element.width/2 - slotSize/2, y: -slotSize/2, cursor: 'n-resize', type: 'n', isSlot: true },
-      { x: element.width/2 - slotSize/2, y: element.height - slotSize/2, cursor: 's-resize', type: 's', isSlot: true },
-      { x: -slotSize/2, y: element.height/2 - slotSize/2, cursor: 'w-resize', type: 'w', isSlot: true },
-      { x: element.width - slotSize/2, y: element.height/2 - slotSize/2, cursor: 'e-resize', type: 'e', isSlot: true }
-    ];
-
-    const handleMouseDown = (e, action, direction = '') => {
-      e.stopPropagation();
-      e.preventDefault();
-      
-      if (action === 'resize') {
-        setIsResizing(true);
-        // setResizeDirection(direction);
-        
-        const rect = canvasRef.current.getBoundingClientRect();
-        setDragStart({
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top,
-          elementX: element.x,
-          elementY: element.y,
-          elementWidth: element.width,
-          elementHeight: element.height,
-          elementRotation: element.rotation,
-          resizeDirection: direction
-        });
-      } else if (action === 'rotate') {
-        setIsRotating(true);
-        
-        const rect = canvasRef.current.getBoundingClientRect();
-        setDragStart({
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top,
-          elementX: element.x,
-          elementY: element.y,
-          elementWidth: element.width,
-          elementHeight: element.height,
-          elementRotation: element.rotation
-        });
-      }
-    };
-
-    return (
-      <div
-        style={{
-          position: 'absolute',
-          left: element.x - 10,
-          top: element.y - 10,
-          width: element.width + 20,
-          height: element.height + 20,
-          pointerEvents: 'none',
-          transform: `rotate(${element.rotation || 0}deg)`,
-          zIndex: element.zIndex + 1000
-        }}
-      >
-        {/* Selection border */}
-        <div
-          style={{
-            position: 'absolute',
-            left: 10,
-            top: 10,
-            width: element.width,
-            height: element.height,
-            border: `2px dashed ${connectionLineColor}`,
-            borderRadius: '2px'
-          }}
-        />
-
-        {/* Handles */}
-        {handles.map((handle, index) => (
-          <div
-            key={index}
-            style={{
-              position: 'absolute',
-              left: handle.x + 10,
-              top: handle.y + 10,
-              width: handle.isSlot ? slotSize : handleSize,
-              height: handle.isSlot ? slotSize : handleSize,
-              backgroundColor: handle.isSlot ? connectionLineColor : handleColor,
-              border: handle.isSlot ? 'none' : `${handleBorder}px solid ${handleBorderColor}`,
-              borderRadius: handle.isSlot ? '1px' : '50%',
-              cursor: handle.cursor,
-              pointerEvents: 'auto',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
-            }}
-            onMouseDown={(e) => handleMouseDown(e, 'resize', handle.type)}
-          />
-        ))}
-
-        {/* Rotate handle */}
-        <div
-          style={{
-            position: 'absolute',
-            top: -30,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: handleSize,
-            height: handleSize,
-            backgroundColor: '#ef4444',
-            border: `2px solid #ffffff`,
-            borderRadius: '50%',
-            cursor: 'grab',
-            pointerEvents: 'auto',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
-          }}
-          onMouseDown={(e) => handleMouseDown(e, 'rotate')}
-        />
-
-        {/* Connection line to rotate handle */}
-        <svg
-          style={{
-            position: 'absolute',
-            top: -25,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: 2,
-            height: 15,
-            pointerEvents: 'none'
-          }}
-        >
-          <line x1="1" y1="0" x2="1" y2="15" stroke="#ef4444" strokeWidth="2" />
-        </svg>
-      </div>
-    );
-  }, [lockedElements]);
-
-  // Enhanced mouse down handler with resize direction - FIXED VERSION
-  const handleMouseDown = useCallback((e, elementId, action = 'drag', direction = '') => {
-    e.stopPropagation();
-    e.preventDefault();
-    
-    const currentElements = getCurrentPageElements();
-    const element = currentElements.find(el => el.id === elementId);
-    if (!element) return;
-
-    // If element is in a group, use the group for operations
-    const targetElement = element.groupId 
-      ? currentElements.find(el => el.id === element.groupId) 
-      : element;
-    
-    if (!targetElement || (lockedElements.has(targetElement.id) && action !== 'select')) return;
-
-    handleSelectElement(e, targetElement.id);
-    
-    const rect = canvasRef.current.getBoundingClientRect();
-    
-    if (action === 'drag' && !lockedElements.has(targetElement.id)) {
-      setIsDragging(true);
-      setShowAlignmentLines(true);
-    } else if (action === 'resize' && !lockedElements.has(targetElement.id)) {
-      setIsResizing(true);
-      // setResizeDirection(direction);
-    } else if (action === 'rotate' && !lockedElements.has(targetElement.id)) {
-      setIsRotating(true);
-    }
-
-    setDragStart({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-      elementX: targetElement.x,
-      elementY: targetElement.y,
-      elementWidth: targetElement.width,
-      elementHeight: targetElement.height,
-      elementRotation: targetElement.rotation,
-      resizeDirection: direction
-    });
-  }, [getCurrentPageElements, lockedElements, handleSelectElement]);
-
-  // Enhanced mouse move handler with directional resizing - FIXED VERSION
-  const handleMouseMove = useCallback((e) => {
-    if (!canvasRef.current) return;
-
-    if (currentTool === 'pen' && isDrawing) {
-      handleDrawing(e);
-      return;
-    }
-
-    if (!selectedElement || (!isDragging && !isResizing && !isRotating && !isPanning)) return;
-
-    const rect = canvasRef.current.getBoundingClientRect();
-    const mouseX = (e.clientX - rect.left - canvasOffset.x) / zoomLevel;
-    const mouseY = (e.clientY - rect.top - canvasOffset.y) / zoomLevel;
-    
-    if (isPanning) {
-      setCanvasOffset({
-        x: canvasOffset.x + e.movementX,
-        y: canvasOffset.y + e.movementY
-      });
-      return;
-    }
-    
-    const currentElements = getCurrentPageElements();
-    const element = currentElements.find(el => el.id === selectedElement);
-    if (!element) return;
-    
-    // Handle group movement
-    if (element.type === 'group' && isDragging) {
-      const deltaX = mouseX - dragStart.x;
-      const deltaY = mouseY - dragStart.y;
-      
-      let newX = dragStart.elementX + deltaX;
-      let newY = dragStart.elementY + deltaY;
-      
-      if (snapToGrid) {
-        newX = Math.round(newX / 10) * 10;
-        newY = Math.round(newY / 10) * 10;
-      }
-      
-      // Move all children of the group
-      const newElements = currentElements.map(el => {
-        if (el.groupId === selectedElement) {
-          return {
-            ...el,
-            x: newX + (el.relativeX || 0),
-            y: newY + (el.relativeY || 0)
-          };
-        } else if (el.id === selectedElement) {
-          return {
-            ...el,
-            x: newX,
-            y: newY
-          };
-        }
-        return el;
-      });
-      
-      setCurrentPageElements(newElements);
-      saveToHistory(newElements);
-      calculateAlignmentLines({ ...element, x: newX, y: newY });
-    } else if (isDragging) {
-      const deltaX = mouseX - dragStart.x;
-      const deltaY = mouseY - dragStart.y;
-      
-      let newX = dragStart.elementX + deltaX;
-      let newY = dragStart.elementY + deltaY;
-      
-      if (snapToGrid) {
-        newX = Math.round(newX / 10) * 10;
-        newY = Math.round(newY / 10) * 10;
-      }
-      
-      if (selectedElements.size === 1) {
-        updateElement(selectedElement, { x: newX, y: newY });
-        calculateAlignmentLines({ ...element, x: newX, y: newY });
-      } else {
-        const deltaMoveX = newX - element.x;
-        const deltaMoveY = newY - element.y;
-        
-        const newElements = currentElements.map(el => {
-          if (selectedElements.has(el.id) && !lockedElements.has(el.id)) {
-            return {
-              ...el,
-              x: el.x + deltaMoveX,
-              y: el.y + deltaMoveY
-            };
-          }
-          return el;
-        });
-        
-        setCurrentPageElements(newElements);
-        saveToHistory(newElements);
-      }
-    } else if (isResizing) {
-      const deltaX = mouseX - dragStart.x;
-      const deltaY = mouseY - dragStart.y;
-      
-      let newX = dragStart.elementX;
-      let newY = dragStart.elementY;
-      let newWidth = dragStart.elementWidth;
-      let newHeight = dragStart.elementHeight;
-
-      switch (dragStart.resizeDirection) {
-        case 'nw':
-          newX = dragStart.elementX + deltaX;
-          newY = dragStart.elementY + deltaY;
-          newWidth = Math.max(20, dragStart.elementWidth - deltaX);
-          newHeight = Math.max(20, dragStart.elementHeight - deltaY);
-          break;
-        case 'ne':
-          newY = dragStart.elementY + deltaY;
-          newWidth = Math.max(20, dragStart.elementWidth + deltaX);
-          newHeight = Math.max(20, dragStart.elementHeight - deltaY);
-          break;
-        case 'sw':
-          newX = dragStart.elementX + deltaX;
-          newWidth = Math.max(20, dragStart.elementWidth - deltaX);
-          newHeight = Math.max(20, dragStart.elementHeight + deltaY);
-          break;
-        case 'se':
-          newWidth = Math.max(20, dragStart.elementWidth + deltaX);
-          newHeight = Math.max(20, dragStart.elementHeight + deltaY);
-          break;
-        case 'n':
-          newY = dragStart.elementY + deltaY;
-          newHeight = Math.max(20, dragStart.elementHeight - deltaY);
-          break;
-        case 's':
-          newHeight = Math.max(20, dragStart.elementHeight + deltaY);
-          break;
-        case 'w':
-          newX = dragStart.elementX + deltaX;
-          newWidth = Math.max(20, dragStart.elementWidth - deltaX);
-          break;
-        case 'e':
-          newWidth = Math.max(20, dragStart.elementWidth + deltaX);
-          break;
-        default:
-          // No resize direction specified
-          break;
-      }
-
-      updateElement(selectedElement, { 
-        x: newX, 
-        y: newY, 
-        width: newWidth, 
-        height: newHeight 
-      });
-    } else if (isRotating) {
-      const centerX = element.x + element.width / 2;
-      const centerY = element.y + element.height / 2;
-      const angle = Math.atan2(mouseY - centerY, mouseX - centerX) * 180 / Math.PI;
-      updateElement(selectedElement, { rotation: angle });
-    }
-  }, [selectedElement, isDragging, isResizing, isRotating, isPanning, dragStart, getCurrentPageElements, calculateAlignmentLines, zoomLevel, canvasOffset, selectedElements, snapToGrid, updateElement, saveToHistory, currentTool, isDrawing, handleDrawing, lockedElements]);
-
-  const handleMouseUp = useCallback(() => {
-    if (currentTool === 'pen' && isDrawing) {
-      finishDrawing();
-    }
-    
-    setIsDragging(false);
-    setIsResizing(false);
-    setIsRotating(false);
-    setIsPanning(false);
-    setShowAlignmentLines(false);
-    setAlignmentLines({ vertical: [], horizontal: [] });
-    // setResizeDirection('');
-  }, [currentTool, isDrawing, finishDrawing]);
-
-  // Canvas panning
-  const handleCanvasMouseDown = useCallback((e) => {
-    if (currentTool === 'pen') {
-      setIsDrawing(true);
-      setDrawingPath([]);
-      return;
-    }
-    
-    if (e.button === 1 || (e.button === 0 && e.altKey)) {
-      e.preventDefault();
-      setIsPanning(true);
-      return;
-    }
-    
-    if (e.target === canvasRef.current) {
-      setSelectedElement(null);
-      setSelectedElements(new Set());
-      setTextEditing(null);
-    }
-  }, [currentTool]);
-
-  // Handle text editing
-  const handleTextEdit = useCallback((e, elementId) => {
-    if (lockedElements.has(elementId)) return;
-    
-    e.stopPropagation();
-    setTextEditing(elementId);
-    setSelectedElement(elementId);
-    setSelectedElements(new Set([elementId]));
-    
-    setTimeout(() => {
-      const element = document.getElementById(`element-${elementId}`);
-      if (element) {
-        element.focus();
-        const range = document.createRange();
-        const selection = window.getSelection();
-        
-        if (element.childNodes.length > 0) {
-          range.setStart(element, element.childNodes.length);
-          range.collapse(true);
-          selection.removeAllRanges();
-          selection.addRange(range);
-        }
-      }
-    }, 0);
-  }, [lockedElements]);
+  // Custom Hooks - History Management
+  const {
+    history,
+    historyIndex,
+    saveToHistory,
+    undo,
+    redo,
+    canUndo,
+    canRedo
+  } = useHistory(setCurrentPageElements);
+
+  // Custom Hooks - Element Management
+  const {
+    getCurrentPageElements,
+    addElement,
+    updateElement,
+    deleteElement,
+    duplicateElement,
+    toggleElementLock,
+    updateFilter,
+    groupElements,
+    ungroupElements,
+    changeZIndex
+  } = useElements({
+    pages,
+    currentPage,
+    setPages,
+    saveToHistory,
+    lockedElements,
+    setLockedElements,
+    selectedElement,
+    setSelectedElement,
+    selectedElements,
+    setSelectedElements,
+    setCurrentTool,
+    currentLanguage,
+    textDirection,
+    t,
+    filterOptions,
+    supportedLanguages
+  });
+
+  // Custom Hooks - Canvas Interaction
+  const {
+    isDragging,
+    isResizing,
+    isRotating,
+    isPanning,
+    isDrawing,
+    drawingPath,
+    showAlignmentLines,
+    alignmentLines,
+    handleMouseDown,
+    handleMouseMove,
+    handleMouseUp,
+    handleCanvasMouseDown,
+    handleSelectElement,
+    handleTextEdit,
+    handleDrawing,
+    finishDrawing,
+    calculateAlignmentLines,
+    renderSelectionHandles,
+    setIsDrawing,
+    setDrawingPath
+  } = useCanvasInteraction({
+    getCurrentPageElements,
+    setCurrentPageElements,
+    updateElement,
+    saveToHistory,
+    addElement,
+    lockedElements,
+    selectedElements,
+    setSelectedElements,
+    selectedElement,
+    setSelectedElement,
+    currentTool,
+    zoomLevel,
+    canvasOffset,
+    setCanvasOffset,
+    snapToGrid,
+    canvasRef,
+    setTextEditing
+  });
+
+  // Custom Hooks - Recording
+  const {
+    recording,
+    mediaRecorder,
+    recordingStartTime,
+    recordingTimeElapsed,
+    startRecording,
+    stopRecording,
+    preloadImages,
+    checkRecordingCompatibility,
+    drawElementToCanvas
+  } = useRecording({
+    getCurrentPageElements,
+    canvasSize,
+    recordingDuration,
+    videoQuality,
+    videoFormat,
+    imageEffects
+  });
+
+  // Custom Hooks - Canvas Utils
+  const {
+    addNewPage,
+    deleteCurrentPage,
+    renameCurrentPage,
+    playAnimations,
+    resetAnimations,
+    zoom
+  } = useCanvasUtils({
+    getCurrentPageElements,
+    pages,
+    setPages,
+    currentPage,
+    setCurrentPage,
+    setSelectedElement,
+    setSelectedElements,
+    zoomLevel,
+    setZoomLevel,
+    isPlaying,
+    setIsPlaying,
+    setShowZoomIndicator,
+    zoomIndicatorTimeoutRef
+  });
+
+  // Calculate selectedElementData (now that getCurrentPageElements is available)
+  const selectedElementData = getCurrentPageElements().find(el => el.id === selectedElement);
+
+  // NOTE: The following functions are now provided by useCanvasInteraction hook:
+  // - calculateAlignmentLines
+  // - handleSelectElement
+  // - handleDrawing
+  // - finishDrawing
+  // - renderSelectionHandles
+  // - handleMouseDown
+  // - handleMouseMove
+  // - handleMouseUp
+  // - handleCanvasMouseDown
+  // - handleTextEdit
 
   // Handle text change with transliteration support
   // const handleTextChange = useCallback((e, elementId) => {
@@ -1780,2036 +481,158 @@ const Sowntra = () => {
   //   updateElement(elementId, { content: newContent });
   // }, [transliterationEnabled, transliterationMap, updateElement]);
 
-  // Add new page
-  const addNewPage = useCallback(() => {
-    const newPageId = `page-${pages.length + 1}`;
-    setPages([...pages, { id: newPageId, name: `Page ${pages.length + 1}`, elements: [] }]);
-    setCurrentPage(newPageId);
-    setSelectedElement(null);
-    setSelectedElements(new Set());
-  }, [pages]);
+  // NOTE: The following functions are now provided by useCanvasUtils hook:
+  // - addNewPage, deleteCurrentPage, renameCurrentPage
+  // - playAnimations, resetAnimations
+  // - zoom
 
-  // Delete current page
-  const deleteCurrentPage = useCallback(() => {
-    if (pages.length <= 1) return;
-    const newPages = pages.filter(page => page.id !== currentPage);
-    setPages(newPages);
-    setCurrentPage(newPages[0].id);
-    setSelectedElement(null);
-    setSelectedElements(new Set());
-  }, [pages, currentPage]);
+  // NOTE: The following functions are now provided by useRecording hook:
+  // - preloadImages, drawElementToCanvas
+  // - checkRecordingCompatibility
+  // - startRecording, stopRecording
 
-  // Rename current page
-  const renameCurrentPage = useCallback(() => {
-    const newName = prompt('Enter new page name:', pages.find(p => p.id === currentPage)?.name || 'Page');
-    if (newName) {
-      setPages(pages.map(page => 
-        page.id === currentPage ? { ...page, name: newName } : page
-      ));
-    }
-  }, [pages, currentPage]);
+  // Custom Hooks - Export Management
+  const {
+    exportAsSVG,
+    exportAsImage,
+    exportAsPDF,
+    getExportReadyElements: getExportReadyElementsFromHook
+  } = useExport({
+    getCurrentPageElements,
+    canvasSize,
+    imageEffects
+  });
 
-  // Play animations
-  const playAnimations = useCallback(() => {
-    setIsPlaying(true);
-    const currentElements = getCurrentPageElements();
-    currentElements.forEach((element, index) => {
-      if (element.animation) {
-        const elementDOM = document.getElementById(`element-${element.id}`);
-        if (elementDOM) {
-          elementDOM.style.animation = 'none';
-          setTimeout(() => {
-            elementDOM.style.animation = `${element.animation} 1s ease-out forwards`;
-          }, index * 200);
-        }
-      }
-    });
-    
-    setTimeout(() => setIsPlaying(false), currentElements.length * 200 + 1000);
-  }, [getCurrentPageElements]);
+  // Custom Hooks - Helper Functions
+  const {
+    getEffectCSSWrapper,
+    getCanvasEffectsWrapper,
+    handleImageUpload,
+    handleLogout,
+    handleCanvasMouseEnter,
+    handleCanvasMouseLeave,
+    renderElement,
+    renderDrawingPath
+  } = useHelpers({
+    textEffects,
+    imageEffects,
+    shapeEffects,
+    specialEffects,
+    fontFamilies,
+    supportedLanguages,
+    stickerOptions,
+    addElement,
+    updateElement,
+    getCurrentPageElements,
+    selectedElements,
+    textEditing,
+    setTextEditing,
+    lockedElements,
+    currentTool,
+    currentLanguage,
+    textDirection,
+    handleMouseDown,
+    handleSelectElement,
+    renderSelectionHandles,
+    handleTextEdit,
+    getBackgroundStyle,
+    getFilterCSS,
+    parseCSS,
+    logout,
+    navigate
+  });
 
-  // Reset animations
-  const resetAnimations = useCallback(() => {
-    const currentElements = getCurrentPageElements();
-    currentElements.forEach(element => {
-      const elementDOM = document.getElementById(`element-${element.id}`);
-      if (elementDOM) {
-        elementDOM.style.animation = 'none';
-      }
-    });
-    setIsPlaying(false);
-  }, [getCurrentPageElements]);
+  // Custom Hooks - Template Management
+  const {
+    applyTemplate,
+    createCustomTemplate
+  } = useTemplates({
+    setCanvasSize,
+    centerCanvas,
+    setShowTemplates,
+    setShowCustomTemplateModal,
+    customTemplateSize
+  });
 
-  // Preload images for recording
-  const preloadImages = useCallback(() => {
-    const currentElements = getCurrentPageElements();
-    const imageElements = currentElements.filter(el => el.type === 'image');
-    
-    return Promise.all(
-      imageElements.map(element => {
-        return new Promise((resolve, reject) => {
-          const img = new window.Image();
-          img.crossOrigin = 'anonymous';
-          img.src = element.src;
-          img.onload = resolve;
-          img.onerror = reject;
-        });
-      })
-    );
-  }, [getCurrentPageElements]);
+  // NOTE: Helper functions now provided by useHelpers hook:
+  // - handleImageUpload, handleLogout, handleCanvasMouseEnter, handleCanvasMouseLeave
+  // - renderElement, renderDrawingPath, getEffectCSSWrapper, getCanvasEffectsWrapper
 
-  // Enhanced drawElementToCanvas function with effects support - FIXED VERSION
-  const drawElementToCanvas = useCallback((ctx, element, time, elementIndex) => {
-    ctx.save();
-    
-    let translateX = 0;
-    let translateY = 0;
-    let scale = 1;
-    let rotation = element.rotation || 0;
-    let opacity = 1;
-    
-    if (element.animation && time !== undefined) {
-      const staggeredTime = Math.max(0, time - (elementIndex * 0.2));
-      const animTime = Math.min(Math.max(staggeredTime, 0), 1);
-      
-      if (animTime > 0 && animTime <= 1) {
-        switch (element.animation) {
-          case 'rise':
-            translateY = -100 * (1 - animTime);
-            opacity = animTime;
-            break;
-          case 'pan':
-            translateX = -100 * (1 - animTime);
-            opacity = animTime;
-            break;
-          case 'fade':
-            opacity = animTime;
-            break;
-          case 'bounce':
-            translateY = -50 * Math.sin(animTime * Math.PI * 2);
-            opacity = animTime;
-            break;
-          case 'zoomIn':
-            scale = 0.3 + 0.7 * animTime;
-            opacity = animTime;
-            break;
-          case 'zoomOut':
-            scale = 2 - 1 * animTime;
-            opacity = animTime;
-            break;
-          case 'slideInLeft':
-            translateX = -200 * (1 - animTime);
-            opacity = animTime;
-            break;
-          case 'slideInRight':
-            translateX = 200 * (1 - animTime);
-            opacity = animTime;
-            break;
-          case 'slideInUp':
-            translateY = -200 * (1 - animTime);
-            opacity = animTime;
-            break;
-          case 'slideInDown':
-            translateY = 200 * (1 - animTime);
-            opacity = animTime;
-            break;
-          case 'spin':
-            rotation += 360 * animTime;
-            opacity = animTime;
-            break;
-          case 'pulse':
-            scale = 1 + 0.2 * Math.sin(animTime * Math.PI * 4);
-            opacity = animTime;
-            break;
-          case 'typewriter':
-            opacity = animTime;
-            break;
-          case 'tumble':
-            rotation = 180 * (1 - animTime);
-            scale = animTime;
-            opacity = animTime;
-            break;
-          case 'wipe':
-            opacity = animTime;
-            break;
-          case 'pop':
-            scale = animTime < 0.8 ? (0.3 + 0.7 * (animTime / 0.8) * 1.2) : (1 - (animTime - 0.8) / 0.2 * 0.2);
-            opacity = animTime;
-            break;
-          case 'flip':
-            rotation = 90 * (1 - animTime);
-            opacity = animTime;
-            break;
-          case 'flash':
-            opacity = Math.sin(animTime * Math.PI * 4) > 0 ? 1 : 0.3;
-            break;
-          case 'glitch':
-            translateX = (Math.sin(animTime * Math.PI * 8) * 5);
-            translateY = (Math.cos(animTime * Math.PI * 6) * 3);
-            break;
-          case 'heartbeat':
-            scale = 1 + 0.1 * Math.sin(animTime * Math.PI * 6);
-            opacity = animTime;
-            break;
-          case 'wiggle':
-            rotation = 5 * Math.sin(animTime * Math.PI * 4);
-            opacity = animTime;
-            break;
-          case 'jiggle':
-            translateX = 2 * Math.sin(animTime * Math.PI * 8);
-            translateY = 2 * Math.cos(animTime * Math.PI * 6);
-            opacity = animTime;
-            break;
-          case 'shake':
-            translateX = 10 * Math.sin(animTime * Math.PI * 10);
-            opacity = animTime;
-            break;
-          case 'fadeOut':
-            opacity = 1 - animTime;
-            break;
-          case 'slideOutLeft':
-            translateX = -200 * animTime;
-            opacity = 1 - animTime;
-            break;
-          case 'slideOutRight':
-            translateX = 200 * animTime;
-            opacity = 1 - animTime;
-            break;
-          case 'blurIn':
-            opacity = animTime;
-            break;
-          case 'flicker':
-            opacity = 0.3 + 0.7 * Math.sin(animTime * Math.PI * 8);
-            break;
-          case 'rotate':
-            rotation = 360 * animTime;
-            opacity = animTime;
-            break;
-          default:
-            opacity = animTime;
-            break;
-        }
-      } else {
-        if (staggeredTime < 0) {
-          opacity = 0;
-        } else if (staggeredTime > 1) {
-          opacity = 1;
-        }
-      }
-    }
-    
-    const centerX = element.x + element.width / 2;
-    const centerY = element.y + element.height / 2;
-    
-    ctx.translate(centerX, centerY);
-    ctx.rotate((rotation * Math.PI) / 180);
-    ctx.scale(scale, scale);
-    ctx.translate(-centerX, -centerY);
-    ctx.translate(translateX, translateY);
-    
-    // Apply canvas effects
-    const canvasEffects = getCanvasEffects(element);
-    
-    // Apply shadow effects
-    if (canvasEffects.shadow && Object.keys(canvasEffects.shadow).length > 0) {
-      ctx.shadowColor = canvasEffects.shadow.color;
-      ctx.shadowBlur = canvasEffects.shadow.blur || 0;
-      ctx.shadowOffsetX = canvasEffects.shadow.offsetX || 0;
-      ctx.shadowOffsetY = canvasEffects.shadow.offsetY || 0;
-    }
-    
-    // Apply filters
-    if (element.filters) {
-      const filterCSS = getFilterCSS(element.filters);
-      if (filterCSS) {
-        ctx.filter = filterCSS;
-      }
-    }
-    
-    // Add image effect filters
-    if (canvasEffects.filters) {
-      ctx.filter += ' ' + canvasEffects.filters;
-    }
-    
-    ctx.globalAlpha = opacity;
-    
-    const backgroundStyle = getCanvasGradient(ctx, element);
-    
-    // FIXED: Rectangle with proper border radius handling
-    if (element.type === 'rectangle') {
-      ctx.fillStyle = backgroundStyle;
-      ctx.strokeStyle = element.stroke;
-      ctx.lineWidth = element.strokeWidth;
-      
-      const borderRadius = element.borderRadius || 0;
-      
-      if (borderRadius > 0) {
-        // Use roundRect for browsers that support it
-        if (ctx.roundRect) {
-          ctx.beginPath();
-          ctx.roundRect(element.x, element.y, element.width, element.height, borderRadius);
-          ctx.fill();
-          if (element.strokeWidth > 0) ctx.stroke();
-        } else {
-          // Fallback for browsers without roundRect
-          ctx.beginPath();
-          ctx.moveTo(element.x + borderRadius, element.y);
-          ctx.lineTo(element.x + element.width - borderRadius, element.y);
-          ctx.arcTo(element.x + element.width, element.y, element.x + element.width, element.y + borderRadius, borderRadius);
-          ctx.lineTo(element.x + element.width, element.y + element.height - borderRadius);
-          ctx.arcTo(element.x + element.width, element.y + element.height, element.x + element.width - borderRadius, element.y + element.height, borderRadius);
-          ctx.lineTo(element.x + borderRadius, element.y + element.height);
-          ctx.arcTo(element.x, element.y + element.height, element.x, element.y + element.height - borderRadius, borderRadius);
-          ctx.lineTo(element.x, element.y + borderRadius);
-          ctx.arcTo(element.x, element.y, element.x + borderRadius, element.y, borderRadius);
-          ctx.closePath();
-          ctx.fill();
-          if (element.strokeWidth > 0) ctx.stroke();
-        }
-      } else {
-        // No border radius
-        ctx.fillRect(element.x, element.y, element.width, element.height);
-        if (element.strokeWidth > 0) {
-          ctx.strokeRect(element.x, element.y, element.width, element.height);
-        }
-      }
-    } else if (element.type === 'circle') {
-      ctx.fillStyle = backgroundStyle;
-      ctx.strokeStyle = element.stroke;
-      ctx.lineWidth = element.strokeWidth;
-      ctx.beginPath();
-      ctx.arc(element.x + element.width / 2, element.y + element.height / 2, element.width / 2, 0, Math.PI * 2);
-      ctx.fill();
-      if (element.strokeWidth > 0) ctx.stroke();
-    } else if (element.type === 'triangle') {
-      ctx.fillStyle = backgroundStyle;
-      ctx.strokeStyle = element.stroke;
-      ctx.lineWidth = element.strokeWidth;
-      ctx.beginPath();
-      ctx.moveTo(element.x + element.width / 2, element.y);
-      ctx.lineTo(element.x + element.width, element.y + element.height);
-      ctx.lineTo(element.x, element.y + element.height);
-      ctx.closePath();
-      ctx.fill();
-      if (element.strokeWidth > 0) ctx.stroke();
-    } else if (element.type === 'text') {
-      ctx.font = `${element.fontWeight} ${element.fontSize}px ${element.fontFamily}`;
-      ctx.fillStyle = element.color;
-      ctx.textAlign = element.textAlign;
-      ctx.textBaseline = 'top'; // Add this for better text positioning
-      
-      let textX = element.x;
-      if (element.textAlign === 'center') {
-        textX = element.x + element.width / 2;
-      } else if (element.textAlign === 'right') {
-        textX = element.x + element.width;
-      }
-      
-      let displayText = element.content;
-      if (element.animation === 'typewriter' && time !== undefined) {
-        const staggeredTime = Math.max(0, time - (elementIndex * 0.2));
-        const animTime = Math.min(Math.max(staggeredTime, 0), 1);
-        const charsToShow = Math.floor(element.content.length * animTime);
-        displayText = element.content.substring(0, charsToShow);
-      }
-      
-      // FIXED: Handle text wrapping for canvas
-      const words = displayText.split(' ');
-      const lineHeight = element.fontSize * 1.2;
-      let line = '';
-      let y = element.y;
-      
-      for (let n = 0; n < words.length; n++) {
-        const testLine = line + words[n] + ' ';
-        const metrics = ctx.measureText(testLine);
-        const testWidth = metrics.width;
-        
-        if (testWidth > element.width && n > 0) {
-          ctx.fillText(line, textX, y);
-          line = words[n] + ' ';
-          y += lineHeight;
-          
-          // Stop if we exceed the element height
-          if (y > element.y + element.height - lineHeight) {
-            break;
-          }
-        } else {
-          line = testLine;
-        }
-      }
-      ctx.fillText(line, textX, y);
-      
-      // Reset shadow for text
-      ctx.shadowColor = 'transparent';
-      ctx.shadowBlur = 0;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 0;
-    } else if (element.type === 'image') {
-      const img = new window.Image();
-      img.src = element.src;
-      
-      // Handle border radius for images - FIXED: Remove stroke unless explicitly set
-      const borderRadius = element.borderRadius || 0;
-      
-      if (borderRadius > 0) {
-        // Create rounded clipping path
-        ctx.save();
-        ctx.beginPath();
-        
-        if (ctx.roundRect) {
-          ctx.roundRect(element.x, element.y, element.width, element.height, borderRadius);
-        } else {
-          // Fallback for browsers without roundRect
-          ctx.moveTo(element.x + borderRadius, element.y);
-          ctx.lineTo(element.x + element.width - borderRadius, element.y);
-          ctx.arcTo(element.x + element.width, element.y, element.x + element.width, element.y + borderRadius, borderRadius);
-          ctx.lineTo(element.x + element.width, element.y + element.height - borderRadius);
-          ctx.arcTo(element.x + element.width, element.y + element.height, element.x + element.width - borderRadius, element.y + element.height, borderRadius);
-          ctx.lineTo(element.x + borderRadius, element.y + element.height);
-          ctx.arcTo(element.x, element.y + element.height, element.x, element.y + element.height - borderRadius, borderRadius);
-          ctx.lineTo(element.x, element.y + borderRadius);
-          ctx.arcTo(element.x, element.y, element.x + borderRadius, element.y, borderRadius);
-        }
-        
-        ctx.closePath();
-        ctx.clip();
-        
-        ctx.drawImage(img, element.x, element.y, element.width, element.height);
-        ctx.restore();
-        
-        // ONLY draw border if strokeWidth is explicitly set and greater than 0
-        if (element.strokeWidth > 0 && element.stroke && element.stroke !== 'transparent') {
-          ctx.strokeStyle = element.stroke;
-          ctx.lineWidth = element.strokeWidth;
-          ctx.beginPath();
-          
-          if (ctx.roundRect) {
-            ctx.roundRect(element.x, element.y, element.width, element.height, borderRadius);
-          } else {
-            ctx.moveTo(element.x + borderRadius, element.y);
-            ctx.lineTo(element.x + element.width - borderRadius, element.y);
-            ctx.arcTo(element.x + element.width, element.y, element.x + element.width, element.y + borderRadius, borderRadius);
-            ctx.lineTo(element.x + element.width, element.y + element.height - borderRadius);
-            ctx.arcTo(element.x + element.width, element.y + element.height, element.x + element.width - borderRadius, element.y + element.height, borderRadius);
-            ctx.lineTo(element.x + borderRadius, element.y + element.height);
-            ctx.arcTo(element.x, element.y + element.height, element.x, element.y + element.height - borderRadius, borderRadius);
-            ctx.lineTo(element.x, element.y + borderRadius);
-            ctx.arcTo(element.x, element.y, element.x + borderRadius, element.y, borderRadius);
-          }
-          
-          ctx.closePath();
-          ctx.stroke();
-        }
-      } else {
-        // No border radius - simple draw
-        ctx.drawImage(img, element.x, element.y, element.width, element.height);
-        
-        // ONLY draw border if strokeWidth is explicitly set and greater than 0
-        if (element.strokeWidth > 0 && element.stroke && element.stroke !== 'transparent') {
-          ctx.strokeStyle = element.stroke;
-          ctx.lineWidth = element.strokeWidth;
-          ctx.strokeRect(element.x, element.y, element.width, element.height);
-        }
-      }
-    } else if (element.type === 'line') {
-      ctx.strokeStyle = element.stroke;
-      ctx.lineWidth = element.strokeWidth;
-      ctx.beginPath();
-      ctx.moveTo(element.x, element.y);
-      ctx.lineTo(element.x + element.width, element.y + element.height);
-      ctx.stroke();
-    } else if (element.type === 'arrow') {
-      ctx.strokeStyle = element.stroke;
-      ctx.lineWidth = element.strokeWidth;
-      ctx.beginPath();
-      ctx.moveTo(element.x, element.y + element.height / 2);
-      ctx.lineTo(element.x + element.width - 10, element.y + element.height / 2);
-      ctx.stroke();
-      
-      ctx.fillStyle = element.stroke;
-      ctx.beginPath();
-      ctx.moveTo(element.x + element.width - 10, element.y + element.height / 2);
-      ctx.lineTo(element.x + element.width - 20, element.y + element.height / 2 - 5);
-      ctx.lineTo(element.x + element.width - 20, element.y + element.height / 2 + 5);
-      ctx.closePath();
-      ctx.fill();
-    } else if (element.type === 'star') {
-      const points = element.points || 5;
-      const outerRadius = Math.min(element.width, element.height) / 2;
-      const innerRadius = outerRadius / 2;
-      const centerX = element.x + element.width / 2;
-      const centerY = element.y + element.height / 2;
-      
-      ctx.fillStyle = backgroundStyle;
-      ctx.strokeStyle = element.stroke;
-      ctx.lineWidth = element.strokeWidth;
-      ctx.beginPath();
-      
-      for (let i = 0; i < points * 2; i++) {
-        const radius = i % 2 === 0 ? outerRadius : innerRadius;
-        const angle = (Math.PI * 2 * i) / (points * 2) - Math.PI / 2;
-        const x = centerX + radius * Math.cos(angle);
-        const y = centerY + radius * Math.sin(angle);
-        
-        if (i === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
-      }
-      
-      ctx.closePath();
-      ctx.fill();
-      if (element.strokeWidth > 0) ctx.stroke();
-    } else if (element.type === 'hexagon') {
-      const centerX = element.x + element.width / 2;
-      const centerY = element.y + element.height / 2;
-      const radius = Math.min(element.width, element.height) / 2;
-      
-      ctx.fillStyle = backgroundStyle;
-      ctx.strokeStyle = element.stroke;
-      ctx.lineWidth = element.strokeWidth;
-      ctx.beginPath();
-      
-      for (let i = 0; i < 6; i++) {
-        const angle = (Math.PI * 2 * i) / 6 - Math.PI / 6;
-        const x = centerX + radius * Math.cos(angle);
-        const y = centerY + radius * Math.sin(angle);
-        
-        if (i === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
-      }
-      
-      ctx.closePath();
-      ctx.fill();
-      if (element.strokeWidth > 0) ctx.stroke();
-    } else if (element.type === 'drawing' && element.path.length > 1) {
-      ctx.strokeStyle = element.stroke;
-      ctx.lineWidth = element.strokeWidth;
-      ctx.beginPath();
-      ctx.moveTo(element.path[0].x, element.path[0].y);
-      
-      for (let i = 1; i < element.path.length; i++) {
-        ctx.lineTo(element.path[i].x, element.path[i].y);
-      }
-      
-      ctx.stroke();
-    } else if (element.type === 'sticker') {
-      ctx.fillStyle = backgroundStyle;
-      ctx.beginPath();
-      ctx.arc(element.x + element.width / 2, element.y + element.height / 2, element.width / 2, 0, Math.PI * 2);
-      ctx.fill();
-      
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 40px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      
-      let iconChar = '⭐';
-      if (element.sticker === 'smile') iconChar = '😊';
-      else if (element.sticker === 'heart') iconChar = '❤️';
-      else if (element.sticker === 'star') iconChar = '⭐';
-      else if (element.sticker === 'flower') iconChar = '🌸';
-      else if (element.sticker === 'sun') iconChar = '☀️';
-      else if (element.sticker === 'moon') iconChar = '🌙';
-      else if (element.sticker === 'cloud') iconChar = '☁️';
-      else if (element.sticker === 'coffee') iconChar = '☕';
-      else if (element.sticker === 'music') iconChar = '🎵';
-      else if (element.sticker === 'camera') iconChar = '📷';
-      else if (element.sticker === 'rocket') iconChar = '🚀';
-      else if (element.sticker === 'car') iconChar = '🚗';
-      
-      ctx.fillText(iconChar, element.x + element.width / 2, element.y + element.height / 2);
-    }
-    
-    ctx.restore();
-  }, [getFilterCSS, getCanvasGradient, getCanvasEffects, imageEffects]);
+  // Custom Hooks - Project Management (Save/Load)
+  const {
+    handleSaveClick,
+    saveProject,
+    confirmSave,
+    loadProject,
+    handleProjectFileLoad
+  } = useProjectManager({
+    pages,
+    currentPage,
+    canvasSize,
+    zoomLevel,
+    canvasOffset,
+    showGrid,
+    snapToGrid,
+    currentLanguage,
+    textDirection,
+    projectName,
+    setProjectName,
+    setShowSaveDialog,
+    setPages,
+    setCurrentPage,
+    setCanvasSize,
+    setZoomLevel,
+    setCanvasOffset,
+    setShowGrid,
+    setSnapToGrid,
+    setCurrentLanguage,
+    setTextDirection,
+    setSelectedElement,
+    setSelectedElements,
+    loadProjectInputRef
+  });
 
-  // Export as SVG
-  const exportAsSVG = useCallback(() => {
-    const currentElements = getCurrentPageElements();
-    
-    let svgContent = `<?xml version="1.0" encoding="UTF-8"?>
-<svg width="${canvasSize.width}" height="${canvasSize.height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-  <rect width="100%" height="100%" fill="white"/>
-  <defs>`;
-    
-    // Add gradient definitions
-    currentElements.forEach((element, idx) => {
-      if (element.fillType === 'gradient' && element.gradient) {
-        const grad = element.gradient;
-        if (grad.type === 'linear') {
-          svgContent += `
-    <linearGradient id="gradient-${idx}" x1="0%" y1="0%" x2="100%" y2="0%" gradientTransform="rotate(${grad.angle || 90} 0.5 0.5)">`;
-          grad.colors.forEach((color, i) => {
-            svgContent += `
-      <stop offset="${grad.stops[i]}%" style="stop-color:${color};stop-opacity:1" />`;
-          });
-          svgContent += `
-    </linearGradient>`;
-        } else {
-          svgContent += `
-    <radialGradient id="gradient-${idx}" cx="${grad.position?.x || 50}%" cy="${grad.position?.y || 50}%">`;
-          grad.colors.forEach((color, i) => {
-            svgContent += `
-      <stop offset="${grad.stops[i]}%" style="stop-color:${color};stop-opacity:1" />`;
-          });
-          svgContent += `
-    </radialGradient>`;
-        }
-      }
-    });
-    
-    svgContent += `
-  </defs>
-  `;
-    
-    // Add elements
-    currentElements.forEach((element, idx) => {
-      const transform = `rotate(${element.rotation || 0} ${element.x + element.width/2} ${element.y + element.height/2})`;
-      const fill = element.fillType === 'gradient' ? `url(#gradient-${idx})` : element.fill;
-      
-      if (element.type === 'rectangle') {
-        svgContent += `
-  <rect x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}" 
-        fill="${fill}" stroke="${element.stroke}" stroke-width="${element.strokeWidth}" 
-        rx="${element.borderRadius || 0}" transform="${transform}"/>`;
-      } else if (element.type === 'circle') {
-        svgContent += `
-  <circle cx="${element.x + element.width/2}" cy="${element.y + element.height/2}" r="${element.width/2}" 
-          fill="${fill}" stroke="${element.stroke}" stroke-width="${element.strokeWidth}" 
-          transform="${transform}"/>`;
-      } else if (element.type === 'text') {
-        svgContent += `
-  <text x="${element.x}" y="${element.y + element.fontSize}" 
-        font-family="${element.fontFamily}" font-size="${element.fontSize}" 
-        fill="${element.color}" text-anchor="${element.textAlign === 'center' ? 'middle' : element.textAlign === 'right' ? 'end' : 'start'}" 
-        transform="${transform}">${element.content}</text>`;
-      }
-    });
-    
-    svgContent += `
-</svg>`;
-    
-    const blob = new Blob([svgContent], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `sowntra-design.svg`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [canvasSize, getCurrentPageElements, getBackgroundStyle]);
+  // NOTE: The following functions are now provided by useProjectManager hook:
+  // - handleSaveClick, saveProject, confirmSave, loadProject, handleProjectFileLoad
 
-  // Export as image - FIXED VERSION with proper zIndex sorting
-  const exportAsImage = useCallback((format) => {
-    // Handle SVG export separately
-    if (format === 'svg') {
-      exportAsSVG();
-      return;
-    }
-    
-    const canvas = document.createElement('canvas');
-    canvas.width = canvasSize.width;
-    canvas.height = canvasSize.height;
-    const ctx = canvas.getContext('2d');
-    
-    if (!ctx) {
-      console.error('Could not get canvas context');
-      alert('Error: Could not create canvas context');
-      return;
-    }
-    
-    // Set white background
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
-    
-    // FIXED: Use the proper sorting function for correct zIndex layering
-    const sortedElements = getSortedElementsForExport();
-    
-    const imageElements = sortedElements.filter(el => el.type === 'image');
-    
-    if (imageElements.length > 0) {
-      let loadedImages = 0;
-      const totalImages = imageElements.length;
-      
-      const drawAllElements = () => {
-        try {
-          // Clear and redraw background
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
-          
-          // Draw ALL elements in correct zIndex order
-          sortedElements.forEach((element, index) => {
-            try {
-              drawElementToCanvas(ctx, element, undefined, index);
-            } catch (elementError) {
-              console.error(`Error drawing element ${element.id}:`, elementError);
-            }
-          });
-          
-          // Export the final canvas
-          const dataUrl = canvas.toDataURL(`image/${format}`, 0.95);
-          const a = document.createElement('a');
-          a.href = dataUrl;
-          a.download = `sowntra-design.${format}`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-        } catch (error) {
-          console.error('Error in drawAllElements:', error);
-          alert('Error exporting image. Please try again.');
-        }
-      };
-      
-      const checkAllLoaded = () => {
-        loadedImages++;
-        if (loadedImages === totalImages) {
-          drawAllElements();
-        }
-      };
-      
-      imageElements.forEach(element => {
-        const img = new window.Image();
-        img.crossOrigin = 'anonymous';
-        img.src = element.src;
-        img.onload = () => {
-          checkAllLoaded();
-        };
-        img.onerror = () => {
-          console.error('Failed to load image:', element.src);
-          checkAllLoaded(); // Continue even if some images fail
-        };
-      });
-    } else {
-      // No images, draw all elements directly in correct order
-      try {
-        sortedElements.forEach((element, index) => {
-          drawElementToCanvas(ctx, element, undefined, index);
-        });
-        
-        const dataUrl = canvas.toDataURL(`image/${format}`, 0.95);
-        const a = document.createElement('a');
-        a.href = dataUrl;
-        a.download = `sowntra-design.${format}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      } catch (error) {
-        console.error('Error exporting canvas:', error);
-        alert('Error exporting image. Please try again.');
-      }
-    }
-  }, [canvasSize, getSortedElementsForExport, drawElementToCanvas, exportAsSVG]);
-
-  // Export as PDF - FIXED VERSION with proper zIndex sorting
-  const exportAsPDF = useCallback(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = canvasSize.width;
-    canvas.height = canvasSize.height;
-    const ctx = canvas.getContext('2d');
-    
-    if (!ctx) {
-      console.error('Could not get canvas context');
-      alert('Error: Could not create canvas context');
-      return;
-    }
-    
-    // Set white background
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
-    
-    // FIXED: Use the proper sorting function for correct zIndex layering
-    const sortedElements = getSortedElementsForExport();
-    
-    const imageElements = sortedElements.filter(el => el.type === 'image');
-    
-    const generatePDF = () => {
-      try {
-        const imgData = canvas.toDataURL('image/png');
-        
-        // Create PDF with canvas dimensions (convert pixels to mm, 96 DPI)
-        const pdfWidth = canvasSize.width * 0.264583; // Convert px to mm
-        const pdfHeight = canvasSize.height * 0.264583;
-        
-        const pdf = new jsPDF({
-          orientation: pdfWidth > pdfHeight ? 'landscape' : 'portrait',
-          unit: 'mm',
-          format: [pdfWidth, pdfHeight]
-        });
-        
-        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-        pdf.save('sowntra-design.pdf');
-      } catch (error) {
-        console.error('Error exporting PDF:', error);
-        alert('Error exporting PDF. Please try again.');
-      }
-    };
-    
-    if (imageElements.length > 0) {
-      let loadedImages = 0;
-      const totalImages = imageElements.length;
-      
-      const drawAllElements = () => {
-        // Clear and redraw background
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
-        
-        // Draw ALL elements in correct zIndex order
-        sortedElements.forEach((element, index) => {
-          drawElementToCanvas(ctx, element, undefined, index);
-        });
-        generatePDF();
-      };
-      
-      const checkAllLoaded = () => {
-        loadedImages++;
-        if (loadedImages === totalImages) {
-          drawAllElements();
-        }
-      };
-      
-      imageElements.forEach(element => {
-        const img = new window.Image();
-        img.crossOrigin = 'anonymous';
-        img.src = element.src;
-        img.onload = () => {
-          checkAllLoaded();
-        };
-        img.onerror = () => {
-          console.error('Failed to load image:', element.src);
-          checkAllLoaded();
-        };
-      });
-    } else {
-      // No images, draw all elements directly in correct order
-      // Clear and redraw background
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
-      
-      sortedElements.forEach((element, index) => {
-        drawElementToCanvas(ctx, element, undefined, index);
-      });
-      generatePDF();
-    }
-  }, [canvasSize, getSortedElementsForExport, drawElementToCanvas]);
-
-  // Logout handler
-  const handleLogout = useCallback(async () => {
-    try {
-      await logout();
-      navigate('/', { replace: true });
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-  }, [logout, navigate]);
-
-  // Zoom in/out
-  const zoom = useCallback((direction) => {
-    const newZoom = direction === 'in' 
-      ? Math.min(zoomLevel + 0.1, 3)
-      : Math.max(zoomLevel - 0.1, 0.5);
-    
-    setZoomLevel(newZoom);
-  }, [zoomLevel]);
-
-  // Reset zoom and pan
-  // const resetView = useCallback(() => {
-  //   setZoomLevel(1);
-  //   setCanvasOffset({ x: 0, y: 0 });
-  // }, []);
-
-  // Handle canvas mouse enter/leave for highlighting
-  const handleCanvasMouseEnter = useCallback(() => {
-    // setCanvasHighlighted(true);
-  }, []);
-
-  const handleCanvasMouseLeave = useCallback(() => {
-    // setCanvasHighlighted(false);
-  }, []);
-
-  // Browser compatibility check
-  const checkRecordingCompatibility = useCallback(() => {
-    if (typeof MediaRecorder === 'undefined') {
-      alert('Your browser does not support video recording. Please try Chrome, Firefox, or Edge.');
-      return false;
-    }
-    
-    const canvas = document.createElement('canvas');
-    if (typeof canvas.captureStream !== 'function') {
-      alert('Your browser does not support canvas recording. Please try Chrome or Firefox.');
-      return false;
-    }
-    
-    return true;
-  }, []);
-
-  // Enhanced startRecording function with MP4 support
-  const startRecording = useCallback(async () => {
-    try {
-      if (recording) {
-        console.log('Recording already in progress');
-        return;
-      }
-
-      if (!checkRecordingCompatibility()) return;
-      
-      await preloadImages();
-      
-      setRecording(true);
-      setRecordingStartTime(Date.now());
-      setRecordingTimeElapsed(0);
-      
-      const canvas = document.createElement('canvas');
-      canvas.width = canvasSize.width;
-      canvas.height = canvasSize.height;
-      const ctx = canvas.getContext('2d');
-      
-      if (!ctx) {
-        throw new Error('Could not get canvas context');
-      }
-      
-      let stream;
-      try {
-        stream = canvas.captureStream(30);
-      } catch (error) {
-        console.error('Error capturing stream:', error);
-        alert('Your browser does not support canvas recording. Please try Chrome or Firefox.');
-        setRecording(false);
-        setRecordingStartTime(null);
-        return;
-      }
-      
-      // Enhanced MIME type detection with MP4 support
-      const getSupportedMimeType = () => {
-        const mimeTypes = [
-          // MP4/H.264 options (try these first if MP4 is selected)
-          'video/mp4;codecs=h264',
-          'video/mp4;codecs=avc1.42E01E',
-          'video/mp4;codecs=avc1.42801E',
-          
-          // WebM options (fallback)
-          'video/webm;codecs=vp9',
-          'video/webm;codecs=vp8',
-          'video/webm'
-        ];
-        
-        // If user selected MP4, prioritize MP4 codecs
-        const preferredTypes = videoFormat === 'mp4' 
-          ? mimeTypes.filter(type => type.includes('mp4'))
-          : mimeTypes.filter(type => type.includes('webm'));
-        
-        // Add fallback types
-        const allTypes = [...preferredTypes, ...mimeTypes];
-        
-        for (let mimeType of allTypes) {
-          if (MediaRecorder.isTypeSupported(mimeType)) {
-            console.log('Supported MIME type:', mimeType);
-            return mimeType;
-          }
-        }
-        
-        return null;
-      };
-      
-      const mimeType = getSupportedMimeType();
-      
-      if (!mimeType) {
-        alert('Your browser does not support any video recording formats. Please try Chrome.');
-        setRecording(false);
-        setRecordingStartTime(null);
-        return;
-      }
-      
-      const options = { mimeType };
-      
-      // Set bitrate based on quality
-      switch(videoQuality) {
-        case 'low':
-          options.videoBitsPerSecond = 1000000;
-          break;
-        case 'medium':
-          options.videoBitsPerSecond = 2500000;
-          break;
-        case 'high':
-        default:
-          options.videoBitsPerSecond = 5000000;
-          break;
-      }
-      
-      const recorder = new MediaRecorder(stream, options);
-      
-      const chunks = [];
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunks.push(e.data);
-        }
-      };
-      
-      recorder.onstop = () => {
-        try {
-          if (chunks.length === 0) {
-            console.warn('No data recorded');
-            return;
-          }
-
-          const blob = new Blob(chunks, { type: mimeType });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          
-          // Determine correct file extension
-          let extension = 'webm';
-          if (mimeType.includes('mp4')) {
-            extension = 'mp4';
-          } else if (videoFormat === 'gif') {
-            extension = 'gif';
-          }
-          
-          a.download = `sowntra-animation-${new Date().getTime()}.${extension}`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-          
-          console.log('Recording saved successfully');
-        } catch (error) {
-          console.error('Error creating download:', error);
-          alert('Error creating video file. Please try again.');
-        } finally {
-          setRecording(false);
-          setRecordingStartTime(null);
-          setRecordingTimeElapsed(0);
-          setMediaRecorder(null);
-          if (recordingIntervalRef.current) {
-            clearInterval(recordingIntervalRef.current);
-            recordingIntervalRef.current = null;
-          }
-        }
-      };
-      
-      recorder.onerror = (event) => {
-        console.error('MediaRecorder error:', event.error);
-        alert('Error during recording: ' + event.error.message);
-        setRecording(false);
-        setRecordingStartTime(null);
-        setRecordingTimeElapsed(0);
-        setMediaRecorder(null);
-        if (recordingIntervalRef.current) {
-          clearInterval(recordingIntervalRef.current);
-          recordingIntervalRef.current = null;
-        }
-      };
-      
-      recorder.start();
-      setMediaRecorder(recorder);
-      
-      // Elapsed time counter
-      recordingIntervalRef.current = setInterval(() => {
-        setRecordingTimeElapsed(prev => prev + 1);
-      }, 1000);
-      
-      let startTime = null;
-      const frameDuration = 1000 / 30;
-      let lastFrameTime = 0;
-      let animationId = null;
-      
-      const drawAnimationFrame = (timestamp) => {
-        if (!startTime) startTime = timestamp;
-        const elapsed = timestamp - startTime;
-        
-        if (recorder.state === 'recording') {
-          if (timestamp - lastFrameTime >= frameDuration) {
-            lastFrameTime = timestamp;
-            
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // FIXED: Use proper zIndex sorting for recording too
-            const sortedElements = getSortedElementsForExport();
-            
-            sortedElements.forEach((element, index) => {
-              // Use recordingDuration for animation loop timing
-              const animationProgress = (elapsed / 1000) % recordingDuration;
-              drawElementToCanvas(ctx, element, animationProgress, index);
-            });
-          }
-          
-          animationId = requestAnimationFrame(drawAnimationFrame);
-        }
-      };
-      
-      animationId = requestAnimationFrame(drawAnimationFrame);
-      
-    } catch (error) {
-      console.error('Error starting recording:', error);
-      alert('Error starting recording: ' + error.message);
-      setRecording(false);
-      setRecordingStartTime(null);
-      setRecordingTimeElapsed(0);
-      setMediaRecorder(null);
-      if (recordingIntervalRef.current) {
-        clearInterval(recordingIntervalRef.current);
-        recordingIntervalRef.current = null;
-      }
-    }
-  }, [recording, canvasSize, drawElementToCanvas, recordingDuration, videoQuality, checkRecordingCompatibility, preloadImages, videoFormat, getSortedElementsForExport]);
-
-  // Stop recording
-  const stopRecording = useCallback(() => {
-    console.log('Stop recording called, state:', mediaRecorder?.state);
-    
-    if (!recording) {
-      console.log('Not currently recording');
-      return;
-    }
-
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
-      console.log('Stopping media recorder');
-      mediaRecorder.stop();
-      // State cleanup is handled in recorder.onstop callback
-    } else {
-      // Cleanup if recorder is in invalid state
-      setRecording(false);
-      setRecordingStartTime(null);
-      setRecordingTimeElapsed(0);
-      setMediaRecorder(null);
-      if (recordingIntervalRef.current) {
-        clearInterval(recordingIntervalRef.current);
-        recordingIntervalRef.current = null;
-      }
-    }
-  }, [mediaRecorder, recording]);
-
-  // Show save dialog
-  const handleSaveClick = useCallback(() => {
-    setProjectName(`My Design ${new Date().toLocaleDateString()}`);
-    setShowSaveDialog(true);
-  }, []);
-
-  // Save project to backend (PostgreSQL)
-  const saveProject = useCallback(async (customTitle = null) => {
-    try {
-      const projectData = {
-        version: '1.0',
-        timestamp: new Date().toISOString(),
-        title: customTitle || `My Design ${new Date().toLocaleDateString()}`,
-        description: 'Created with Sowntra',
-        pages: pages,
-        currentPage: currentPage,
-        canvasSize: canvasSize,
-        zoomLevel: zoomLevel,
-        canvasOffset: canvasOffset,
-        showGrid: showGrid,
-        snapToGrid: snapToGrid,
-        currentLanguage: currentLanguage,
-        textDirection: textDirection
-      };
-
-      const response = await projectAPI.saveProject(projectData);
-      
-      // Also save locally as backup
-      const dataStr = JSON.stringify(projectData, null, 2);
-      const dataBlob = new Blob([dataStr], { type: 'application/json' });
-      const url = URL.createObjectURL(dataBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `sowntra-project-${new Date().getTime()}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      
-      alert('Project saved successfully to cloud and locally!');
-    } catch (error) {
-      console.error('Error saving project:', error);
-      alert('Error saving project to cloud. Saving locally only...');
-      
-      // Fallback to local save only
-      try {
-        const projectData = {
-          version: '1.0',
-          timestamp: new Date().toISOString(),
-          pages: pages,
-          currentPage: currentPage,
-          canvasSize: canvasSize,
-          zoomLevel: zoomLevel,
-          canvasOffset: canvasOffset,
-          showGrid: showGrid,
-          snapToGrid: snapToGrid,
-          currentLanguage: currentLanguage,
-          textDirection: textDirection
-        };
-
-        const dataStr = JSON.stringify(projectData, null, 2);
-        const dataBlob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(dataBlob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `sowntra-project-${new Date().getTime()}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        
-        alert('Project saved locally!');
-      } catch (localError) {
-        console.error('Error saving locally:', localError);
-        alert('Error saving project. Please try again.');
-      }
-    }
-  }, [pages, currentPage, canvasSize, zoomLevel, canvasOffset, showGrid, snapToGrid, currentLanguage, textDirection]);
-
-  // Confirm save with project name
-  const confirmSave = useCallback(async () => {
-    if (!projectName.trim()) {
-      alert('Please enter a project name');
-      return;
-    }
-    
-    setShowSaveDialog(false);
-    await saveProject(projectName.trim());
-  }, [projectName, saveProject]);
-
-  // Load project from JSON file
-  const loadProject = useCallback(() => {
-    loadProjectInputRef.current?.click();
-  }, []);
-
-  // Handle project file load
-  const handleProjectFileLoad = useCallback((event) => {
-    const file = event.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const projectData = JSON.parse(e.target.result);
-          
-          // Validate project data
-          if (!projectData.version || !projectData.pages) {
-            throw new Error('Invalid project file');
-          }
-
-          // Restore project state
-          setPages(projectData.pages);
-          setCurrentPage(projectData.currentPage || projectData.pages[0]?.id);
-          setCanvasSize(projectData.canvasSize || { width: 800, height: 600 });
-          setZoomLevel(projectData.zoomLevel || 1);
-          setCanvasOffset(projectData.canvasOffset || { x: 0, y: 0 });
-          setShowGrid(projectData.showGrid || false);
-          setSnapToGrid(projectData.snapToGrid || false);
-          setCurrentLanguage(projectData.currentLanguage || 'en');
-          setTextDirection(projectData.textDirection || 'ltr');
-          
-          // Clear selections
-          setSelectedElement(null);
-          setSelectedElements(new Set());
-          
-          alert('Project loaded successfully!');
-        } catch (error) {
-          console.error('Error loading project:', error);
-          alert('Error loading project. Please make sure the file is a valid Sowntra project file.');
-        }
-      };
-      reader.readAsText(file);
-    }
-    
-    // Reset the input value so the same file can be loaded again
-    event.target.value = '';
-  }, []);
-
-  // Transliteration Toggle Component
-  const TransliterationToggle = useCallback(() => {
-    const needsTransliteration = ['hi', 'ta', 'te', 'bn', 'mr', 'gu', 'kn', 'ml', 'pa', 'or'].includes(currentLanguage);
-    
-    if (!needsTransliteration) return null;
-    
-    return (
-      <div className="mb-3">
-        <label className="flex items-center">
-          <input
-            type="checkbox"
-            checked={transliterationEnabled}
-            onChange={() => setTransliterationEnabled(!transliterationEnabled)}
-            className="mr-2"
-          />
-          <span className="text-sm">Enable Transliteration (Type in English)</span>
-        </label>
-        <p className="text-xs text-gray-500 mt-1">
-          Type English letters to get {supportedLanguages[currentLanguage]?.name} characters
-        </p>
-      </div>
-    );
-  }, [currentLanguage, transliterationEnabled]);
-
-  // Video Settings Component
-  const VideoSettings = useCallback(() => (
-    <div className="mb-4 p-3 bg-gray-100 rounded">
-      <h3 className="font-semibold mb-2 text-gray-700">{t('export.videoSettings')}</h3>
-      
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-sm font-medium mb-1 text-gray-700">{t('recording.format')}</label>
-          <select
-            value={videoFormat}
-            onChange={(e) => setVideoFormat(e.target.value)}
-            className="w-full p-2 border rounded text-sm text-gray-700"
-          >
-            <option value="webm">{t('export.webmRecommended')}</option>
-            <option value="mp4">{t('export.mp4Limited')}</option>
-            <option value="gif">{t('export.gifAnimated')}</option>
-          </select>
-          {videoFormat === 'mp4' && (
-            <p className="text-xs text-orange-600 mt-1">
-              {t('export.mp4Warning')}
-            </p>
-          )}
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium mb-1 text-gray-700">{t('recording.quality')}</label>
-          <select
-            value={videoQuality}
-            onChange={(e) => setVideoQuality(e.target.value)}
-            className="w-full p-2 border rounded text-sm text-gray-700"
-          >
-            <option value="low">{t('export.lowQuality')}</option>
-            <option value="medium">{t('export.mediumQuality')}</option>
-            <option value="high">{t('export.highQuality')}</option>
-          </select>
-        </div>
-      </div>
-      
-      <div className="mt-3">
-        <label className="block text-sm font-medium mb-1 text-gray-700">
-          Animation Loop: {recordingDuration}s
-        </label>
-        <input
-          type="range"
-          min="3"
-          max="30"
-          value={recordingDuration}
-          onChange={(e) => setRecordingDuration(parseInt(e.target.value))}
-          className="w-full"
-        />
-        <p className="text-xs text-gray-500 mt-1">Duration for animations to loop (not recording length)</p>
-      </div>
-    </div>
-  ), [videoFormat, videoQuality, recordingDuration, t]);
-
-  // Recording Status Component
-  const RecordingStatus = useCallback(() => {
-    if (!recording) return null;
-    
-    const formatTime = (seconds) => {
-      const mins = Math.floor(seconds / 60);
-      const secs = seconds % 60;
-      return mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}s`;
-    };
-    
-    return (
-      <div className="fixed top-4 right-4 bg-red-500 text-white px-3 py-2 rounded-lg shadow-lg z-50">
-        <div className="flex items-center">
-          <div className="w-3 h-3 bg-white rounded-full mr-2 animate-pulse"></div>
-          <span>Recording... {formatTime(recordingTimeElapsed)}</span>
-        </div>
-      </div>
-    );
-  }, [recording, recordingTimeElapsed]);
+  // RecordingStatus, TransliterationToggle, VideoSettings are now imported as components
 
   // Language Help Modal
-  const LanguageHelpModal = useCallback(() => {
-    if (!showLanguageHelp) return null;
-    
-    const getLanguageInstructions = () => {
-      switch(currentLanguage) {
-        case 'ta':
-          return (
-            <div>
-              <h3 className="font-bold mb-2">Typing in Tamil</h3>
-              <p className="text-sm mb-2">You can type Tamil using either:</p>
-              <ul className="list-disc list-inside text-sm space-y-1">
-                <li><strong>Virtual Keyboard:</strong> Click on the Tamil characters shown on the screen keyboard</li>
-                <li><strong>Transliteration:</strong> Enable transliteration and type English letters that sound like Tamil words</li>
-                <li><strong>System Keyboard:</strong> Set up Tamil input on your operating system</li>
-              </ul>
-              <div className="mt-4 p-2 bg-gray-100 rounded">
-                <p className="text-sm font-semibold">Common transliterations:</p>
-                <p className="text-sm">nandri = நன்றி (Thank you)</p>
-                <p className="text-sm">vanakkam = வணக்கம் (Hello)</p>
-                <p className="text-sm">tamil = தமிழ் (Tamil)</p>
-              </div>
-            </div>
-          );
-        case 'hi':
-          return (
-            <div>
-              <h3 className="font-bold mb-2">Typing in Hindi</h3>
-              <p className="text-sm mb-2">You can type Hindi using either:</p>
-              <ul className="list-disc list-inside text-sm space-y-1">
-                <li><strong>Virtual Keyboard:</strong> Click on the Devanagari characters shown on the screen keyboard</li>
-                <li><strong>Transliteration:</strong> Enable transliteration and type English letters that sound like Hindi words</li>
-                <li><strong>System Keyboard:</strong> Set up Hindi input on your operating system</li>
-              </ul>
-              <div className="mt-4 p-2 bg-gray-100 rounded">
-                <p className="text-sm font-semibold">Common transliterations:</p>
-                <p className="text-sm">dhanyavaad = धन्यवाद (Thank you)</p>
-                <p className="text-sm">namaste = नमस्ते (Hello)</p>
-                <p className="text-sm">bhaarat = भारत (India)</p>
-              </div>
-            </div>
-          );
-        default:
-          return <p className="text-sm">Select an Indian language to see typing instructions.</p>;
-      }
-    };
-    
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white p-6 rounded-lg max-w-md">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">Typing Help - {supportedLanguages[currentLanguage]?.name}</h2>
-            <button 
-              onClick={() => setShowLanguageHelp(false)}
-              className="p-1 rounded hover:bg-gray-200"
-            >
-              ×
-            </button>
-          </div>
-          {getLanguageInstructions()}
-          <button 
-            onClick={() => setShowLanguageHelp(false)}
-            className="mt-4 w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    );
-  }, [showLanguageHelp, currentLanguage]);
+  // LanguageHelpModal is now imported from components
 
-  // Effects Panel Component
-  const EffectsPanel = useCallback(() => {
-    if (!showEffectsPanel || !selectedElementData) return null;
-    
-    return (
-      <div className="fixed right-80 top-20 bg-white shadow-lg rounded-lg p-4 w-80 z-40">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="font-bold">Effects</h3>
-          <button 
-            onClick={() => setShowEffectsPanel(false)}
-            className="p-1 rounded hover:bg-gray-200"
-          >
-            ×
-          </button>
-        </div>
-        
-        {/* Text Effects */}
-        {selectedElementData.type === 'text' && (
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">Text Effects</label>
-            <div className="grid grid-cols-2 gap-2">
-              {Object.entries(textEffects).map(([key, effect]) => (
-                <button
-                  key={key}
-                  onClick={() => updateElement(selectedElement, { textEffect: key })}
-                  className={`p-2 rounded text-xs ${
-                    selectedElementData.textEffect === key 
-                      ? 'bg-blue-100 text-blue-600 border border-blue-300' 
-                      : 'bg-gray-100 border border-gray-300 hover:bg-gray-200'
-                  }`}
-                >
-                  {effect.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        
-        {/* Image Effects */}
-        {selectedElementData.type === 'image' && (
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">Image Effects</label>
-            <div className="grid grid-cols-2 gap-2">
-              {Object.entries(imageEffects).map(([key, effect]) => (
-                <button
-                  key={key}
-                  onClick={() => updateElement(selectedElement, { imageEffect: key })}
-                  className={`p-2 rounded text-xs ${
-                    selectedElementData.imageEffect === key 
-                      ? 'bg-blue-100 text-blue-600 border border-blue-300' 
-                      : 'bg-gray-100 border border-gray-300 hover:bg-gray-200'
-                  }`}
-                >
-                  {effect.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        
-        {/* Shape Effects */}
-        {['rectangle', 'circle', 'triangle', 'star', 'hexagon'].includes(selectedElementData.type) && (
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">Shape Effects</label>
-            <div className="grid grid-cols-2 gap-2">
-              {Object.entries(shapeEffects).map(([key, effect]) => (
-                <button
-                  key={key}
-                  onClick={() => updateElement(selectedElement, { shapeEffect: key })}
-                  className={`p-2 rounded text-xs ${
-                    selectedElementData.shapeEffect === key 
-                      ? 'bg-blue-100 text-blue-600 border border-blue-300' 
-                      : 'bg-gray-100 border border-gray-300 hover:bg-gray-200'
-                  }`}
-                >
-                  {effect.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        
-        {/* Special Effects for All Elements */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-2">Special Effects</label>
-          <div className="grid grid-cols-2 gap-2">
-            {Object.entries(specialEffects).map(([key, effect]) => (
-              <button
-                key={key}
-                onClick={() => updateElement(selectedElement, { specialEffect: key })}
-                className={`p-2 rounded text-xs ${
-                  selectedElementData.specialEffect === key 
-                    ? 'bg-blue-100 text-blue-600 border border-blue-300' 
-                    : 'bg-gray-100 border border-gray-300 hover:bg-gray-200'
-                }`}
-              >
-                {effect.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }, [showEffectsPanel, selectedElementData, selectedElement, updateElement]);
+  // EffectsPanel is now imported from components
 
   // Custom Template Modal Component
-  const CustomTemplateModal = useCallback(() => {
-    if (!showCustomTemplateModal) return null;
+  // CustomTemplateModal is now imported from components
 
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white p-6 rounded-lg max-w-md w-full">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">Custom Template Size</h2>
-            <button 
-              onClick={() => setShowCustomTemplateModal(false)}
-              className="p-1 rounded hover:bg-gray-200"
-            >
-              ×
-            </button>
-          </div>
-          
-          <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-4">
-              <div className="col-span-2">
-                <label className="block text-sm font-medium mb-1">Width</label>
-                <input
-                  type="number"
-                  value={customTemplateSize.width}
-                  onChange={(e) => setCustomTemplateSize(prev => ({
-                    ...prev,
-                    width: parseInt(e.target.value) || 800
-                  }))}
-                  className="w-full p-2 border rounded"
-                  min="100"
-                  max="10000"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Unit</label>
-                <select
-                  value={customTemplateSize.unit}
-                  onChange={(e) => setCustomTemplateSize(prev => ({
-                    ...prev,
-                    unit: e.target.value
-                  }))}
-                  className="w-full p-2 border rounded"
-                >
-                  <option value="px">px</option>
-                  <option value="in">in</option>
-                  <option value="mm">mm</option>
-                  <option value="cm">cm</option>
-                </select>
-              </div>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium mb-1">Height</label>
-              <input
-                type="number"
-                value={customTemplateSize.height}
-                onChange={(e) => setCustomTemplateSize(prev => ({
-                  ...prev,
-                  height: parseInt(e.target.value) || 600
-                }))}
-                className="w-full p-2 border rounded"
-                min="100"
-                max="10000"
-              />
-            </div>
-            
-            <div className="bg-gray-50 p-3 rounded">
-              <p className="text-sm text-gray-600">
-                <strong>Preview:</strong> {customTemplateSize.width} × {customTemplateSize.height} {customTemplateSize.unit}
-                <br />
-                {customTemplateSize.unit !== 'px' && (
-                  <span className="text-xs">
-                    Approximately: {Math.round(customTemplateSize.width * (customTemplateSize.unit === 'in' ? 96 : customTemplateSize.unit === 'mm' ? 3.78 : 37.8))} × {Math.round(customTemplateSize.height * (customTemplateSize.unit === 'in' ? 96 : customTemplateSize.unit === 'mm' ? 3.78 : 37.8))} pixels
-                  </span>
-                )}
-              </p>
-            </div>
-            
-            <div className="flex space-x-2">
-              <button
-                onClick={() => setShowCustomTemplateModal(false)}
-                className="flex-1 p-2 bg-gray-200 rounded hover:bg-gray-300"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={createCustomTemplate}
-                className="flex-1 p-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-              >
-                Create Design
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }, [showCustomTemplateModal, customTemplateSize, createCustomTemplate]);
+  // NOTE: renderElement and renderDrawingPath functions now provided by useHelpers hook
 
-  // Render element with enhanced selection handles and effects - FIXED VERSION
-  const renderElement = useCallback((element) => {
-    const isSelected = selectedElements.has(element.id);
-    const isEditing = textEditing === element.id;
-    const isLocked = lockedElements.has(element.id);
-    const needsComplexScript = ['hi', 'ta', 'te', 'bn', 'mr', 'gu', 'kn', 'ml', 'pa', 'or', 'ur', 'ar', 'he'].includes(currentLanguage);
-    const isRTL = textDirection === 'rtl';
-    
-    // Handle group element rendering
-    if (element.type === 'group') {
-      const style = {
-        position: 'absolute',
-        left: element.x,
-        top: element.y,
-        width: element.width,
-        height: element.height,
-        transform: `rotate(${element.rotation || 0}deg)`,
-        zIndex: element.zIndex,
-        cursor: 'move',
-        border: `${element.strokeWidth}px dashed ${element.stroke}`,
-        pointerEvents: 'none'
-      };
+  // Custom Hooks - Keyboard Shortcuts
+  useKeyboardShortcuts({
+    textEditing,
+    selectedElements,
+    selectedElement,
+    getCurrentPageElements,
+    lockedElements,
+    setCurrentPageElements,
+    setSelectedElement,
+    setSelectedElements,
+    saveToHistory,
+    undo,
+    redo,
+    groupElements,
+    ungroupElements,
+    toggleElementLock,
+    setTextEditing,
+    showEffectsPanel,
+    setShowEffectsPanel
+  });
 
-      return (
-        <div key={element.id}>
-          {/* Group outline */}
-          <div
-            style={style}
-            onMouseDown={(e) => {
-              e.stopPropagation();
-              handleSelectElement(e, element.id);
-            }}
-          />
-          
-          {/* Render group children */}
-          {getCurrentPageElements()
-            .filter(el => el.groupId === element.id)
-            .map(renderElement)}
-          
-          {/* Selection handles for the group */}
-          {isSelected && currentTool === 'select' && !isLocked && (
-            renderSelectionHandles(element)
-          )}
-        </div>
-      );
-    }
+  // NOTE: Keyboard shortcuts handler now provided by useKeyboardShortcuts hook
+  // This replaces the large useEffect with handleKeyDown function
 
-    const style = {
-      position: 'absolute',
-      left: element.x,
-      top: element.y,
-      width: element.width,
-      height: element.height,
-      transform: `rotate(${element.rotation || 0}deg)`,
-      zIndex: element.zIndex,
-      cursor: isLocked ? 'not-allowed' : (currentTool === 'select' ? 'move' : 'default'),
-      filter: element.filters ? getFilterCSS(element.filters) : 'none',
-      opacity: element.filters?.opacity ? element.filters.opacity.value / 100 : 1
-    };
-
-    // Apply effects CSS
-    const effectCSS = getEffectCSS(element);
-    if (effectCSS) {
-      Object.assign(style, parseCSS(effectCSS));
-    }
-
-    let content;
-    if (element.type === 'text') {
-      content = (
-        <div
-          id={`element-${element.id}`}
-          style={{
-            ...style,
-            fontSize: element.fontSize,
-            fontFamily: needsComplexScript ? supportedLanguages[currentLanguage]?.font : element.fontFamily,
-            fontWeight: element.fontWeight,
-            fontStyle: element.fontStyle,
-            textDecoration: element.textDecoration,
-            color: element.color,
-            textAlign: isRTL ? 'right' : element.textAlign,
-            display: 'flex',
-            alignItems: 'flex-start', // Changed from 'center' to 'flex-start' for better text wrapping
-            cursor: isLocked ? 'not-allowed' : (isEditing ? 'text' : 'move'),
-            outline: 'none',
-            userSelect: isEditing ? 'text' : 'none',
-            minHeight: element.height,
-            minWidth: element.width,
-            padding: '4px',
-            wordWrap: 'break-word',
-            whiteSpace: 'pre-wrap',
-            overflow: 'hidden', // Add this to contain text
-            wordBreak: 'break-word' // Add this for better breaking
-          }}
-          className={`text-element ${needsComplexScript ? 'complex-script' : ''} ${element.fillType === 'gradient' ? 'gradient-fix' : ''}`}
-          contentEditable={!isLocked && isEditing}
-          suppressContentEditableWarning={true}
-          onBlur={(e) => {
-            const newContent = e.target.textContent || '';
-            updateElement(element.id, { content: newContent });
-            setTextEditing(null);
-          }}
-          onInput={(e) => {
-            // Auto-adjust height based on content
-            if (isEditing) {
-              const newHeight = Math.max(element.fontSize * 2, e.target.scrollHeight);
-              updateElement(element.id, { height: newHeight });
-            }
-          }}
-          onKeyDown={(e) => {
-            // Prevent deletion of the entire element
-            if (e.key === 'Backspace' && e.target.textContent === '') {
-              e.preventDefault();
-            }
-          }}
-          onDoubleClick={(e) => {
-            if (!isLocked) {
-              e.stopPropagation();
-              handleTextEdit(e, element.id);
-            }
-          }}
-          onMouseDown={(e) => {
-            if (!isLocked && !isEditing) {
-              e.stopPropagation();
-              handleMouseDown(e, element.id);
-            }
-          }}
-        >
-          {element.content}
-        </div>
-      );
-    } else if (element.type === 'rectangle') {
-      content = (
-        <div
-          id={`element-${element.id}`}
-          className={element.fillType === 'gradient' ? 'gradient-fix' : ''}
-          style={{
-            ...style,
-            backgroundColor: element.fillType === 'solid' ? element.fill : 'transparent',
-            background: element.fillType === 'gradient' ? getBackgroundStyle(element) : 'none',
-            border: `${element.strokeWidth}px solid ${element.stroke}`,
-            borderRadius: element.borderRadius,
-          }}
-          onMouseDown={(e) => !isLocked && handleMouseDown(e, element.id)}
-        />
-      );
-    } else if (element.type === 'circle') {
-      content = (
-        <div
-          id={`element-${element.id}`}
-          className={element.fillType === 'gradient' ? 'gradient-fix' : ''}
-          style={{
-            ...style,
-            backgroundColor: element.fillType === 'solid' ? element.fill : 'transparent',
-            background: element.fillType === 'gradient' ? getBackgroundStyle(element) : 'none',
-            border: `${element.strokeWidth}px solid ${element.stroke}`,
-            borderRadius: '50%',
-          }}
-          onMouseDown={(e) => !isLocked && handleMouseDown(e, element.id)}
-        />
-      );
-    } else if (element.type === 'triangle') {
-      content = (
-        <div
-          id={`element-${element.id}`}
-          className={element.fillType === 'gradient' ? 'gradient-fix' : ''}
-          style={{
-            ...style,
-            width: 0,
-            height: 0,
-            borderLeft: `${element.width/2}px solid transparent`,
-            borderRight: `${element.width/2}px solid transparent`,
-            borderBottom: `${element.height}px solid ${element.fillType === 'solid' ? element.fill : getBackgroundStyle(element)}`,
-            borderTop: 'none',
-            background: element.fillType === 'gradient' ? getBackgroundStyle(element) : 'none'
-          }}
-          onMouseDown={(e) => !isLocked && handleMouseDown(e, element.id)}
-        />
-      );
-    } else if (element.type === 'image') {
-      content = (
-        <img
-          id={`element-${element.id}`}
-          src={element.src}
-          alt=""
-          style={{
-            ...style,
-            objectFit: 'cover',
-            borderRadius: element.borderRadius,
-          }}
-          onMouseDown={(e) => !isLocked && handleMouseDown(e, element.id)}
-          draggable={false}
-        />
-      );
-    } else if (element.type === 'line') {
-      content = (
-        <svg
-          id={`element-${element.id}`}
-          style={{...style}}
-          onMouseDown={(e) => !isLocked && handleMouseDown(e, element.id)}
-        >
-          <line
-            x1={0}
-            y1={0}
-            x2={element.width}
-            y2={element.height}
-            stroke={element.stroke}
-            strokeWidth={element.strokeWidth}
-          />
-        </svg>
-      );
-    } else if (element.type === 'arrow') {
-      content = (
-        <svg
-          id={`element-${element.id}`}
-          style={{...style}}
-          onMouseDown={(e) => !isLocked && handleMouseDown(e, element.id)}
-        >
-          <defs>
-            <marker
-              id={`arrowhead-${element.id}`}
-              markerWidth="10"
-              markerHeight="7"
-              refX="9"
-              refY="3.5"
-              orient="auto"
-            >
-              <polygon points="0 0, 10 3.5, 0 7" fill={element.stroke} />
-            </marker>
-          </defs>
-          <line
-            x1={0}
-            y1={element.height / 2}
-            x2={element.width - 10}
-            y2={element.height / 2}
-            stroke={element.stroke}
-            strokeWidth={element.strokeWidth}
-            markerEnd={`url(#arrowhead-${element.id})`}
-          />
-        </svg>
-      );
-    } else if (element.type === 'star') {
-      const points = element.points || 5;
-      const outerRadius = Math.min(element.width, element.height) / 2;
-      const innerRadius = outerRadius / 2;
-      const centerX = element.width / 2;
-      const centerY = element.height / 2;
-      
-      let path = '';
-      for (let i = 0; i < points * 2; i++) {
-        const radius = i % 2 === 0 ? outerRadius : innerRadius;
-        const angle = (Math.PI * 2 * i) / (points * 2) - Math.PI / 2;
-        const x = centerX + radius * Math.cos(angle);
-        const y = centerY + radius * Math.sin(angle);
-        path += (i === 0 ? 'M' : 'L') + x + ',' + y;
-      }
-      path += 'Z';
-      
-      content = (
-        <svg
-          id={`element-${element.id}`}
-          style={{...style}}
-          onMouseDown={(e) => !isLocked && handleMouseDown(e, element.id)}
-        >
-          <path
-            d={path}
-            fill={getBackgroundStyle(element)}
-            stroke={element.stroke}
-            strokeWidth={element.strokeWidth}
-          />
-        </svg>
-      );
-    } else if (element.type === 'hexagon') {
-      const centerX = element.width / 2;
-      const centerY = element.height / 2;
-      const radius = Math.min(element.width, element.height) / 2;
-      
-      let path = '';
-      for (let i = 0; i < 6; i++) {
-        const angle = (Math.PI * 2 * i) / 6 - Math.PI / 6;
-        const x = centerX + radius * Math.cos(angle);
-        const y = centerY + radius * Math.sin(angle);
-        path += (i === 0 ? 'M' : 'L') + x + ',' + y;
-      }
-      path += 'Z';
-      
-      content = (
-        <svg
-          id={`element-${element.id}`}
-          style={{...style}}
-          onMouseDown={(e) => !isLocked && handleMouseDown(e, element.id)}
-        >
-          <path
-            d={path}
-            fill={getBackgroundStyle(element)}
-            stroke={element.stroke}
-            strokeWidth={element.strokeWidth}
-          />
-        </svg>
-      );
-    } else if (element.type === 'drawing' && element.path.length > 1) {
-      if (element.path.length < 2) return null;
-      
-      let pathData = 'M ' + element.path[0].x + ' ' + element.path[0].y;
-      for (let i = 1; i < element.path.length; i++) {
-        pathData += ' L ' + element.path[i].x + ' ' + element.path[i].y;
-      }
-      
-      content = (
-        <svg
-          id={`element-${element.id}`}
-          style={{...style}}
-          onMouseDown={(e) => !isLocked && handleMouseDown(e, element.id)}
-        >
-          <path
-            d={pathData}
-            fill="none"
-            stroke={element.stroke}
-            strokeWidth={element.strokeWidth}
-          />
-        </svg>
-      );
-    } else if (element.type === 'sticker') {
-      content = (
-        <div
-          id={`element-${element.id}`}
-          className={element.fillType === 'gradient' ? 'gradient-fix' : ''}
-          style={{
-            ...style,
-            backgroundColor: element.fillType === 'solid' ? element.fill : 'transparent',
-            background: element.fillType === 'gradient' ? getBackgroundStyle(element) : 'none',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '40px',
-          }}
-          onMouseDown={(e) => !isLocked && handleMouseDown(e, element.id)}
-        >
-          {stickerOptions.find(s => s.name === element.sticker)?.icon || '😊'}
-        </div>
-      );
-    }
-
-    return (
-      <div key={element.id}>
-        {content}
-        {isSelected && currentTool === 'select' && !isLocked && (
-          renderSelectionHandles(element)
-        )}
-        {isLocked && (
-          <div
-            style={{
-              position: 'absolute',
-              left: element.x,
-              top: element.y,
-              width: element.width,
-              height: element.height,
-              backgroundColor: 'rgba(0,0,0,0.1)',
-              pointerEvents: 'none',
-              zIndex: element.zIndex + 500,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}
-          >
-            <Lock size={20} color="#666" />
-          </div>
-        )}
-      </div>
-    );
-  }, [selectedElements, textEditing, lockedElements, currentTool, getFilterCSS, handleTextEdit, handleMouseDown, currentLanguage, textDirection, getBackgroundStyle, renderSelectionHandles, updateElement, getEffectCSS, getCurrentPageElements, handleSelectElement]);
-
-  // Helper function to parse CSS string to object
-  const parseCSS = (cssString) => {
-    const style = {};
-    const declarations = cssString.split(';');
-    declarations.forEach(decl => {
-      const [property, value] = decl.split(':').map(s => s.trim());
-      if (property && value) {
-        style[property] = value;
-      }
-    });
-    return style;
-  };
-
-  // Render drawing path in progress
-  const renderDrawingPath = useCallback(() => {
-    if (drawingPath.length < 2) return null;
-    
-    let pathData = 'M ' + drawingPath[0].x + ' ' + drawingPath[0].y;
-    for (let i = 1; i < drawingPath.length; i++) {
-      pathData += ' L ' + drawingPath[i].x + ' ' + drawingPath[i].y;
-    }
-    
-    return (
-      <svg
-        style={{
-          position: 'absolute',
-          left: 0,
-          top: 0,
-          width: '100%',
-          height: '100%',
-          pointerEvents: 'none',
-          zIndex: 10000
-        }}
-      >
-        <path
-          d={pathData}
-          fill="none"
-          stroke="#000000"
-          strokeWidth="3"
-        />
-      </svg>
-    );
-  }, [drawingPath]);
-
-  // Keyboard shortcuts
+  // Keyboard shortcuts - OLD (now in hook)
+  /*
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (textEditing) return;
@@ -3870,6 +693,7 @@ const Sowntra = () => {
           saveToHistory(newElements);
         }
       }
+
   
       if (e.key === 'Escape') {
         setSelectedElement(null);
@@ -3898,6 +722,7 @@ const Sowntra = () => {
         }
       }
 
+
       if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
         e.preventDefault();
         if (selectedElement) {
@@ -3911,6 +736,7 @@ const Sowntra = () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [selectedElements, getCurrentPageElements, selectedElement, undo, redo, saveToHistory, groupElements, textEditing, lockedElements, setCurrentPageElements, ungroupElements, toggleElementLock, showEffectsPanel]);
+  */
 
   // Add event listeners
   useEffect(() => {
@@ -3924,68 +750,62 @@ const Sowntra = () => {
 
   return (
     <>
-
       <div className={`h-screen flex flex-col ${textDirection === 'rtl' ? 'rtl-layout' : ''}`}>
-        {/* Header */}
-         <Header
-        t={t}
-        i18n={i18n}
-        navigate={navigate}
-        zoom={zoom}
-        centerCanvas={centerCanvas}
-        zoomLevel={zoomLevel}
-        showTemplates={showTemplates}
-        setShowTemplates={setShowTemplates}
-        showEffectsPanel={showEffectsPanel}
-        setShowEffectsPanel={setShowEffectsPanel}
-        playAnimations={playAnimations}
-        resetAnimations={resetAnimations}
-        isPlaying={isPlaying}
-        setShowLanguageMenu={setShowLanguageMenu}
-        showLanguageMenu={showLanguageMenu}
-        supportedLanguages={supportedLanguages}
-        currentLanguage={currentLanguage}
-        setCurrentLanguage={setCurrentLanguage}
-        setShowLanguageHelp={setShowLanguageHelp}
-        showAccountMenu={showAccountMenu}
-        setShowAccountMenu={setShowAccountMenu}
-        handleLogout={handleLogout}
-        setGradientPickerKey={setGradientPickerKey}
-      />
+        {/* Header - Responsive */}
+        <TopHeader
+          t={t}
+          navigate={navigate}
+          zoom={zoom}
+          zoomLevel={zoomLevel}
+          centerCanvas={centerCanvas}
+          showTemplates={showTemplates}
+          setShowTemplates={setShowTemplates}
+          showEffectsPanel={showEffectsPanel}
+          setShowEffectsPanel={setShowEffectsPanel}
+          playAnimations={playAnimations}
+          resetAnimations={resetAnimations}
+          isPlaying={isPlaying}
+          recording={recording}
+          recordingTimeElapsed={recordingTimeElapsed}
+          startRecording={startRecording}
+          stopRecording={stopRecording}
+          supportedLanguages={supportedLanguages}
+          currentLanguage={currentLanguage}
+          setCurrentLanguage={setCurrentLanguage}
+          i18n={i18n}
+          showLanguageMenu={showLanguageMenu}
+          setShowLanguageMenu={setShowLanguageMenu}
+          setShowLanguageHelp={setShowLanguageHelp}
+          setGradientPickerKey={setGradientPickerKey}
+          currentUser={currentUser}
+          showAccountMenu={showAccountMenu}
+          setShowAccountMenu={setShowAccountMenu}
+          handleLogout={handleLogout}
+        />
 
-
-        {/* Template Selector */}
-        {showTemplates && (
-         <TemplateSelector
-            showTemplates={showTemplates}
-            socialMediaTemplates={socialMediaTemplates}
-            applyTemplate={applyTemplate}
-            />
-        )}
-
-        {/* Custom Template Modal */}
-        <CustomTemplateModal />
-
-        {/* Pages Navigation */}
-        <PagesNav
+        {/* Pages Navigation - Responsive */}
+        <PagesNavigator
+          t={t}
           pages={pages}
           currentPage={currentPage}
           setCurrentPage={setCurrentPage}
           addNewPage={addNewPage}
           deleteCurrentPage={deleteCurrentPage}
           renameCurrentPage={renameCurrentPage}
-          t={t}
         />
 
         {/* Main Content Area */}
         <div className="main-content">
-          {/* Left Tools Panel component added*/}
-          <LeftToolsPanel
-            t={(key) => key}
+          {/* Left Tools Panel - Hidden on mobile */}
+          <ToolsSidebar
+            t={t}
             currentTool={currentTool}
             setCurrentTool={setCurrentTool}
             addElement={addElement}
             fileInputRef={fileInputRef}
+            handleImageUpload={handleImageUpload}
+            loadProjectInputRef={loadProjectInputRef}
+            handleProjectFileLoad={handleProjectFileLoad}
             undo={undo}
             redo={redo}
             historyIndex={historyIndex}
@@ -3997,620 +817,270 @@ const Sowntra = () => {
           />
 
           {/* Canvas Area - FILLS SCREEN */}
-          <Canvas
-              canvasContainerRef={canvasContainerRef}
-              canvasRef={canvasRef}
-              canvasSize={canvasSize}
-              zoomLevel={zoomLevel}
-              canvasOffset={canvasOffset}
-              handleCanvasMouseDown={handleCanvasMouseDown}
-              handleCanvasMouseEnter={handleCanvasMouseEnter}
-              handleCanvasMouseLeave={handleCanvasMouseLeave}
-              showGrid={showGrid}
-              getCurrentPageElements={getCurrentPageElements}
-              renderElement={renderElement}
-              renderDrawingPath={renderDrawingPath}
-              showAlignmentLines={showAlignmentLines}
-              alignmentLines={alignmentLines}
-            />
+          <CanvasWorkspace
+            canvasContainerRef={canvasContainerRef}
+            canvasRef={canvasRef}
+            canvasSize={canvasSize}
+            zoomLevel={zoomLevel}
+            canvasOffset={canvasOffset}
+            handleCanvasMouseDown={handleCanvasMouseDown}
+            handleCanvasMouseEnter={handleCanvasMouseEnter}
+            handleCanvasMouseLeave={handleCanvasMouseLeave}
+            touchStartDistance={touchStartDistance}
+            setTouchStartDistance={setTouchStartDistance}
+            initialZoomLevel={initialZoomLevel}
+            setInitialZoomLevel={setInitialZoomLevel}
+            lastTouchEnd={lastTouchEnd}
+            setLastTouchEnd={setLastTouchEnd}
+            zoom={zoom}
+            setZoomLevel={setZoomLevel}
+            showGrid={showGrid}
+            getCurrentPageElements={getCurrentPageElements}
+            renderElement={renderElement}
+            renderDrawingPath={renderDrawingPath}
+            drawingPath={drawingPath}
+            showAlignmentLines={showAlignmentLines}
+            alignmentLines={alignmentLines}
+          />
 
-          {/* Right Properties Panel */}
-          <div className="properties-panel">
-            {/* Properties Section */}
-            <div className="mb-6">
-              <h2 className="text-lg font-bold mb-4">{t('properties.title')}</h2>
-              
-              {selectedElementData ? (
-                <div>
-                  {/* Animation Selection */}
-                  <div className="mb-3">
-                    <label className="block text-sm font-medium mb-1">{t('properties.animation')}</label>
-                    <select
-                      value={selectedElementData.animation || ''}
-                      onChange={(e) => updateElement(selectedElement, { animation: e.target.value || null })}
-                      className="w-full p-2 border rounded text-sm"
-                    >
-                      <option value="">{t('effects.none')}</option>
-                      {Object.entries(animations).map(([key, anim]) => (
-                        <option key={key} value={key}>
-                          {anim.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Effects Quick Access */}
-                  <div className="mb-3">
-                    <label className="block text-sm font-medium mb-1">{t('properties.quickEffects')}</label>
-                    <button
-                      onClick={() => setShowEffectsPanel(!showEffectsPanel)}
-                      className="w-full p-2 bg-purple-100 text-purple-600 rounded text-sm hover:bg-purple-200 flex items-center justify-center"
-                    >
-                      <Sparkles size={14} className="mr-1" />
-                      {t('properties.openEffectsPanel')}
-                    </button>
-                  </div>
-
-                  {/* Position and Size */}
-                  <div className="grid grid-cols-2 gap-2 mb-3">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">{t('properties.x')}</label>
-                      <input
-                        type="number"
-                        value={selectedElementData.x}
-                        onChange={(e) => updateElement(selectedElement, { x: parseInt(e.target.value) })}
-                        className="w-full p-2 border rounded text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">{t('properties.y')}</label>
-                      <input
-                        type="number"
-                        value={selectedElementData.y}
-                        onChange={(e) => updateElement(selectedElement, { y: parseInt(e.target.value) })}
-                        className="w-full p-2 border rounded text-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 mb-3">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">{t('properties.width')}</label>
-                      <input
-                        type="number"
-                        value={selectedElementData.width}
-                        onChange={(e) => updateElement(selectedElement, { width: parseInt(e.target.value) })}
-                        className="w-full p-2 border rounded text-sm"
-                        min="1"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">{t('properties.height')}</label>
-                      <input
-                        type="number"
-                        value={selectedElementData.height}
-                        onChange={(e) => updateElement(selectedElement, { height: parseInt(e.target.value) })}
-                        className="w-full p-2 border rounded text-sm"
-                        min="1"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mb-3">
-                    <label className="block text-sm font-medium mb-1">{t('properties.rotation')}</label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="360"
-                      value={selectedElementData.rotation || 0}
-                      onChange={(e) => updateElement(selectedElement, { rotation: parseInt(e.target.value) })}
-                      className="w-full"
-                    />
-                    <div className="text-xs text-center">{selectedElementData.rotation || 0}°</div>
-                  </div>
-
-                  {/* Filters */}
-                  <div className="mb-3">
-                    <label className="block text-sm font-medium mb-1">Filters</label>
-                    {Object.entries(selectedElementData.filters || filterOptions).map(([key, filter]) => (
-                      <div key={key} className="filter-slider">
-                        <label>{filter.name}</label>
-                        <input
-                          type="range"
-                          min="0"
-                          max={filter.max}
-                          value={filter.value}
-                          onChange={(e) => updateFilter(selectedElement, key, parseInt(e.target.value))}
-                          className="w-full"
-                        />
-                        <div className="filter-value">{filter.value}{filter.unit}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Fill Type Selection */}
-                  {['rectangle', 'circle', 'triangle', 'star', 'hexagon', 'sticker'].includes(selectedElementData.type) && (
-                    <>
-                      <div className="mb-3">
-                        <label className="block text-sm font-medium mb-1">Fill Type</label>
-                        <div className="flex space-x-2 mb-3">
-                          <button
-                            onClick={() => updateElement(selectedElement, { fillType: 'solid' })}
-                            className={`p-2 rounded text-xs flex-1 ${
-                              selectedElementData.fillType === 'solid' ? 'bg-blue-100 text-blue-600 border border-blue-300' : 'bg-gray-100 border border-gray-300'
-                            }`}
-                          >
-                            Solid Color
-                          </button>
-                          <button
-                            onClick={() => updateElement(selectedElement, { fillType: 'gradient' })}
-                            className={`p-2 rounded text-xs flex-1 ${
-                              selectedElementData.fillType === 'gradient' ? 'bg-blue-100 text-blue-600 border border-blue-300' : 'bg-gray-100 border border-gray-300'
-                            }`}
-                          >
-                            Gradient
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* SOLID COLOR PICKER */}
-                      {selectedElementData.fillType === 'solid' && (
-                        <div className="mb-3">
-                          <label className="block text-sm font-medium mb-1">Fill Color</label>
-                          <input
-                            type="color"
-                            value={selectedElementData.fill}
-                            onChange={(e) => updateElement(selectedElement, { fill: e.target.value })}
-                            className="w-full p-2 border rounded text-sm h-10 cursor-pointer"
-                          />
-                        </div>
-                      )}
-
-                      {/* GRADIENT PICKER - NOW FULLY WORKING */}
-                      {selectedElementData.fillType === 'gradient' && (
-                        <GradientPicker
-                          key={gradientPickerKey}
-                          gradient={selectedElementData.gradient}
-                          onGradientChange={(gradient) => updateElement(selectedElement, { gradient })}
-                        />
-                      )}
-                    </>
-                  )}
-
-                  {/* Text Properties */}
-                  {selectedElementData.type === 'text' && (
-                    <>
-                      <div className="mb-3">
-                        <label className="block text-sm font-medium mb-1">{t('text.fontSize')}</label>
-                        <input
-                          type="number"
-                          value={selectedElementData.fontSize}
-                          onChange={(e) => updateElement(selectedElement, { fontSize: parseInt(e.target.value) })}
-                          className="w-full p-2 border rounded text-sm"
-                          min="8"
-                          max="72"
-                        />
-                      </div>
-                      <div className="mb-3">
-                        <label className="block text-sm font-medium mb-1">{t('text.fontFamily')}</label>
-                        <select
-                          value={selectedElementData.fontFamily}
-                          onChange={(e) => updateElement(selectedElement, { fontFamily: e.target.value })}
-                          className="w-full p-2 border rounded text-sm"
-                        >
-                          {fontFamilies.map(font => (
-                            <option key={font} value={font}>{font}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="mb-3">
-                        <label className="block text-sm font-medium mb-1">{t('text.color')}</label>
-                        <input
-                          type="color"
-                          value={selectedElementData.color}
-                          onChange={(e) => updateElement(selectedElement, { color: e.target.value })}
-                          className="w-full p-2 border rounded text-sm h-10"
-                        />
-                      </div>
-                      <div className="mb-3">
-                        <label className="block text-sm font-medium mb-1">{t('text.textAlign')}</label>
-                        <div className="flex space-x-1">
-                          <button
-                            onClick={() => updateElement(selectedElement, { textAlign: 'left' })}
-                            className={`p-2 rounded ${selectedElementData.textAlign === 'left' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100'}`}
-                            title={t('text.left')}
-                          >
-                            <AlignLeft size={16} />
-                          </button>
-                          <button
-                            onClick={() => updateElement(selectedElement, { textAlign: 'center' })}
-                            className={`p-2 rounded ${selectedElementData.textAlign === 'center' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100'}`}
-                            title={t('text.center')}
-                          >
-                            <AlignCenter size={16} />
-                          </button>
-                          <button
-                            onClick={() => updateElement(selectedElement, { textAlign: 'right' })}
-                            className={`p-2 rounded ${selectedElementData.textAlign === 'right' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100'}`}
-                            title={t('text.right')}
-                          >
-                            <AlignRight size={16} />
-                          </button>
-                        </div>
-                      </div>
-                      <div className="mb-3">
-                        <label className="block text-sm font-medium mb-1">{t('text.textStyle')}</label>
-                        <div className="flex space-x-1">
-                          <button
-                            onClick={() => updateElement(selectedElement, { 
-                              fontWeight: selectedElementData.fontWeight === 'bold' ? 'normal' : 'bold' 
-                            })}
-                            className={`p-2 rounded ${selectedElementData.fontWeight === 'bold' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100'}`}
-                            title={t('text.bold')}
-                          >
-                            <Bold size={16} />
-                          </button>
-                          <button
-                            onClick={() => updateElement(selectedElement, { 
-                              fontStyle: selectedElementData.fontStyle === 'italic' ? 'normal' : 'italic' 
-                            })}
-                            className={`p-2 rounded ${selectedElementData.fontStyle === 'italic' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100'}`}
-                            title={t('text.italic')}
-                          >
-                            <Italic size={16} />
-                          </button>
-                          <button
-                            onClick={() => updateElement(selectedElement, { 
-                              textDecoration: selectedElementData.textDecoration === 'underline' ? 'none' : 'underline' 
-                            })}
-                            className={`p-2 rounded ${selectedElementData.textDecoration === 'underline' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100'}`}
-                            title={t('text.underline')}
-                          >
-                            <Underline size={16} />
-                          </button>
-                        </div>
-                      </div>
-                      <TransliterationToggle />
-                    </>
-                  )}
-
-                  {/* Shape Properties */}
-                  {['rectangle', 'circle', 'triangle', 'star', 'hexagon'].includes(selectedElementData.type) && (
-                    <>
-                      <div className="mb-3">
-                        <label className="block text-sm font-medium mb-1">Stroke Color</label>
-                        <input
-                          type="color"
-                          value={selectedElementData.stroke}
-                          onChange={(e) => updateElement(selectedElement, { stroke: e.target.value })}
-                          className="w-full p-2 border rounded text-sm h-10 cursor-pointer"
-                        />
-                      </div>
-                      <div className="mb-3">
-                        <label className="block text-sm font-medium mb-1">Stroke Width</label>
-                        <input
-                          type="number"
-                          value={selectedElementData.strokeWidth}
-                          onChange={(e) => updateElement(selectedElement, { strokeWidth: parseInt(e.target.value) })}
-                          className="w-full p-2 border rounded text-sm"
-                          min="0"
-                        />
-                      </div>
-                      {selectedElementData.type === 'rectangle' && (
-                        <div className="mb-3">
-                          <label className="block text-sm font-medium mb-1">Border Radius</label>
-                          <input
-                            type="number"
-                            value={selectedElementData.borderRadius}
-                            onChange={(e) => updateElement(selectedElement, { borderRadius: parseInt(e.target.value) })}
-                            className="w-full p-2 border rounded text-sm"
-                            min="0"
-                          />
-                        </div>
-                      )}
-                      {selectedElementData.type === 'star' && (
-                        <div className="mb-3">
-                          <label className="block text-sm font-medium mb-1">Points</label>
-                          <input
-                            type="number"
-                            value={selectedElementData.points || 5}
-                            onChange={(e) => updateElement(selectedElement, { points: parseInt(e.target.value) })}
-                            className="w-full p-2 border rounded text-sm"
-                            min="3"
-                            max="20"
-                          />
-                        </div>
-                      )}
-                    </>
-                  )}
-
-                  {/* Image Properties */}
-                  {selectedElementData.type === 'image' && (
-                    <div className="mb-3">
-                      <label className="block text-sm font-medium mb-1">Border Radius</label>
-                      <input
-                        type="number"
-                        value={selectedElementData.borderRadius}
-                        onChange={(e) => updateElement(selectedElement, { borderRadius: parseInt(e.target.value) })}
-                        className="w-full p-2 border rounded text-sm"
-                        min="0"
-                      />
-                    </div>
-                  )}
-
-                  {/* Sticker Properties */}
-                  {selectedElementData.type === 'sticker' && (
-                    <>
-                      <div className="mb-3">
-                        <label className="block text-sm font-medium mb-1">Sticker</label>
-                        <div className="sticker-grid">
-                          {stickerOptions.map(sticker => (
-                            <button
-                              key={sticker.name}
-                              onClick={() => updateElement(selectedElement, { sticker: sticker.name })}
-                              className={`sticker-button ${selectedElementData.sticker === sticker.name ? 'bg-blue-100 border-blue-300' : ''}`}
-                            >
-                              {sticker.icon}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Action Buttons */}
-                  <div className="grid grid-cols-2 gap-2 mb-3">
-                    <button
-                      onClick={() => duplicateElement(selectedElement)}
-                      className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center"
-                      disabled={lockedElements.has(selectedElement)}
-                    >
-                      <Copy size={14} className="mr-1" />
-                      Duplicate
-                    </button>
-                    <button
-                      onClick={() => toggleElementLock(selectedElement)}
-                      className={`p-2 rounded text-sm flex items-center justify-center ${
-                        lockedElements.has(selectedElement) 
-                          ? 'bg-green-100 text-green-600 hover:bg-green-200' 
-                          : 'bg-gray-100 hover:bg-gray-200'
-                      }`}
-                    >
-                      {lockedElements.has(selectedElement) ? (
-                        <>
-                          <Unlock size={14} className="mr-1" />
-                          Unlock
-                        </>
-                      ) : (
-                        <>
-                          <Lock size={14} className="mr-1" />
-                          Lock
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 mb-3">
-                    <button
-                      onClick={() => changeZIndex(selectedElement, 'backward')}
-                      className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center"
-                      disabled={lockedElements.has(selectedElement)}
-                    >
-                      <MinusCircle size={14} className="mr-1" />
-                      Backward
-                    </button>
-                    <button
-                      onClick={() => changeZIndex(selectedElement, 'forward')}
-                      className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center"
-                      disabled={lockedElements.has(selectedElement)}
-                    >
-                      <PlusCircle size={14} className="mr-1" />
-                      Forward
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 mb-3">
-                    <button
-                      onClick={() => changeZIndex(selectedElement, 'back')}
-                      className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center"
-                      disabled={lockedElements.has(selectedElement)}
-                    >
-                      To Back
-                    </button>
-                    <button
-                      onClick={() => changeZIndex(selectedElement, 'front')}
-                      className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center"
-                      disabled={lockedElements.has(selectedElement)}
-                    >
-                      To Front
-                    </button>
-                  </div>
-
-                  <button
-                    onClick={() => deleteElement(selectedElement)}
-                    className="w-full p-2 bg-red-100 text-red-600 rounded text-sm hover:bg-red-200 flex items-center justify-center"
-                    disabled={lockedElements.has(selectedElement)}
-                  >
-                    <Trash2 size={14} className="mr-1" />
-                    {t('properties.delete')}
-                  </button>
-                </div>
-              ) : (
-                <p className="text-gray-500 text-sm">{t('properties.selectElement')}</p>
-              )}
-            </div>
-
-            {/* Export Section */}
-            <div className="mb-6">
-              <h2 className="text-lg font-bold mb-4 text-gray-700">{t('export.title')}</h2>
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                <button
-                  onClick={() => exportAsImage('png')}
-                  className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center text-gray-700"
-                >
-                  <Download size={14} className="mr-1" />
-                  PNG
-                </button>
-                <button
-                  onClick={() => exportAsImage('jpeg')}
-                  className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center text-gray-700"
-                >
-                  <Download size={14} className="mr-1" />
-                  JPEG
-                </button>
-              </div>
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                <button
-                  onClick={() => exportAsImage('webp')}
-                  className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center text-gray-700"
-                >
-                  <Download size={14} className="mr-1" />
-                  WebP
-                </button>
-                <button
-                  onClick={() => exportAsImage('svg')}
-                  className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center text-gray-700"
-                >
-                  <Download size={14} className="mr-1" />
-                  SVG
-                </button>
-              </div>
-              <div className="grid grid-cols-1 gap-2 mb-3">
-                <button
-                  onClick={exportAsPDF}
-                  className="p-2 bg-blue-100 rounded text-sm hover:bg-blue-200 flex items-center justify-center text-blue-700 font-medium"
-                >
-                  <Download size={14} className="mr-1" />
-                  PDF
-                </button>
-              </div>
-              
-              {/* Video Export Settings */}
-              <VideoSettings />
-              
-              {!recording ? (
-                <button
-                  onClick={startRecording}
-                  className="w-full p-2 rounded text-sm flex items-center justify-center bg-blue-500 text-white hover:bg-blue-600"
-                >
-                  <Film size={14} className="mr-1" />
-                  {t('export.exportVideo')}
-                </button>
-              ) : (
-                <div className="space-y-2">
-                  <div className="w-full p-2 bg-red-50 border border-red-200 rounded text-sm flex items-center justify-center text-red-600">
-                    <div className="flex items-center">
-                      <div className="w-2 h-2 bg-red-500 rounded-full mr-2 animate-pulse"></div>
-                      {t('recording.recording')}: {Math.floor(recordingTimeElapsed / 60)}:{(recordingTimeElapsed % 60).toString().padStart(2, '0')}
-                    </div>
-                  </div>
-                  <button
-                    onClick={stopRecording}
-                    className="w-full p-2 rounded text-sm flex items-center justify-center bg-red-500 text-white hover:bg-red-600"
-                  >
-                    <Square size={14} className="mr-1" />
-                    {t('recording.stop')}
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Project Actions */}
-            <div>
-              <h2 className="text-lg font-bold mb-4 text-gray-700">{t('project.title')}</h2>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={handleSaveClick}
-                  className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center text-gray-700"
-                >
-                  <Save size={14} className="mr-1" />
-                  {t('project.save')}
-                </button>
-                <button
-                  onClick={loadProject}
-                  className="p-2 bg-gray-100 rounded text-sm hover:bg-gray-200 flex items-center justify-center text-gray-700"
-                >
-                  <FolderOpen size={14} className="mr-1" />
-                  {t('project.load')}
-                </button>
-              </div>
-            </div>
-          </div> 
-          {/* <PropertiesPanel/> This will need to be added */}
+          {/* Right Properties Panel - Hidden on mobile */}
+          <PropertiesPanel
+            selectedElement={selectedElement}
+            selectedElementData={selectedElementData}
+            animations={animations}
+            filterOptions={filterOptions}
+            fontFamilies={fontFamilies}
+            stickerOptions={stickerOptions}
+            showEffectsPanel={showEffectsPanel}
+            setShowEffectsPanel={setShowEffectsPanel}
+            gradientPickerKey={gradientPickerKey}
+            lockedElements={lockedElements}
+            updateElement={updateElement}
+            updateFilter={updateFilter}
+            duplicateElement={duplicateElement}
+            deleteElement={deleteElement}
+            toggleElementLock={toggleElementLock}
+            changeZIndex={changeZIndex}
+            exportAsImage={exportAsImage}
+            exportAsPDF={exportAsPDF}
+            handleSaveClick={handleSaveClick}
+            loadProject={loadProject}
+            TransliterationToggle={TransliterationToggle}
+            recording={recording}
+            startRecording={startRecording}
+            stopRecording={stopRecording}
+            recordingTimeElapsed={recordingTimeElapsed}
+            videoFormat={videoFormat}
+            setVideoFormat={setVideoFormat}
+            videoQuality={videoQuality}
+            setVideoQuality={setVideoQuality}
+            recordingDuration={recordingDuration}
+            setRecordingDuration={setRecordingDuration}
+          />
         </div>
 
+
         {/* Effects Panel */}
-        <EffectsPanel
-          showEffectsPanel={showEffectsPanel}
-          selectedElementData={selectedElementData}
+        <EffectsPanel 
+          show={showEffectsPanel}
           selectedElement={selectedElement}
-          updateElement={updateElement}
-          setShowEffectsPanel={setShowEffectsPanel}
-          t={t}
-          />
+          selectedElementData={selectedElementData}
+          onUpdateElement={updateElement}
+          onClose={() => setShowEffectsPanel(false)}
+        />
 
         {/* Floating Toolbar for Selected Elements */}
         {selectedElements.size > 0 && (
-           <FloatingToolbar
-            selectedElements={selectedElements}
-            selectedElementData={selectedElementData}
-            groupElements={groupElements}
-            ungroupElements={ungroupElements}
-            selectedElement={selectedElement}
-            changeZIndex={changeZIndex}
-            toggleElementLock={toggleElementLock}
-            duplicateElement={duplicateElement}
-            deleteElement={deleteElement}
-            lockedElements={lockedElements}
-          />
+          <div
+            ref={floatingToolbarRef}
+            className={`${styles.toolbar || ''} fixed left-1/2 transform -translate-x-1/2 floating-toolbar transition-all duration-300`}
+            style={{ 
+              zIndex: 1000,
+              bottom: (showMobileTools || showMobileProperties) ? '-100px' : '1rem' // Hide below when drawers open
+            }}
+          >
+            <button
+              onClick={() => {
+                if (selectedElements.size > 1) {
+                  groupElements();
+                }
+              }}
+              className="toolbar-button"
+              title="Group"
+              disabled={selectedElements.size < 2}
+            >
+              <Group size={18} />
+            </button>
+            <button
+              onClick={() => {
+                if (selectedElementData?.type === 'group') {
+                  ungroupElements(selectedElement);
+                }
+              }}
+              className="toolbar-button"
+              title="Ungroup"
+              disabled={selectedElementData?.type !== 'group'}
+            >
+              <Ungroup size={18} />
+            </button>
+            <button
+              onClick={() => {
+                Array.from(selectedElements).forEach(id => {
+                  if (!lockedElements.has(id)) {
+                    changeZIndex(id, 'forward');
+                  }
+                });
+              }}
+              className="toolbar-button"
+              title="Bring Forward"
+            >
+              <PlusCircle size={18} />
+            </button>
+            <button
+              onClick={() => {
+                Array.from(selectedElements).forEach(id => {
+                  if (!lockedElements.has(id)) {
+                    changeZIndex(id, 'backward');
+                  }
+                });
+              }}
+              className="toolbar-button"
+              title="Send Backward"
+            >
+              <MinusCircle size={18} />
+            </button>
+            <button
+              onClick={() => {
+                Array.from(selectedElements).forEach(id => {
+                  if (!lockedElements.has(id)) {
+                    toggleElementLock(id);
+                  }
+                });
+              }}
+              className="toolbar-button"
+              title="Toggle Lock"
+            >
+              <Lock size={18} />
+            </button>
+            <button
+              onClick={() => {
+                Array.from(selectedElements).forEach(id => {
+                  if (!lockedElements.has(id)) {
+                    duplicateElement(id);
+                  }
+                });
+              }}
+              className="toolbar-button"
+              title="Duplicate"
+            >
+              <Copy size={18} />
+            </button>
+            <button
+              onClick={() => {
+                Array.from(selectedElements).forEach(id => {
+                  if (!lockedElements.has(id)) {
+                    deleteElement(id);
+                  }
+                });
+              }}
+              className="toolbar-button text-red-500"
+              title="Delete"
+            >
+              <Trash2 size={18} />
+            </button>
+          </div>
+
         )}
 
         {/* Language Help Modal */}
-        <LanguageHelpModal />
-
         {/* Recording Status */}
-        <RecordingStatus />
+        <RecordingStatus 
+          recording={recording}
+          recordingTimeElapsed={recordingTimeElapsed}
+        />
 
-        {/* Save Project Dialog */}
-        {showSaveDialog && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
-              <h3 className="text-xl font-bold text-gray-900 mb-4">Save Project</h3>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Project Name
-                </label>
-                <input
-                  type="text"
-                  value={projectName}
-                  onChange={(e) => setProjectName(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                  placeholder="Enter project name..."
-                  autoFocus
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      confirmSave();
-                    }
-                  }}
-                />
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowSaveDialog(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmSave}
-                  className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
-                >
-                  Save Project
-                </button>
-              </div>
+        {/* Mobile Zoom Indicator - Auto-hides after 10 seconds */}
+        {showZoomIndicator && (
+          <div 
+            className={`${styles.zoomIndicator || ''} md:hidden`}
+            style={styleHelpers.getZoomIndicatorStyle(showZoomIndicator)}
+          >
+            <div className="flex items-center gap-2">
+              <ZoomIn size={16} />
+              <span className="font-medium">{Math.round(zoomLevel * 100)}%</span>
             </div>
           </div>
         )}
+
+        {/* Mobile Floating Action Buttons */}
+        <MobileFABButtons
+          zoom={zoom}
+          centerCanvas={centerCanvas}
+          setShowMobileTools={setShowMobileTools}
+          setShowMobileProperties={setShowMobileProperties}
+          selectedElement={selectedElement}
+        />
+
+        {/* Mobile Tools Drawer */}
+        <MobileToolsDrawer
+          showMobileTools={showMobileTools}
+          setShowMobileTools={setShowMobileTools}
+          currentTool={currentTool}
+          setCurrentTool={setCurrentTool}
+          addElement={addElement}
+          fileInputRef={fileInputRef}
+          setShowTemplates={setShowTemplates}
+          showTemplates={showTemplates}
+          zoom={zoom}
+          undo={undo}
+          redo={redo}
+          historyIndex={historyIndex}
+          history={history}
+          handleSaveClick={handleSaveClick}
+          recording={recording}
+          recordingTimeElapsed={recordingTimeElapsed}
+          startRecording={startRecording}
+          stopRecording={stopRecording}
+          playAnimations={playAnimations}
+          resetAnimations={resetAnimations}
+          isPlaying={isPlaying}
+          setShowEffectsPanel={setShowEffectsPanel}
+          showEffectsPanel={showEffectsPanel}
+        />
+
+        {/* Mobile Properties Drawer */}
+        <MobilePropertiesDrawer
+          showMobileProperties={showMobileProperties}
+          setShowMobileProperties={setShowMobileProperties}
+          selectedElementData={selectedElementData}
+          selectedElement={selectedElement}
+          updateElement={updateElement}
+          duplicateElement={duplicateElement}
+          deleteElement={deleteElement}
+          animations={animations}
+          gradientPickerKey={gradientPickerKey}
+        />
+
+        {/* Save Project Dialog */}
+        {/* All Modals */}
+        <ModalsContainer
+          showTemplates={showTemplates}
+          setShowTemplates={setShowTemplates}
+          applyTemplate={applyTemplate}
+          showCustomTemplateModal={showCustomTemplateModal}
+          setShowCustomTemplateModal={setShowCustomTemplateModal}
+          customTemplateSize={customTemplateSize}
+          setCustomTemplateSize={setCustomTemplateSize}
+          createCustomTemplate={createCustomTemplate}
+          showLanguageHelp={showLanguageHelp}
+          setShowLanguageHelp={setShowLanguageHelp}
+          currentLanguage={currentLanguage}
+          showSaveDialog={showSaveDialog}
+          setShowSaveDialog={setShowSaveDialog}
+          projectName={projectName}
+          setProjectName={setProjectName}
+          confirmSave={confirmSave}
+        />
       </div>
     </>
   );
