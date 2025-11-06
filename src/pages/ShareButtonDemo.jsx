@@ -1,5 +1,7 @@
+
 import React from 'react';
 import ShareButton from '../components/common/ShareButton';
+
 
 const ShareButtonDemo = () => {
   return (
@@ -11,7 +13,8 @@ const ShareButtonDemo = () => {
             ShareButton Component Demo
           </h1>
           <p className="text-lg text-gray-600">
-            Professional share button with Web Share API and beautiful fallback modal
+            Professional share button with Web Share API and beautiful fallback
+            modal
           </p>
         </div>
 
@@ -23,10 +26,11 @@ const ShareButtonDemo = () => {
               Basic Share Button
             </h2>
             <p className="text-gray-600 mb-6">
-              Click to share this page. On mobile devices, it will open the native share sheet. 
-              On desktop, it will show a custom modal with share options.
+              Click to share this page. On mobile devices, it will open the
+              native share sheet. On desktop, it will show a custom modal with
+              share options.
             </p>
-            <ShareButton 
+            <ShareButton
               url={window.location.href}
               title="Check out Sowntra!"
               text="Amazing design tool for creating beautiful content"
@@ -39,10 +43,10 @@ const ShareButtonDemo = () => {
               Custom URL Share
             </h2>
             <p className="text-gray-600 mb-6">
-              Share a custom project URL with specific parameters. Perfect for sharing 
-              individual projects or designs.
+              Share a custom project URL with specific parameters. Perfect for
+              sharing individual projects or designs.
             </p>
-            <ShareButton 
+            <ShareButton
               url="https://sowntra.com/project?id=123&name=MyAwesomeDesign"
               title="Check out my design!"
               text="I created this amazing design on Sowntra. Take a look!"
@@ -55,10 +59,10 @@ const ShareButtonDemo = () => {
               Compact Version
             </h2>
             <p className="text-gray-600 mb-6">
-              Smaller version for toolbars and compact interfaces. Perfect for integration 
-              into existing UIs.
+              Smaller version for toolbars and compact interfaces. Perfect for
+              integration into existing UIs.
             </p>
-            <ShareButton 
+            <ShareButton
               url={window.location.href}
               title="Sowntra Design Tool"
               text="Create amazing designs with Sowntra!"
@@ -68,9 +72,7 @@ const ShareButtonDemo = () => {
 
           {/* Card 4 - Features List */}
           <div className="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl shadow-xl p-8 text-white">
-            <h2 className="text-2xl font-semibold mb-4">
-              ✨ Features
-            </h2>
+            <h2 className="text-2xl font-semibold mb-4">✨ Features</h2>
             <ul className="space-y-3">
               <li className="flex items-start">
                 <span className="mr-2">🚀</span>
@@ -155,4 +157,3 @@ const ShareButtonDemo = () => {
 };
 
 export default ShareButtonDemo;
-

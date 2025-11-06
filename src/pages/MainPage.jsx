@@ -1,19 +1,14 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { 
-  Plus, Square, Circle, Triangle, Type, Image, Play, Pause, 
+import { textEffects,imageEffects,fontFamilies,supportedLanguages,specialEffects,stickerOptions,filterOptions,animations,gradientPresets, shapeEffects,socialMediaTemplates } from '../types/types.js';
+import "../styles/MainPageStyles.css";
+
+import {  Square,  
   Copy, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline,
-  Download, Save, FolderOpen, Undo, Redo, Group, Ungroup, Move, Minus, 
-  Maximize, MinusCircle, PlusCircle, Layers, Grid, MousePointer, ZoomIn,
-  ZoomOut, Lock, Unlock, Users, MessageCircle, Star,
-  Hexagon,  ArrowRight, ArrowLeft,
-  Music,
-  Film, FileText, BookOpen, Printer, Heart,
-  Zap, 
-  CreditCard, 
-  Tv, Smartphone, Monitor,
-  Megaphone, 
-  User, LogOut, Settings,
-  Languages, Sparkles, HelpCircle
+  Download, Save, FolderOpen, 
+ MinusCircle, PlusCircle, 
+ Lock, Unlock,
+  Film,
+ Sparkles, 
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -21,6 +16,7 @@ import { useAuth } from '../contexts/AuthContext';
 import ShareButton from '../components/common/ShareButton';
 import jsPDF from 'jspdf';
 import { projectAPI } from '../services/api';
+
 // Component imports
 import RecordingStatus from '../features/canvas/components/RecordingStatus';
 import ModalsContainer from '../features/canvas/components/ModalsContainer';
@@ -81,6 +77,7 @@ import {
   animations,
   filterOptions
 } from '../utils/constants';
+
 
 const Sowntra = () => {
   const { t, i18n } = useTranslation();
@@ -149,9 +146,11 @@ const Sowntra = () => {
   const loadProjectInputRef = useRef(null);
   const zoomIndicatorTimeoutRef = useRef(null);
 
+
   // getCurrentPageElements will be provided by useElements hook below
   
   // All constants (supportedLanguages, textEffects, imageEffects, shapeEffects, specialEffects, etc.) imported from constants.js
+
 
   // Center canvas function - maximizes canvas size while maintaining aspect ratio
   const centerCanvas = useCallback(() => {
@@ -290,6 +289,7 @@ const Sowntra = () => {
     loadTransliterationData();
   }, [currentLanguage]);
 
+
   // Cleanup zoom indicator timeout on unmount
   useEffect(() => {
     return () => {
@@ -300,6 +300,8 @@ const Sowntra = () => {
   }, []);
 
   // socialMediaTemplates, stickerOptions, animations, filterOptions imported from constants.js
+
+ 
 
   // Helper function for setCurrentPageElements (needed before hooks)
   const setCurrentPageElements = useCallback((newElements) => {
@@ -691,6 +693,7 @@ const Sowntra = () => {
           saveToHistory(newElements);
         }
       }
+
   
       if (e.key === 'Escape') {
         setSelectedElement(null);
@@ -718,6 +721,7 @@ const Sowntra = () => {
           toggleElementLock(selectedElement);
         }
       }
+
 
       if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
         e.preventDefault();
@@ -875,6 +879,7 @@ const Sowntra = () => {
           />
         </div>
 
+
         {/* Effects Panel */}
         <EffectsPanel 
           show={showEffectsPanel}
@@ -984,6 +989,7 @@ const Sowntra = () => {
               <Trash2 size={18} />
             </button>
           </div>
+
         )}
 
         {/* Language Help Modal */}
