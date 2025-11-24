@@ -74,12 +74,12 @@ const useElements = ({
       filters: JSON.parse(JSON.stringify(filterOptions)),
       fill: properties.fill || (type === 'rectangle' ? '#3b82f6' : 
                               type === 'circle' ? '#ef4444' : 
-                              type === 'triangle' ? '#10b981' : 
-                              type === 'star' ? '#f59e0b' : 
+                              type === 'triangle' ? 'transparent' : 
+                              type === 'star' ? 'transparent' : 
                               type === 'hexagon' ? '#8b5cf6' : '#3b82f6'),
       stroke: properties.stroke || (type === 'image' ? 'transparent' : '#000000'),
       strokeWidth: properties.strokeWidth || (type === 'image' ? 0 : 2),
-      fillType: properties.fillType || 'solid',
+      fillType: properties.fillType || (type === 'triangle' || type === 'star' ? 'none' : 'solid'),
       gradient: properties.gradient || {
         type: 'linear',
         colors: ['#3b82f6', '#ef4444'],

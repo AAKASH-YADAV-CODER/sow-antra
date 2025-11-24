@@ -87,7 +87,7 @@ const VideoSettings = ({
         </p>
       </div>
 
-      <style jsx>{`
+      <style>{`
         .slider-thumb::-webkit-slider-thumb {
           appearance: none;
           width: 16px;

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-// import { textEffects,imageEffects,fontFamilies,supportedLanguages,specialEffects,stickerOptions,filterOptions,animations,gradientPresets, shapeEffects,socialMediaTemplates } from '../types/types.js';
+import { textEffects,imageEffects,fontFamilies,supportedLanguages,specialEffects,stickerOptions,filterOptions,animations,gradientPresets, shapeEffects,socialMediaTemplates } from '../types/types.js';
 import "../styles/MainPageStyles.css";
 
 import {  Square,  
@@ -8,7 +8,8 @@ import {  Square,
  MinusCircle, PlusCircle, 
  Lock, Unlock,
   Film,
- Sparkles, Group,ZoomIn,Ungroup,
+ Sparkles, 
+ Group, Ungroup, ZoomIn
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -23,7 +24,8 @@ import ModalsContainer from '../features/canvas/components/ModalsContainer';
 import EffectsPanel from '../features/canvas/components/EffectsPanel';
 import GradientPicker from '../features/canvas/components/GradientPicker';
 import PropertiesPanel from '../features/canvas/components/PropertiesPanel';
-import { MobileToolsDrawer, MobilePropertiesDrawer } from '../features/canvas/components/MobileDrawers';
+import { MobilePropertiesDrawer } from '../features/canvas/components/MobileDrawers';
+import MobileToolsBar from '../features/canvas/components/MobileToolsBar';
 import MobileFABButtons from '../features/canvas/components/MobileFABButtons';
 import CanvasElement from '../features/canvas/components/CanvasElement';
 import TopHeader from '../features/canvas/components/TopHeader';
@@ -64,19 +66,6 @@ import { useHelpers } from '../features/canvas/hooks/useHelpers';
 // UI Helper Components
 import TransliterationToggle from '../features/canvas/components/TransliterationToggle';
 import VideoSettings from '../features/canvas/components/VideoSettings';
-// Constants imports
-import { 
-  fontFamilies,
-  supportedLanguages,
-  textEffects,
-  imageEffects,
-  shapeEffects,
-  specialEffects,
-  socialMediaTemplates,
-  stickerOptions,
-  animations,
-  filterOptions
-} from '../utils/constants';
 
 
 const Sowntra = () => {
@@ -890,15 +879,60 @@ const Sowntra = () => {
         />
 
         {/* Floating Toolbar for Selected Elements */}
-        {selectedElements.size > 0 && (
-          <div
-            ref={floatingToolbarRef}
-            className={`${styles.toolbar || ''} fixed left-1/2 transform -translate-x-1/2 floating-toolbar transition-all duration-300`}
-            style={{ 
-              zIndex: 1000,
-              bottom: (showMobileTools || showMobileProperties) ? '-100px' : '1rem' // Hide below when drawers open
-            }}
-          >
+        {selectedElements.size > 0 && selectedElementData && !(showMobileTools || showMobileProperties) && (() => {
+          // Calculate toolbar position with bounds checking
+          const isMobile = window.innerWidth <= 768;
+          const toolbarWidth = 300; // Approximate toolbar width
+          const toolbarHeight = 50; // Approximate toolbar height
+          const padding = 10;
+          
+          let left, top, bottom, transformValue;
+          
+          if (isMobile && selectedElementData) {
+            // Calculate horizontal position
+            const elementCenterX = selectedElementData.x + (selectedElementData.width / 2);
+            left = Math.max(
+              padding + (toolbarWidth / 2), 
+              Math.min(elementCenterX, window.innerWidth - (toolbarWidth / 2) - padding)
+            );
+            
+            // Calculate vertical position - try above element first
+            let calculatedTop = selectedElementData.y - toolbarHeight - 10;
+            
+            // If toolbar would go off top, position below element
+            if (calculatedTop < padding) {
+              calculatedTop = selectedElementData.y + selectedElementData.height + 10;
+            }
+            
+            // If still off bottom, clamp it
+            if (calculatedTop + toolbarHeight > window.innerHeight - padding) {
+              calculatedTop = window.innerHeight - toolbarHeight - padding;
+            }
+            
+            top = `${Math.max(padding, calculatedTop)}px`;
+            bottom = 'auto';
+            transformValue = 'translateX(-50%)';
+          } else {
+            // Desktop positioning
+            left = '50%';
+            top = 'auto';
+            bottom = '1rem';
+            transformValue = 'translateX(-50%)';
+          }
+          
+          return (
+            <div
+              ref={floatingToolbarRef}
+              className={`${styles.toolbar || ''} floating-toolbar transition-all duration-300`}
+              style={{ 
+                zIndex: 1000,
+                position: 'fixed',
+                left: typeof left === 'number' ? `${left}px` : left,
+                top,
+                bottom,
+                transform: transformValue
+              }}
+            >
             <button
               onClick={() => {
                 if (selectedElements.size > 1) {
@@ -989,8 +1023,8 @@ const Sowntra = () => {
               <Trash2 size={18} />
             </button>
           </div>
-
-        )}
+          );
+        })()}
 
         {/* Language Help Modal */}
         {/* Recording Status */}
@@ -1016,36 +1050,26 @@ const Sowntra = () => {
         <MobileFABButtons
           zoom={zoom}
           centerCanvas={centerCanvas}
-          setShowMobileTools={setShowMobileTools}
           setShowMobileProperties={setShowMobileProperties}
           selectedElement={selectedElement}
         />
 
-        {/* Mobile Tools Drawer */}
-        <MobileToolsDrawer
-          showMobileTools={showMobileTools}
-          setShowMobileTools={setShowMobileTools}
+        {/* Mobile Tools Bar */}
+        <MobileToolsBar
           currentTool={currentTool}
           setCurrentTool={setCurrentTool}
           addElement={addElement}
           fileInputRef={fileInputRef}
-          setShowTemplates={setShowTemplates}
-          showTemplates={showTemplates}
-          zoom={zoom}
           undo={undo}
           redo={redo}
           historyIndex={historyIndex}
           history={history}
           handleSaveClick={handleSaveClick}
           recording={recording}
-          recordingTimeElapsed={recordingTimeElapsed}
           startRecording={startRecording}
           stopRecording={stopRecording}
-          playAnimations={playAnimations}
-          resetAnimations={resetAnimations}
-          isPlaying={isPlaying}
+          setShowTemplates={setShowTemplates}
           setShowEffectsPanel={setShowEffectsPanel}
-          showEffectsPanel={showEffectsPanel}
         />
 
         {/* Mobile Properties Drawer */}

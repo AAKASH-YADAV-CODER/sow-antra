@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   MousePointer, Type, Square, Circle, Triangle, Star, Image, Layers,
-  ZoomIn, ZoomOut, Undo, Redo, Save, Film, Play, Pause, Sparkles, Copy, Trash2
+  ZoomIn, ZoomOut, Undo, Redo, Save, Film, Play, Pause, Sparkles, Copy, Trash2,
+  Shapes, ChevronDown, ChevronUp, Hexagon, Minus, ArrowRight
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import GradientPicker from './GradientPicker';
@@ -41,15 +42,18 @@ const MobileToolsDrawer = ({
         className="md:hidden fixed inset-0 bg-black/50 z-50"
         onClick={() => setShowMobileTools(false)}
       />
-      <div className="md:hidden fixed left-0 top-0 bottom-0 w-72 bg-white shadow-2xl z-50 overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b p-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold">{t('tools.title')}</h2>
-          <button
-            onClick={() => setShowMobileTools(false)}
-            className="p-3 rounded-lg hover:bg-gray-100 text-2xl leading-none touch-manipulation min-h-[44px] min-w-[44px]"
-          >
-            ×
-          </button>
+      <div className="md:hidden fixed left-0 right-0 bottom-0 h-[70vh] bg-white shadow-2xl z-50 overflow-y-auto rounded-t-3xl">
+        <div className="sticky top-0 bg-white border-b p-4">
+          <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-3"></div>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold">{t('tools.title')}</h2>
+            <button
+              onClick={() => setShowMobileTools(false)}
+              className="p-3 rounded-lg hover:bg-gray-100 text-2xl leading-none touch-manipulation min-h-[44px] min-w-[44px]"
+            >
+              ×
+            </button>
+          </div>
         </div>
         
         <div className="p-4 space-y-2">
@@ -94,18 +98,7 @@ const MobileToolsDrawer = ({
           <button onClick={() => { addElement('text'); setShowMobileTools(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 touch-manipulation">
             <Type size={20} /> <span>Add Text</span>
           </button>
-          <button onClick={() => { addElement('rectangle'); setShowMobileTools(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 touch-manipulation">
-            <Square size={20} /> <span>Rectangle</span>
-          </button>
-          <button onClick={() => { addElement('circle'); setShowMobileTools(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 touch-manipulation">
-            <Circle size={20} /> <span>Circle</span>
-          </button>
-          <button onClick={() => { addElement('triangle'); setShowMobileTools(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 touch-manipulation">
-            <Triangle size={20} /> <span>Triangle</span>
-          </button>
-          <button onClick={() => { addElement('star'); setShowMobileTools(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 touch-manipulation">
-            <Star size={20} /> <span>Star</span>
-          </button>
+          <MobileShapesSection addElement={addElement} setShowMobileTools={setShowMobileTools} />
           <button onClick={() => { fileInputRef.current?.click(); setShowMobileTools(false); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 touch-manipulation">
             <Image size={20} /> <span>Add Image</span>
           </button>
@@ -290,6 +283,54 @@ const MobilePropertiesDrawer = ({
         </div>
       </div>
     </>
+  );
+};
+
+// Mobile Shapes Section Component
+const MobileShapesSection = ({ addElement, setShowMobileTools }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const shapes = [
+    { type: 'rectangle', icon: Square, label: 'Rectangle' },
+    { type: 'circle', icon: Circle, label: 'Circle' },
+    { type: 'triangle', icon: Triangle, label: 'Triangle' },
+    { type: 'star', icon: Star, label: 'Star' },
+    { type: 'hexagon', icon: Hexagon, label: 'Hexagon' },
+    { type: 'line', icon: Minus, label: 'Line' },
+    { type: 'arrow', icon: ArrowRight, label: 'Arrow' }
+  ];
+
+  return (
+    <div className="w-full">
+      <button 
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg hover:bg-gray-100 touch-manipulation"
+      >
+        <div className="flex items-center gap-3">
+          <Shapes size={20} />
+          <span>Shapes</span>
+        </div>
+        {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+      </button>
+      
+      {isExpanded && (
+        <div className="ml-4 mt-1 space-y-1">
+          {shapes.map(({ type, icon: Icon, label }) => (
+            <button
+              key={type}
+              onClick={() => {
+                addElement(type);
+                setShowMobileTools(false);
+              }}
+              className="w-full flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-gray-100 touch-manipulation"
+            >
+              <Icon size={18} />
+              <span className="text-sm">{label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 };
 

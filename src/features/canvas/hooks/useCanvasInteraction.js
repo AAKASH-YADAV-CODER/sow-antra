@@ -492,6 +492,10 @@ export const useCanvasInteraction = ({
       }
     };
 
+    // Selection box must rotate around the element's center point
+    // Element center relative to selection box's top-left:
+    // X: element.width/2 + 10 (half width + 10px padding)
+    // Y: element.height/2 + 10 (half height + 10px padding)
     const selectionBoxStyle = {
       position: 'absolute',
       left: element.x - 10,
@@ -500,6 +504,7 @@ export const useCanvasInteraction = ({
       height: element.height + 20,
       pointerEvents: 'none',
       transform: `rotate(${element.rotation || 0}deg)`,
+      transformOrigin: `${element.width / 2 + 10}px ${element.height / 2 + 10}px`,
       zIndex: element.zIndex + 1000
     };
 
@@ -516,6 +521,7 @@ export const useCanvasInteraction = ({
 
     return (
       <div
+        key={`selection-${element.id}`}
         className={styles.selectionBox || ''}
         style={selectionBoxStyle}
       >
@@ -584,7 +590,7 @@ export const useCanvasInteraction = ({
         </svg>
       </div>
     );
-  }, [lockedElements, canvasRef]);
+  }, [lockedElements, canvasRef, setIsResizing, setIsRotating, setDragStart, styles]);
 
   return {
     // State

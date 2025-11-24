@@ -3,7 +3,6 @@ import {
   ArrowLeft, ZoomIn, ZoomOut, Maximize, Layers, Sparkles, Play, Pause,
   Square, Film, Languages, User, LogOut, Settings, HelpCircle
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import ShareButton from '../../../components/common/ShareButton';
 
 /**
@@ -133,19 +132,14 @@ const TopHeader = ({
         </button>
         
         {recording ? (
-          <div className="flex items-center space-x-2">
-            <div className="px-3 py-2 bg-red-50 border border-red-200 rounded flex items-center text-red-600">
-              <div className="w-2 h-2 bg-red-500 rounded-full mr-2 animate-pulse"></div>
-              Recording: {Math.floor(recordingTimeElapsed / 60)}:{(recordingTimeElapsed % 60).toString().padStart(2, '0')}
-            </div>
-            <button
-              onClick={stopRecording}
-              className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 flex items-center touch-manipulation"
-            >
-              <Square size={16} className="mr-1" />
-              Stop
-            </button>
-          </div>
+          <button
+            onClick={stopRecording}
+            className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 flex items-center touch-manipulation"
+          >
+            <div className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></div>
+            <Square size={16} className="mr-1" />
+            Stop ({Math.floor(recordingTimeElapsed / 60)}:{(recordingTimeElapsed % 60).toString().padStart(2, '0')})
+          </button>
         ) : (
           <button
             onClick={startRecording}
@@ -179,7 +173,7 @@ const TopHeader = ({
                 className="md:hidden fixed inset-0 bg-black/50 z-50"
                 onClick={() => setShowLanguageMenu(false)}
               />
-              <div className="md:dropdown-menu md:relative md:w-[200px] md:shadow-lg md:border md:border-gray-200 fixed md:static left-0 right-0 top-0 bottom-0 md:top-auto md:left-auto md:right-auto md:bottom-auto bg-white md:rounded-lg z-50 flex flex-col md:max-h-96 max-h-screen overflow-hidden">
+              <div className="fixed md:absolute md:right-0 left-0 right-0 top-0 bottom-0 md:top-full md:mt-2 md:left-auto md:bottom-auto md:w-56 bg-white shadow-lg border border-gray-200 z-50 md:rounded-lg flex flex-col md:max-h-96 max-h-screen overflow-hidden">
                 <div className="font-semibold px-4 py-3 border-b text-gray-700 flex items-center justify-between sticky top-0 bg-white z-10">
                   <div className="text-base md:text-sm font-bold">{t('language.title')}</div>
                   <button 

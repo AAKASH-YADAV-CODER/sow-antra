@@ -47,22 +47,17 @@ const PropertiesPanel = ({
 }) => {
   const { t } = useTranslation();
 
-  if (!selectedElementData) {
-    return (
-      <div className="properties-panel hidden md:block">
+  return (
+    <div className="properties-panel hidden md:block">
+      {/* Properties Section */}
+      {!selectedElementData ? (
         <div className="mb-6">
           <h2 className="text-lg font-bold mb-4">{t('properties.title')}</h2>
           <p className="text-gray-500 text-sm">{t('properties.selectElement')}</p>
         </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="properties-panel hidden md:block">
-      {/* Properties Section */}
-      <div className="mb-6">
-        <h2 className="text-lg font-bold mb-4">{t('properties.title')}</h2>
+      ) : (
+        <div className="mb-6">
+          <h2 className="text-lg font-bold mb-4">{t('properties.title')}</h2>
 
         {/* Animation Selection */}
         <div className="mb-3">
@@ -479,7 +474,8 @@ const PropertiesPanel = ({
           <Trash2 size={14} className="mr-1" />
           {t('properties.delete')}
         </button>
-      </div>
+        </div>
+      )}
 
       {/* Export Section */}
       <div className="mb-6">

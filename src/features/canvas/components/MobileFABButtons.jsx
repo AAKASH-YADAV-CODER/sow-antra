@@ -1,5 +1,5 @@
 import React from 'react';
-import { ZoomIn, ZoomOut, Maximize, Layers, Settings } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize, Settings } from 'lucide-react';
 
 /**
  * Mobile Floating Action Buttons Component
@@ -8,12 +8,11 @@ import { ZoomIn, ZoomOut, Maximize, Layers, Settings } from 'lucide-react';
 const MobileFABButtons = ({
   zoom,
   centerCanvas,
-  setShowMobileTools,
   setShowMobileProperties,
   selectedElement
 }) => {
   return (
-    <div className="md:hidden fixed bottom-4 right-4 flex flex-col gap-3 z-40">
+    <div className="md:hidden fixed bottom-20 right-4 flex flex-col gap-3 z-40">
       {/* Zoom In Button */}
       <button
         onClick={() => zoom('in')}
@@ -41,23 +40,9 @@ const MobileFABButtons = ({
         <Maximize size={20} />
       </button>
       
-      <button
-        onClick={() => {
-          setShowMobileTools(true);
-          setShowMobileProperties(false);
-        }}
-        className="w-14 h-14 bg-purple-500 hover:bg-purple-600 text-white rounded-full shadow-lg flex items-center justify-center touch-manipulation"
-        title="Tools"
-      >
-        <Layers size={24} />
-      </button>
-      
       {selectedElement && (
         <button
-          onClick={() => {
-            setShowMobileProperties(true);
-            setShowMobileTools(false);
-          }}
+          onClick={() => setShowMobileProperties(true)}
           className="w-14 h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center touch-manipulation"
           title="Properties"
         >
