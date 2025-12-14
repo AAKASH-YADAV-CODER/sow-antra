@@ -236,8 +236,6 @@ export const useRecording = ({
       let startTime = null;
       const frameDuration = 1000 / 30;
       let lastFrameTime = 0;
-      // eslint-disable-next-line no-unused-vars
-      let animationId;
       
       const drawAnimationFrame = (timestamp) => {
         if (!startTime) startTime = timestamp;
@@ -260,11 +258,11 @@ export const useRecording = ({
             });
           }
           
-          animationId = requestAnimationFrame(drawAnimationFrame);
+          requestAnimationFrame(drawAnimationFrame);
         }
       };
       
-      animationId = requestAnimationFrame(drawAnimationFrame);
+      requestAnimationFrame(drawAnimationFrame);
       
     } catch (error) {
       console.error('Error starting recording:', error);

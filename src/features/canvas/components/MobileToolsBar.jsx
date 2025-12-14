@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   MousePointer, Type, Square, Circle, Triangle, Star, Image,
-  Undo, Redo, Save, Film, Layers, Sparkles, Shapes, ChevronDown, ChevronUp,
+  Undo, Redo, Save, Film, Layers, Sparkles, Shapes,
   Hexagon, Minus, ArrowRight
 } from 'lucide-react';
 

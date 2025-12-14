@@ -13,8 +13,6 @@ const GradientPicker = ({ gradient, onGradientChange, gradientPickerKey }) => {
     
     return gradient ? { ...defaultGradient, ...gradient } : defaultGradient;
   });
-  
-  const [selectedStopIndex, setSelectedStopIndex] = useState(null);
 
   useEffect(() => {
     if (gradient) {

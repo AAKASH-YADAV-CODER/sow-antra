@@ -1,33 +1,26 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { textEffects,imageEffects,fontFamilies,supportedLanguages,specialEffects,stickerOptions,filterOptions,animations,gradientPresets, shapeEffects,socialMediaTemplates } from '../types/types.js';
+import { textEffects,imageEffects,fontFamilies,supportedLanguages,specialEffects,stickerOptions,filterOptions,animations, shapeEffects } from '../types/types.js';
 import "../styles/MainPageStyles.css";
 
-import {  Square,  
-  Copy, Trash2, AlignLeft, AlignCenter, AlignRight, Bold, Italic, Underline,
-  Download, Save, FolderOpen, 
+import {  
+  Copy, Trash2,
  MinusCircle, PlusCircle, 
- Lock, Unlock,
-  Film,
- Sparkles, 
+ Lock,
  Group, Ungroup, ZoomIn
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import ShareButton from '../components/common/ShareButton';
-import jsPDF from 'jspdf';
 import { projectAPI } from '../services/api';
 
 // Component imports
 import RecordingStatus from '../features/canvas/components/RecordingStatus';
 import ModalsContainer from '../features/canvas/components/ModalsContainer';
 import EffectsPanel from '../features/canvas/components/EffectsPanel';
-import GradientPicker from '../features/canvas/components/GradientPicker';
 import PropertiesPanel from '../features/canvas/components/PropertiesPanel';
 import { MobilePropertiesDrawer } from '../features/canvas/components/MobileDrawers';
 import MobileToolsBar from '../features/canvas/components/MobileToolsBar';
 import MobileFABButtons from '../features/canvas/components/MobileFABButtons';
-import CanvasElement from '../features/canvas/components/CanvasElement';
 import TopHeader from '../features/canvas/components/TopHeader';
 import ToolsSidebar from '../features/canvas/components/ToolsSidebar';
 import PagesNavigator from '../features/canvas/components/PagesNavigator';
@@ -40,18 +33,8 @@ import * as styleHelpers from '../utils/styleHelpers';
 import { 
   getFilterCSS, 
   getBackgroundStyle, 
-  getCanvasGradient, 
-  getCanvasEffects, 
-  getEffectCSS,
   parseCSS 
 } from '../utils/helpers';
-import { 
-  drawElementToCanvas as drawElementToCanvasUtil,
-  exportAsImage as exportAsImageUtil,
-  exportAsPDF as exportAsPDFUtil,
-  exportAsSVG as exportAsSVGUtil,
-  getSortedElementsForExport
-} from '../utils/canvasExport';
 // Custom hooks
 import useElements from '../features/canvas/hooks/useElements';
 import useHistory from '../features/canvas/hooks/useHistory';
@@ -65,7 +48,6 @@ import { useKeyboardShortcuts } from '../features/canvas/hooks/useKeyboardShortc
 import { useHelpers } from '../features/canvas/hooks/useHelpers';
 // UI Helper Components
 import TransliterationToggle from '../features/canvas/components/TransliterationToggle';
-import VideoSettings from '../features/canvas/components/VideoSettings';
 
 
 const Sowntra = () => {
@@ -98,7 +80,7 @@ const Sowntra = () => {
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [textDirection, setTextDirection] = useState('ltr');
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
-  const [transliterationEnabled, setTransliterationEnabled] = useState(false);
+  // const [transliterationEnabled, setTransliterationEnabled] = useState(false);
   // const [transliterationMap, setTransliterationMap] = useState({});
   const [showLanguageHelp, setShowLanguageHelp] = useState(false);
   const [videoFormat, setVideoFormat] = useState('webm');
@@ -118,7 +100,7 @@ const Sowntra = () => {
   });
   
   // Mobile panel states
-  const [showMobileTools, setShowMobileTools] = useState(false);
+  const [showMobileTools] = useState(false);
   const [showMobileProperties, setShowMobileProperties] = useState(false);
 
   // Mobile touch gesture states
@@ -130,7 +112,6 @@ const Sowntra = () => {
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
   const floatingToolbarRef = useRef(null);
-  const recordingIntervalRef = useRef(null);
   const canvasContainerRef = useRef(null);
   const loadProjectInputRef = useRef(null);
   const zoomIndicatorTimeoutRef = useRef(null);
@@ -170,29 +151,7 @@ const Sowntra = () => {
   // Sync i18n with currentLanguage on mount
   useEffect(() => {
     i18n.changeLanguage(currentLanguage);
-  }, []);
-
-  // Update text direction when language changes
-  useEffect(() => {
-    setTextDirection(supportedLanguages[currentLanguage]?.direction || 'ltr');
-    
-    // Update text elements with new language font
-    const currentElements = getCurrentPageElements();
-    const updatedElements = currentElements.map(el => {
-      if (el.type === 'text') {
-        return {
-          ...el,
-          fontFamily: supportedLanguages[currentLanguage]?.font || 'Arial',
-          textAlign: supportedLanguages[currentLanguage]?.direction === 'rtl' ? 'right' : el.textAlign
-        };
-      }
-      return el;
-    });
-    setCurrentPageElements(updatedElements);
-    
-    // Force gradient picker to re-render
-    setGradientPickerKey(prev => prev + 1);
-  }, [currentLanguage]);
+  }, [currentLanguage, i18n]);
 
   // Auto-fit canvas to screen on mount and resize
   useEffect(() => {
@@ -281,9 +240,10 @@ const Sowntra = () => {
 
   // Cleanup zoom indicator timeout on unmount
   useEffect(() => {
+    const timeoutRef = zoomIndicatorTimeoutRef.current;
     return () => {
-      if (zoomIndicatorTimeoutRef.current) {
-        clearTimeout(zoomIndicatorTimeoutRef.current);
+      if (timeoutRef) {
+        clearTimeout(timeoutRef);
       }
     };
   }, []);
@@ -305,9 +265,7 @@ const Sowntra = () => {
     historyIndex,
     saveToHistory,
     undo,
-    redo,
-    canUndo,
-    canRedo
+    redo
   } = useHistory(setCurrentPageElements);
 
   // Custom Hooks - Element Management
@@ -343,11 +301,6 @@ const Sowntra = () => {
 
   // Custom Hooks - Canvas Interaction
   const {
-    isDragging,
-    isResizing,
-    isRotating,
-    isPanning,
-    isDrawing,
     drawingPath,
     showAlignmentLines,
     alignmentLines,
@@ -357,12 +310,7 @@ const Sowntra = () => {
     handleCanvasMouseDown,
     handleSelectElement,
     handleTextEdit,
-    handleDrawing,
-    finishDrawing,
-    calculateAlignmentLines,
-    renderSelectionHandles,
-    setIsDrawing,
-    setDrawingPath
+    renderSelectionHandles
   } = useCanvasInteraction({
     getCurrentPageElements,
     setCurrentPageElements,
@@ -386,14 +334,9 @@ const Sowntra = () => {
   // Custom Hooks - Recording
   const {
     recording,
-    mediaRecorder,
-    recordingStartTime,
     recordingTimeElapsed,
     startRecording,
-    stopRecording,
-    preloadImages,
-    checkRecordingCompatibility,
-    drawElementToCanvas
+    stopRecording
   } = useRecording({
     getCurrentPageElements,
     canvasSize,
@@ -429,6 +372,28 @@ const Sowntra = () => {
 
   // Calculate selectedElementData (now that getCurrentPageElements is available)
   const selectedElementData = getCurrentPageElements().find(el => el.id === selectedElement);
+
+  // Update text direction when language changes
+  useEffect(() => {
+    setTextDirection(supportedLanguages[currentLanguage]?.direction || 'ltr');
+    
+    // Update text elements with new language font
+    const currentElements = getCurrentPageElements();
+    const updatedElements = currentElements.map(el => {
+      if (el.type === 'text') {
+        return {
+          ...el,
+          fontFamily: supportedLanguages[currentLanguage]?.font || 'Arial',
+          textAlign: supportedLanguages[currentLanguage]?.direction === 'rtl' ? 'right' : el.textAlign
+        };
+      }
+      return el;
+    });
+    setCurrentPageElements(updatedElements);
+    
+    // Force gradient picker to re-render
+    setGradientPickerKey(prev => prev + 1);
+  }, [currentLanguage, getCurrentPageElements, setCurrentPageElements]);
 
   // NOTE: The following functions are now provided by useCanvasInteraction hook:
   // - calculateAlignmentLines
@@ -482,10 +447,8 @@ const Sowntra = () => {
 
   // Custom Hooks - Export Management
   const {
-    exportAsSVG,
     exportAsImage,
-    exportAsPDF,
-    getExportReadyElements: getExportReadyElementsFromHook
+    exportAsPDF
   } = useExport({
     getCurrentPageElements,
     canvasSize,
@@ -494,8 +457,6 @@ const Sowntra = () => {
 
   // Custom Hooks - Helper Functions
   const {
-    getEffectCSSWrapper,
-    getCanvasEffectsWrapper,
     handleImageUpload,
     handleLogout,
     handleCanvasMouseEnter,
@@ -550,7 +511,6 @@ const Sowntra = () => {
   // Custom Hooks - Project Management (Save/Load)
   const {
     handleSaveClick,
-    saveProject,
     confirmSave,
     loadProject,
     handleProjectFileLoad

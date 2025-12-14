@@ -590,7 +590,7 @@ export const useCanvasInteraction = ({
         </svg>
       </div>
     );
-  }, [lockedElements, canvasRef, setIsResizing, setIsRotating, setDragStart, styles]);
+  }, [lockedElements, canvasRef, setIsResizing, setIsRotating, setDragStart]);
 
   return {
     // State
