@@ -11,7 +11,8 @@ const CollaborationPresence = ({
   currentUser,
   onCanvasMouseMove,
   zoomLevel = 1,
-  canvasOffset = { x: 0, y: 0 }
+  canvasOffset = { x: 0, y: 0 },
+  canvasRef
 }) => {
   // Get unique users (avoid duplicates)
   const uniqueUsers = activeUsers.reduce((acc, user) => {
@@ -89,14 +90,52 @@ const CollaborationPresence = ({
 
       {/* Cursor Overlays */}
       {Array.from(cursors.entries()).map(([socketId, cursor]) => {
-        if (!cursor) return null;
+        if (!cursor || cursor.x === undefined || cursor.y === undefined) return null;
         
         const color = cursor.color || '#6366f1';
         const userName = cursor.userName || 'Anonymous';
         
-        // Adjust cursor position based on zoom and offset
-        const adjustedX = (cursor.x * zoomLevel) + canvasOffset.x;
-        const adjustedY = (cursor.y * zoomLevel) + canvasOffset.y;
+        // Try to find canvas element - use ref if provided, otherwise query selector
+        let canvasElement = null;
+        if (canvasRef && canvasRef.current) {
+          canvasElement = canvasRef.current;
+        } else {
+          canvasElement = document.querySelector('.bg-white.shadow-lg');
+        }
+        
+        if (!canvasElement) {
+          // Fallback: use fixed positioning relative to viewport
+          // Cursor coordinates are in canvas space, convert to screen
+          const adjustedX = window.innerWidth / 2 + (cursor.x * zoomLevel) + canvasOffset.x;
+          const adjustedY = window.innerHeight / 2 + (cursor.y * zoomLevel) + canvasOffset.y;
+          
+          return (
+            <div
+              key={socketId}
+              className="fixed pointer-events-none z-40"
+              style={{
+                left: `${adjustedX}px`,
+                top: `${adjustedY}px`,
+                transform: 'translate(-50%, -50%)'
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" className="absolute" style={{ color }}>
+                <path d="M3 3L10.07 19.97L12.58 12.58L19.97 10.07L3 3Z" fill={color} stroke="white" strokeWidth="1" />
+              </svg>
+              <div className="absolute top-6 left-0 whitespace-nowrap px-2 py-1 rounded text-xs font-medium text-white shadow-lg" style={{ backgroundColor: color }}>
+                {userName}
+              </div>
+            </div>
+          );
+        }
+        
+        const canvasRect = canvasElement.getBoundingClientRect();
+        
+        // Convert canvas coordinates to screen coordinates
+        // cursor.x and cursor.y are in canvas coordinate system (0 to canvasSize.width/height)
+        // We need to apply zoom and offset, then add canvas position
+        const adjustedX = canvasRect.left + (cursor.x * zoomLevel) + canvasOffset.x;
+        const adjustedY = canvasRect.top + (cursor.y * zoomLevel) + canvasOffset.y;
         
         return (
           <div

@@ -1140,6 +1140,7 @@ const Sowntra = () => {
             currentUser={currentUser}
             zoomLevel={zoomLevel}
             canvasOffset={canvasOffset}
+            canvasRef={canvasRef}
           />
         )}
       </div>

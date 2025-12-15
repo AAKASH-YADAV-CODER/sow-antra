@@ -94,6 +94,7 @@ const CanvasWorkspace = ({
             }}
             ref={canvasRef}
             onMouseDown={handleCanvasMouseDown}
+            onMouseMove={handleMouseMoveCallback}
             onMouseEnter={handleCanvasMouseEnter}
             onMouseLeave={handleCanvasMouseLeave}
             onTouchStart={(e) => {

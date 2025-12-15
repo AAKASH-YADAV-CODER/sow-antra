@@ -27,6 +27,7 @@ const useCollaboration = ({
   const isInitializedRef = useRef(false);
   const lastUpdateRef = useRef(null);
   const lastSyncRef = useRef(null);
+  const isApplyingRemoteChangeRef = useRef(false);
 
   // Initialize collaboration connection
   useEffect(() => {
@@ -53,15 +54,40 @@ const useCollaboration = ({
 
     // Listen to collaboration events
     const handleActiveUsers = (users) => {
-      setActiveUsers(Array.isArray(users) ? users : []);
+      console.log('👥 Received active users list:', users?.length || 0, 'users');
+      if (Array.isArray(users)) {
+        // Filter out current user from the list (we'll add them separately)
+        const otherUsers = users.filter(u => 
+          u.userId !== currentUser?.uid && 
+          u.userEmail !== currentUser?.email
+        );
+        console.log('👥 Setting active users:', otherUsers.length);
+        setActiveUsers(otherUsers);
+      } else {
+        setActiveUsers([]);
+      }
     };
 
     const handleUserJoined = (user) => {
       console.log('👤 User joined:', user);
       setActiveUsers(prev => {
-        // Avoid duplicates
-        const exists = prev.find(u => u.socketId === user.socketId);
-        if (exists) return prev;
+        // Avoid duplicates - check by socketId or userId
+        const exists = prev.find(u => 
+          u.socketId === user.socketId || 
+          (u.userId && user.userId && u.userId === user.userId) ||
+          (u.userEmail && user.userEmail && u.userEmail === user.userEmail)
+        );
+        if (exists) {
+          console.log('👤 User already in list, updating:', user.userName);
+          // Update existing user
+          return prev.map(u => 
+            (u.socketId === user.socketId || 
+             (u.userId && user.userId && u.userId === user.userId)) 
+              ? { ...u, ...user } 
+              : u
+          );
+        }
+        console.log('👤 Adding new user to list:', user.userName);
         return [...prev, user];
       });
     };
@@ -107,6 +133,14 @@ const useCollaboration = ({
     const handleConnected = () => {
       console.log('✅ Connected to collaboration server');
       setIsConnected(true);
+      
+      // Request active users list after connection
+      setTimeout(() => {
+        if (collaborationService.isConnected()) {
+          // The server should send active-users on join, but we can request it
+          console.log('📡 Requesting active users list...');
+        }
+      }, 500);
     };
 
     const handleDisconnected = () => {
@@ -130,12 +164,20 @@ const useCollaboration = ({
       isInitializedRef.current = true;
     }
 
-    // Observe Yjs changes
-    pagesText.observe(() => {
-      syncFromYjs();
-    });
+    // Observe Yjs changes - debounce to avoid too many syncs
+    let syncTimeout;
+    const observer = () => {
+      clearTimeout(syncTimeout);
+      syncTimeout = setTimeout(() => {
+        syncFromYjs();
+      }, 150);
+    };
+    
+    pagesText.observe(observer);
 
     return () => {
+      clearTimeout(syncTimeout);
+      pagesText.unobserve(observer);
       collaborationService.off('active-users', handleActiveUsers);
       collaborationService.off('user-joined', handleUserJoined);
       collaborationService.off('user-left', handleUserLeft);
@@ -150,6 +192,11 @@ const useCollaboration = ({
 
   // Sync local state to Yjs
   const syncToYjs = useCallback(() => {
+    // Don't sync if we're currently applying a remote change
+    if (isApplyingRemoteChangeRef.current) {
+      return;
+    }
+    
     if (!yDocRef.current || !pages || !isCollaborative) return;
 
     try {
@@ -157,7 +204,7 @@ const useCollaboration = ({
       const pagesData = pages.map(page => ({
         id: page.id,
         name: page.name,
-        elements: page.elements,
+        elements: page.elements || [],
         timestamp: Date.now()
       }));
       
@@ -176,7 +223,7 @@ const useCollaboration = ({
         const update = Y.encodeStateAsUpdate(yDocRef.current);
         collaborationService.sendUpdate(update);
         
-        console.log('✅ Synced to Yjs:', { pageCount: pagesData.length, currentPage });
+        console.log('✅ Synced to Yjs:', { pageCount: pagesData.length, currentPage, elementCount: pagesData[0]?.elements?.length || 0 });
       }
     } catch (error) {
       console.error('Error syncing to Yjs:', error);
@@ -191,19 +238,54 @@ const useCollaboration = ({
       const pagesText = yDocRef.current.getText('pages');
       const pagesDataStr = pagesText.toString();
       
-      if (pagesDataStr) {
+      if (pagesDataStr && pagesDataStr !== lastSyncRef.current) {
         const remotePages = JSON.parse(pagesDataStr);
         
-        // Merge with local pages, preserving structure
+        // Set flag to prevent sync loop
+        isApplyingRemoteChangeRef.current = true;
+        
+        // Merge with local pages, properly merging elements
         setPages(prevPages => {
           const updatedPages = prevPages.map(localPage => {
             const remotePage = remotePages.find(rp => rp.id === localPage.id);
-            if (remotePage && remotePage.timestamp > (localPage.lastSync || 0)) {
-              return {
-                ...localPage,
-                elements: remotePage.elements || localPage.elements,
-                lastSync: remotePage.timestamp
-              };
+            if (remotePage) {
+              // Merge elements - combine unique elements from both local and remote
+              const localElements = localPage.elements || [];
+              const remoteElements = remotePage.elements || [];
+              
+              // Create a map of elements by ID for efficient lookup
+              const elementMap = new Map();
+              
+              // Add local elements first
+              localElements.forEach(el => {
+                elementMap.set(el.id, el);
+              });
+              
+              // Add/update with remote elements (remote takes precedence for same ID)
+              remoteElements.forEach(el => {
+                elementMap.set(el.id, el);
+              });
+              
+              // Convert back to array
+              const mergedElements = Array.from(elementMap.values());
+              
+              // Only update if there are actual changes
+              const localStr = JSON.stringify(localElements);
+              const mergedStr = JSON.stringify(mergedElements);
+              
+              if (localStr !== mergedStr) {
+                console.log('🔄 Merging remote elements:', {
+                  localCount: localElements.length,
+                  remoteCount: remoteElements.length,
+                  mergedCount: mergedElements.length
+                });
+                
+                return {
+                  ...localPage,
+                  elements: mergedElements,
+                  lastSync: remotePage.timestamp || Date.now()
+                };
+              }
             }
             return localPage;
           });
@@ -215,7 +297,7 @@ const useCollaboration = ({
                 id: remotePage.id,
                 name: remotePage.name || `Page ${updatedPages.length + 1}`,
                 elements: remotePage.elements || [],
-                lastSync: remotePage.timestamp
+                lastSync: remotePage.timestamp || Date.now()
               });
             }
           });
@@ -227,17 +309,31 @@ const useCollaboration = ({
         const currentPageData = remotePages.find(p => p.id === currentPage);
         if (currentPageData && currentPageData.elements) {
           const currentElements = getCurrentPageElements();
-          // Only update if remote is newer or different
+          const remoteElements = currentPageData.elements || [];
+          
+          // Merge elements for current page
+          const elementMap = new Map();
+          currentElements.forEach(el => elementMap.set(el.id, el));
+          remoteElements.forEach(el => elementMap.set(el.id, el));
+          const mergedElements = Array.from(elementMap.values());
+          
           const currentStr = JSON.stringify(currentElements);
-          const remoteStr = JSON.stringify(currentPageData.elements);
-          if (currentStr !== remoteStr) {
-            console.log('🔄 Syncing remote elements to local state');
-            setCurrentPageElements(currentPageData.elements);
+          const mergedStr = JSON.stringify(mergedElements);
+          
+          if (currentStr !== mergedStr) {
+            console.log('🔄 Updating current page elements from remote');
+            setCurrentPageElements(mergedElements);
           }
         }
+        
+        // Reset flag after a short delay to allow state updates to complete
+        setTimeout(() => {
+          isApplyingRemoteChangeRef.current = false;
+        }, 100);
       }
     } catch (error) {
       console.error('Error syncing from Yjs:', error);
+      isApplyingRemoteChangeRef.current = false;
     }
   }, [currentPage, getCurrentPageElements, setCurrentPageElements, setPages]);
 

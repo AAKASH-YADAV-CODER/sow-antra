@@ -7,6 +7,7 @@ import MainPage from './MainPage';
 import { 
   Users, Mail, ArrowLeft
 } from 'lucide-react';
+import ActiveUsersList from '../features/collaboration/components/ActiveUsersList';
 
 const WhiteboardPage = () => {
   const { boardId } = useParams();
@@ -177,7 +178,7 @@ const WhiteboardPage = () => {
   return (
     <div className="h-screen flex flex-col">
       {/* Collaboration Header Overlay */}
-      <div className="absolute top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between">
+      <div className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between shadow-sm">
         <div className="flex items-center space-x-4">
           <button
             onClick={() => navigate('/home')}
@@ -205,40 +206,13 @@ const WhiteboardPage = () => {
         </div>
 
         <div className="flex items-center space-x-2">
-          {/* Active Users with Avatars */}
-          <div className="flex items-center space-x-2 px-3 py-1.5 bg-gray-100 rounded-lg">
-            <Users className="w-4 h-4 text-gray-600" />
-            <div className="flex items-center -space-x-2">
-              {/* Current user */}
-              <div
-                className="w-6 h-6 rounded-full bg-purple-600 text-white text-xs flex items-center justify-center font-semibold border-2 border-white"
-                title={currentUser?.displayName || currentUser?.email || 'You'}
-              >
-                {(currentUser?.displayName || currentUser?.email || 'U').charAt(0).toUpperCase()}
-              </div>
-              {/* Other active users */}
-              {activeUsers.slice(0, 3).map((user, index) => {
-                const initials = (user.userName || user.userEmail || 'A').charAt(0).toUpperCase();
-                const color = user.color || '#6366f1';
-                return (
-                  <div
-                    key={user.socketId || index}
-                    className="w-6 h-6 rounded-full text-white text-xs flex items-center justify-center font-semibold border-2 border-white"
-                    style={{ backgroundColor: color }}
-                    title={user.userName || user.userEmail || 'Anonymous'}
-                  >
-                    {initials}
-                  </div>
-                );
-              })}
-              {activeUsers.length > 3 && (
-                <div className="w-6 h-6 rounded-full bg-gray-400 text-white text-xs flex items-center justify-center font-semibold border-2 border-white">
-                  +{activeUsers.length - 3}
-                </div>
-              )}
-            </div>
-            <span className="text-sm text-gray-700">{activeUsers.length + 1} active</span>
-          </div>
+          {/* Active Users List - Clickable to see details */}
+          <ActiveUsersList
+            activeUsers={activeUsers}
+            currentUser={currentUser}
+            boardMembers={boardMembers}
+            totalMembers={boardMembers.length}
+          />
 
           {/* Invite Button */}
           {canEdit && (
@@ -254,7 +228,7 @@ const WhiteboardPage = () => {
       </div>
 
       {/* Main Page Content - offset by header height */}
-      <div className="flex-1 pt-12">
+      <div className="flex-1 pt-16 overflow-hidden">
         <MainPage />
       </div>
 

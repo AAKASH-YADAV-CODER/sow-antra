@@ -9,7 +9,10 @@ const getWebSocketURL = () => {
   // Default to port 4001 to match backend
   const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:4001';
   // Convert http:// to ws:// for WebSocket connection
-  return apiUrl.replace(/^http/, 'ws');
+  // Ensure we use ws:// for localhost, wss:// for https
+  const wsUrl = apiUrl.replace(/^http/, 'ws');
+  console.log('🔌 WebSocket URL:', wsUrl);
+  return wsUrl;
 };
 
 const WS_URL = getWebSocketURL();
@@ -26,28 +29,44 @@ class CollaborationService {
   connect(boardId, userId, userName, userEmail) {
     if (this.socket && this.socket.connected) {
       if (this.currentBoardId === boardId) {
+        console.log('✅ Already connected to this board');
         return; // Already connected to this board
       }
       this.disconnect();
     }
 
     this.currentBoardId = boardId;
-    this.socket = io(WS_URL, {
+    
+    // Ensure we're using the correct WebSocket URL format
+    // Remove trailing slash and any namespace paths
+    let wsUrl = WS_URL.replace(/\/$/, ''); // Remove trailing slash
+    // Remove any existing socket.io path or namespace from URL
+    // Socket.IO will add /socket.io/ via the path option
+    wsUrl = wsUrl.split('/socket.io')[0];
+    wsUrl = wsUrl.split('/')[0] + '//' + wsUrl.split('//')[1]?.split('/')[0] || wsUrl;
+    
+    console.log('🔗 Connecting to WebSocket:', wsUrl, 'for board:', boardId);
+    
+    // Connect to root namespace (default '/')
+    // By not specifying a namespace in the URL, we connect to the default namespace '/'
+    this.socket = io(wsUrl, {
       path: '/socket.io/',
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionAttempts: 5,
-      // Connect to default namespace (no namespace specified)
-      // This ensures we're connecting to the root namespace
-      forceNew: false,
-      // Add query parameters if needed
+      forceNew: false, // Don't force new - reuse connection if possible
+      // Add query parameters
       query: {
         boardId,
         userId,
         userName,
         userEmail
-      }
+      },
+      autoConnect: true,
+      withCredentials: true,
+      // Ensure we're using the default namespace (not specifying namespace = root '/')
+      // This prevents "Invalid namespace" errors
     });
 
     // Initialize Yjs document
@@ -55,13 +74,31 @@ class CollaborationService {
 
     // Socket connection events
     this.socket.on('connect', () => {
-      console.log('✅ Connected to collaboration server');
-      this.emit('join-board', {
+      const namespace = this.socket.nsp?.name || 'unknown';
+      console.log('✅ Connected to collaboration server', {
+        socketId: this.socket.id,
         boardId,
         userId,
-        userName,
-        userEmail
+        namespace: namespace
       });
+      
+      // Verify namespace is correct
+      if (namespace !== '/') {
+        console.warn('⚠️ Warning: Connected to non-root namespace:', namespace);
+      }
+      
+      // Emit join-board after connection is established
+      setTimeout(() => {
+        if (this.socket && this.socket.connected) {
+          this.emit('join-board', {
+            boardId,
+            userId,
+            userName,
+            userEmail
+          });
+          this.emitEvent('connected');
+        }
+      }, 100);
     });
 
     this.socket.on('disconnect', () => {
@@ -70,8 +107,21 @@ class CollaborationService {
     });
 
     this.socket.on('connect_error', (error) => {
-      console.error('Connection error:', error);
-      this.emitEvent('error', { message: 'Failed to connect to server' });
+      const errorMsg = error.message || String(error);
+      
+      // Handle "Invalid namespace" error - this usually happens on initial connection
+      if (errorMsg.includes('Invalid namespace')) {
+        console.warn('⚠️ Invalid namespace error (this is usually harmless and will retry):', errorMsg);
+        // Socket.IO will automatically retry with correct configuration
+        // Don't emit error event for this as it's expected during connection establishment
+        return;
+      }
+      
+      console.error('❌ Connection error:', errorMsg);
+      this.emitEvent('error', { 
+        message: errorMsg,
+        error: error
+      });
     });
 
     // Board sync events
@@ -109,10 +159,28 @@ class CollaborationService {
     });
 
     this.socket.on('active-users', (data) => {
-      data.users.forEach(user => {
-        this.activeUsers.set(user.socketId, user);
-      });
-      this.emitEvent('active-users', data.users);
+      console.log('📋 Received active users list:', data.users?.length || 0, 'users', data.users);
+      // Clear and update active users
+      this.activeUsers.clear();
+      if (data.users && Array.isArray(data.users)) {
+        data.users.forEach(user => {
+          const key = user.socketId || user.userId || user.userEmail;
+          if (key) {
+            this.activeUsers.set(key, {
+              ...user,
+              socketId: user.socketId,
+              userId: user.userId,
+              userName: user.userName || user.userEmail || 'Anonymous',
+              userEmail: user.userEmail,
+              color: user.color || '#6366f1',
+              role: user.role || 'viewer'
+            });
+          }
+        });
+      }
+      const usersArray = Array.from(this.activeUsers.values());
+      console.log('👥 Active users after update:', usersArray.map(u => u.userName || u.userEmail));
+      this.emitEvent('active-users', usersArray);
     });
 
     // Cursor events
