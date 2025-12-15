@@ -182,8 +182,13 @@ const CanvasElement = ({
         onInput={(e) => {
           // Auto-adjust height based on content
           if (isEditing) {
+            const newContent = e.target.textContent || '';
             const newHeight = Math.max(element.fontSize * 2, e.target.scrollHeight);
-            updateElement(element.id, { height: newHeight });
+            // Update content in real-time during editing (not just on blur)
+            updateElement(element.id, { 
+              content: newContent,
+              height: newHeight 
+            });
           }
         }}
         onKeyDown={(e) => {

@@ -90,7 +90,15 @@ const CollaborationPresence = ({
 
       {/* Cursor Overlays */}
       {Array.from(cursors.entries()).map(([socketId, cursor]) => {
-        if (!cursor || cursor.x === undefined || cursor.y === undefined) return null;
+        // Filter out invalid cursors (stuck or undefined)
+        if (!cursor || cursor.x === undefined || cursor.y === undefined || 
+            isNaN(cursor.x) || isNaN(cursor.y)) return null;
+        
+        // Filter out current user's cursor
+        if (currentUser && (
+          (cursor.userId && cursor.userId === currentUser.uid) ||
+          (cursor.userEmail && cursor.userEmail === currentUser.email)
+        )) return null;
         
         const color = cursor.color || '#6366f1';
         const userName = cursor.userName || 'Anonymous';

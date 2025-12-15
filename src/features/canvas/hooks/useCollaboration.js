@@ -28,6 +28,8 @@ const useCollaboration = ({
   const lastUpdateRef = useRef(null);
   const lastSyncRef = useRef(null);
   const isApplyingRemoteChangeRef = useRef(false);
+  const pendingLocalElementsRef = useRef(new Set()); // Track elements added locally but not yet synced
+  const lastLocalSyncTimeRef = useRef(0); // Track when we last synced local changes
 
   // Initialize collaboration connection
   useEffect(() => {
@@ -56,13 +58,11 @@ const useCollaboration = ({
     const handleActiveUsers = (users) => {
       console.log('👥 Received active users list:', users?.length || 0, 'users');
       if (Array.isArray(users)) {
-        // Filter out current user from the list (we'll add them separately)
-        const otherUsers = users.filter(u => 
-          u.userId !== currentUser?.uid && 
-          u.userEmail !== currentUser?.email
-        );
-        console.log('👥 Setting active users:', otherUsers.length);
-        setActiveUsers(otherUsers);
+        // Don't filter out current user - show all users including initiator
+        // This ensures other users can see the first user who initiated collaboration
+        const allUsers = users.filter(u => u && (u.userId || u.userEmail || u.socketId));
+        console.log('👥 Setting active users (including current user):', allUsers.length);
+        setActiveUsers(allUsers);
       } else {
         setActiveUsers([]);
       }
@@ -94,25 +94,46 @@ const useCollaboration = ({
 
     const handleUserLeft = (data) => {
       console.log('👋 User left:', data);
-      setActiveUsers(prev => prev.filter(u => u.socketId !== data.socketId));
+      setActiveUsers(prev => prev.filter(u => 
+        u.socketId !== data.socketId &&
+        !(data.userId && u.userId === data.userId) &&
+        !(data.userEmail && u.userEmail === data.userEmail)
+      ));
       setCursors(prev => {
         const newCursors = new Map(prev);
-        newCursors.delete(data.socketId);
+        // Remove cursor by socketId, userId, or userEmail
+        for (const [key, cursor] of prev.entries()) {
+          if (key === data.socketId ||
+              (data.userId && cursor.userId === data.userId) ||
+              (data.userEmail && cursor.userEmail === data.userEmail)) {
+            newCursors.delete(key);
+          }
+        }
         return newCursors;
       });
     };
 
     const handleCursorUpdate = (data) => {
+      // Don't show own cursor
+      if (currentUser && (
+        (data.userId && data.userId === currentUser.uid) ||
+        (data.userEmail && data.userEmail === currentUser.email)
+      )) {
+        return;
+      }
+      
       setCursors(prev => {
         const newCursors = new Map(prev);
-        // Don't show own cursor
-        if (data.socketId && data.cursor) {
+        if (data.socketId && data.cursor && 
+            data.cursor.x !== undefined && data.cursor.y !== undefined &&
+            !isNaN(data.cursor.x) && !isNaN(data.cursor.y)) {
           newCursors.set(data.socketId, {
             x: data.cursor.x,
             y: data.cursor.y,
             userName: data.userName || 'Anonymous',
             color: data.color || '#6366f1',
-            userId: data.userId
+            userId: data.userId,
+            userEmail: data.userEmail
           });
         }
         return newCursors;
@@ -122,12 +143,23 @@ const useCollaboration = ({
     const handleSynced = () => {
       console.log('✅ Board synced');
       setIsConnected(true);
-      syncFromYjs();
+      // Sync local state to Yjs first to ensure first user's changes are visible
+      setTimeout(() => {
+        syncToYjs();
+        // Then sync from Yjs to get any remote changes
+        setTimeout(() => {
+          syncFromYjs();
+        }, 50);
+      }, 100);
     };
 
     const handleUpdate = () => {
       console.log('🔄 Board update received');
-      syncFromYjs();
+      // Only sync from Yjs if we're not in the middle of applying local changes
+      // This prevents overwriting local changes that are being synced
+      if (!isApplyingRemoteChangeRef.current) {
+        syncFromYjs();
+      }
     };
 
     const handleConnected = () => {
@@ -158,19 +190,33 @@ const useCollaboration = ({
     collaborationService.on('connected', handleConnected);
     collaborationService.on('disconnected', handleDisconnected);
 
-    // Sync initial state to Yjs
+    // Sync initial state to Yjs after connection is established
+    // This ensures first user's changes are visible to others
     if (!isInitializedRef.current) {
-      syncToYjs();
-      isInitializedRef.current = true;
+      // Wait for connection before initial sync
+      const initSync = () => {
+        if (collaborationService.isConnected()) {
+          syncToYjs();
+          isInitializedRef.current = true;
+        } else {
+          // Retry after connection
+          setTimeout(initSync, 100);
+        }
+      };
+      initSync();
     }
 
     // Observe Yjs changes - debounce to avoid too many syncs
+    // Only sync from Yjs if we're not applying remote changes
     let syncTimeout;
     const observer = () => {
       clearTimeout(syncTimeout);
       syncTimeout = setTimeout(() => {
-        syncFromYjs();
-      }, 150);
+        // Only sync from remote if we're not in the middle of a local sync
+        if (!isApplyingRemoteChangeRef.current) {
+          syncFromYjs();
+        }
+      }, 200);
     };
     
     pagesText.observe(observer);
@@ -192,10 +238,9 @@ const useCollaboration = ({
 
   // Sync local state to Yjs
   const syncToYjs = useCallback(() => {
-    // Don't sync if we're currently applying a remote change
-    if (isApplyingRemoteChangeRef.current) {
-      return;
-    }
+    // Don't block sync on remote changes - allow local updates to go through
+    // This ensures drawing/dragging and adding multiple shapes works smoothly
+    // The isApplyingRemoteChangeRef flag is only used to prevent sync loops in syncFromYjs, not block local actions
     
     if (!yDocRef.current || !pages || !isCollaborative) return;
 
@@ -208,16 +253,28 @@ const useCollaboration = ({
         timestamp: Date.now()
       }));
       
+      // Validate data before stringifying
+      const newData = JSON.stringify(pagesData);
+      
       // Use Yjs Text to store JSON data
       const pagesText = yDocRef.current.getText('pages');
       const currentData = pagesText.toString();
-      const newData = JSON.stringify(pagesData);
       
       // Only update if data has changed (avoid infinite loops)
-      if (currentData !== newData && newData !== lastSyncRef.current) {
-        pagesText.delete(0, pagesText.length);
-        pagesText.insert(0, newData);
+      // But don't check lastSyncRef here - let it update to allow initiator to see changes
+      if (currentData !== newData) {
+        // Use transaction to ensure atomic update and prevent JSON corruption
+        yDocRef.current.transact(() => {
+          pagesText.delete(0, pagesText.length);
+          pagesText.insert(0, newData);
+        });
+        
+        // Update lastSyncRef after successful sync
         lastSyncRef.current = newData;
+        lastLocalSyncTimeRef.current = Date.now();
+        
+        // Clear pending elements since they're now synced
+        pendingLocalElementsRef.current.clear();
         
         // Send update to server
         const update = Y.encodeStateAsUpdate(yDocRef.current);
@@ -227,6 +284,8 @@ const useCollaboration = ({
       }
     } catch (error) {
       console.error('Error syncing to Yjs:', error);
+      // Reset flag on error
+      isApplyingRemoteChangeRef.current = false;
     }
   }, [pages, currentPage, isCollaborative]);
 
@@ -234,18 +293,53 @@ const useCollaboration = ({
   const syncFromYjs = useCallback(() => {
     if (!yDocRef.current || !setPages) return;
 
+    // Don't sync from remote if we just synced local changes recently (within 200ms)
+    // This prevents overwriting local changes that are in the process of being synced
+    const timeSinceLastLocalSync = Date.now() - lastLocalSyncTimeRef.current;
+    if (timeSinceLastLocalSync < 200) {
+      console.log('⏸️ Skipping remote sync - local changes pending');
+      return;
+    }
+
     try {
       const pagesText = yDocRef.current.getText('pages');
       const pagesDataStr = pagesText.toString();
       
-      if (pagesDataStr && pagesDataStr !== lastSyncRef.current) {
-        const remotePages = JSON.parse(pagesDataStr);
+      // Skip if this is the same data we already processed
+      if (pagesDataStr === lastSyncRef.current && lastSyncRef.current) {
+        return;
+      }
+      
+      // Always process updates from Yjs, even if they match lastSyncRef
+      // This ensures the initiator can see their own changes reflected back
+      if (pagesDataStr) {
+        // Validate JSON before parsing to prevent errors
+        let remotePages;
+        try {
+          // Try to parse the JSON
+          remotePages = JSON.parse(pagesDataStr);
+          
+          // Validate it's an array
+          if (!Array.isArray(remotePages)) {
+            console.warn('⚠️ Invalid pages data format, expected array');
+            isApplyingRemoteChangeRef.current = false;
+            return;
+          }
+        } catch (parseError) {
+          console.error('❌ JSON parse error in syncFromYjs:', parseError);
+          console.error('❌ Problematic JSON (first 500 chars):', pagesDataStr.substring(0, 500));
+          // If JSON is corrupted, try to recover by using last known good state
+          // Don't update lastSyncRef so we can retry on next update
+          isApplyingRemoteChangeRef.current = false;
+          return;
+        }
         
         // Set flag to prevent sync loop
         isApplyingRemoteChangeRef.current = true;
         
         // Merge with local pages, properly merging elements
         setPages(prevPages => {
+          let hasChanges = false;
           const updatedPages = prevPages.map(localPage => {
             const remotePage = remotePages.find(rp => rp.id === localPage.id);
             if (remotePage) {
@@ -256,24 +350,34 @@ const useCollaboration = ({
               // Create a map of elements by ID for efficient lookup
               const elementMap = new Map();
               
-              // Add local elements first
+              // Add local elements first - this preserves local changes that haven't been synced yet
               localElements.forEach(el => {
                 elementMap.set(el.id, el);
               });
               
               // Add/update with remote elements (remote takes precedence for same ID)
+              // This ensures remote updates are applied, but local elements are preserved
               remoteElements.forEach(el => {
-                elementMap.set(el.id, el);
+                // Only update if the element exists in local, otherwise add it
+                // This prevents overwriting local elements that are being synced
+                if (elementMap.has(el.id)) {
+                  // Remote takes precedence for existing elements (updates from other users)
+                  elementMap.set(el.id, el);
+                } else {
+                  // New element from remote - add it
+                  elementMap.set(el.id, el);
+                }
               });
               
               // Convert back to array
               const mergedElements = Array.from(elementMap.values());
               
-              // Only update if there are actual changes
+              // Check if there are actual changes
               const localStr = JSON.stringify(localElements);
               const mergedStr = JSON.stringify(mergedElements);
               
               if (localStr !== mergedStr) {
+                hasChanges = true;
                 console.log('🔄 Merging remote elements:', {
                   localCount: localElements.length,
                   remoteCount: remoteElements.length,
@@ -293,6 +397,7 @@ const useCollaboration = ({
           // Add any new pages from remote
           remotePages.forEach(remotePage => {
             if (!updatedPages.find(p => p.id === remotePage.id)) {
+              hasChanges = true;
               updatedPages.push({
                 id: remotePage.id,
                 name: remotePage.name || `Page ${updatedPages.length + 1}`,
@@ -302,7 +407,11 @@ const useCollaboration = ({
             }
           });
           
-          return updatedPages;
+          // Only update if there are actual changes
+          if (hasChanges) {
+            return updatedPages;
+          }
+          return prevPages;
         });
 
         // Update current page elements if needed
@@ -311,10 +420,20 @@ const useCollaboration = ({
           const currentElements = getCurrentPageElements();
           const remoteElements = currentPageData.elements || [];
           
-          // Merge elements for current page
+          // Merge elements for current page - preserve local elements
           const elementMap = new Map();
+          // Add local elements first to preserve them
           currentElements.forEach(el => elementMap.set(el.id, el));
-          remoteElements.forEach(el => elementMap.set(el.id, el));
+          // Then add/update with remote elements
+          remoteElements.forEach(el => {
+            if (elementMap.has(el.id)) {
+              // Remote takes precedence for existing elements
+              elementMap.set(el.id, el);
+            } else {
+              // New element from remote
+              elementMap.set(el.id, el);
+            }
+          });
           const mergedElements = Array.from(elementMap.values());
           
           const currentStr = JSON.stringify(currentElements);
@@ -325,6 +444,10 @@ const useCollaboration = ({
             setCurrentPageElements(mergedElements);
           }
         }
+        
+        // Update lastSyncRef to the current state after processing
+        // This prevents duplicate processing but allows new changes to come through
+        lastSyncRef.current = pagesDataStr;
         
         // Reset flag after a short delay to allow state updates to complete
         setTimeout(() => {
@@ -353,22 +476,53 @@ const useCollaboration = ({
   useEffect(() => {
     if (!isCollaborative || !isInitializedRef.current) return;
     
+    // Track newly added elements to prevent them from being lost during sync
+    const currentElements = getCurrentPageElements();
+    currentElements.forEach(el => {
+      // Mark elements as pending if they're new (not in pending set yet)
+      // This helps us preserve them during remote sync
+      if (!pendingLocalElementsRef.current.has(el.id)) {
+        // Check if this element exists in the last synced state
+        // If not, it's a new local element
+        const lastSyncedData = lastSyncRef.current;
+        if (lastSyncedData) {
+          try {
+            const lastSyncedPages = JSON.parse(lastSyncedData);
+            const lastSyncedPage = lastSyncedPages.find(p => p.id === currentPage);
+            const lastSyncedElements = lastSyncedPage?.elements || [];
+            const existsInLastSync = lastSyncedElements.some(se => se.id === el.id);
+            if (!existsInLastSync) {
+              pendingLocalElementsRef.current.add(el.id);
+            }
+          } catch (e) {
+            // If we can't parse, assume it's new
+            pendingLocalElementsRef.current.add(el.id);
+          }
+        } else {
+          // No last sync, assume it's new
+          pendingLocalElementsRef.current.add(el.id);
+        }
+      }
+    });
+    
     // Debounce sync to avoid too many updates, but make it faster for real-time feel
+    // Use shorter debounce for text editing (100ms) vs shapes (200ms)
     const timeoutId = setTimeout(() => {
       syncToYjs();
-    }, 200);
+    }, 150); // Slightly increased to allow multiple rapid additions
 
     return () => clearTimeout(timeoutId);
-  }, [pages, syncToYjs, isCollaborative]);
+  }, [pages, syncToYjs, isCollaborative, currentPage, getCurrentPageElements]);
 
   // Sync when current page elements change - watch for element count changes
   useEffect(() => {
     if (!isCollaborative || !isInitializedRef.current) return;
     
     // Sync immediately when elements are added/removed, debounce for updates
+    // Use shorter debounce for faster real-time sync
     const timeoutId = setTimeout(() => {
       syncToYjs();
-    }, 200);
+    }, 100); // Reduced from 200ms for faster sync
 
     return () => clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps

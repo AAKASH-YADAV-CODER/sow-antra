@@ -105,15 +105,51 @@ const WhiteboardPage = () => {
 
     // Listen to collaboration events
     collaborationService.on('active-users', (users) => {
-      setActiveUsers(Array.isArray(users) ? users : []);
+      // Replace the entire list to avoid duplicates on refresh
+      const usersArray = Array.isArray(users) ? users : [];
+      // Deduplicate by socketId, userId, or userEmail
+      const uniqueUsers = usersArray.reduce((acc, user) => {
+        const key = user.socketId || user.userId || user.userEmail;
+        if (key && !acc.find(u => 
+          u.socketId === user.socketId || 
+          (u.userId && user.userId && u.userId === user.userId) ||
+          (u.userEmail && user.userEmail && u.userEmail === user.userEmail)
+        )) {
+          acc.push(user);
+        }
+        return acc;
+      }, []);
+      setActiveUsers(uniqueUsers);
     });
 
     collaborationService.on('user-joined', (user) => {
-      setActiveUsers(prev => [...prev, user]);
+      setActiveUsers(prev => {
+        // Check if user already exists to avoid duplicates
+        const exists = prev.find(u => 
+          u.socketId === user.socketId || 
+          (u.userId && user.userId && u.userId === user.userId) ||
+          (u.userEmail && user.userEmail && u.userEmail === user.userEmail)
+        );
+        if (exists) {
+          // Update existing user instead of adding duplicate
+          return prev.map(u => 
+            (u.socketId === user.socketId || 
+             (u.userId && user.userId && u.userId === user.userId) ||
+             (u.userEmail && user.userEmail && u.userEmail === user.userEmail))
+              ? { ...u, ...user } 
+              : u
+          );
+        }
+        return [...prev, user];
+      });
     });
 
     collaborationService.on('user-left', (data) => {
-      setActiveUsers(prev => prev.filter(u => u.socketId !== data.socketId));
+      setActiveUsers(prev => prev.filter(u => 
+        u.socketId !== data.socketId &&
+        !(data.userId && u.userId === data.userId) &&
+        !(data.userEmail && u.userEmail === data.userEmail)
+      ));
     });
 
     collaborationService.on('user-role', (data) => {
