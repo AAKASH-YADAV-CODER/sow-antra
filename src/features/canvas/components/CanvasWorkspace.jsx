@@ -39,8 +39,19 @@ const CanvasWorkspace = ({
   
   // Alignment lines
   showAlignmentLines,
-  alignmentLines
+  alignmentLines,
+  
+  // Collaboration
+  onMouseMove
 }) => {
+  const handleMouseMoveCallback = (e) => {
+    if (onMouseMove && canvasRef.current) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      onMouseMove(x, y);
+    }
+  };
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <div 

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ArrowRight, CheckCircle, LogOut, FolderOpen, Clock, Trash2 } from 'lucide-react';
-import { projectAPI } from '../services/api';
+import { projectAPI, boardAPI } from '../services/api';
 
 const HomePage = () => {
   const { currentUser, logout } = useAuth();
@@ -57,6 +57,23 @@ const HomePage = () => {
 
   const handleOpenProject = (projectId) => {
     navigate(`/main?project=${projectId}`);
+  };
+
+  const handleTeamCollaboration = async () => {
+    try {
+      // Create a new board/workspace for collaboration
+      const response = await boardAPI.createBoard({
+        title: `${currentUser?.displayName || 'My'} Workspace`,
+        description: 'Collaborative whiteboard workspace',
+        isPublic: false
+      });
+      
+      // Navigate to the whiteboard
+      navigate(`/whiteboard/${response.data.id}`);
+    } catch (error) {
+      console.error('Error creating workspace:', error);
+      alert('Failed to create workspace. Please try again.');
+    }
   };
 
   const getJoinedDate = () => {
@@ -165,7 +182,10 @@ const HomePage = () => {
               <p className="text-gray-600 text-sm">Access your saved designs and continue working</p>
             </div>
             
-            <div className="bg-white p-6 rounded-xl border border-gray-200 hover:border-purple-200 hover:shadow-lg transition-all cursor-pointer">
+            <div 
+              onClick={handleTeamCollaboration}
+              className="bg-white p-6 rounded-xl border border-gray-200 hover:border-purple-200 hover:shadow-lg transition-all cursor-pointer"
+            >
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4 mx-auto">
                 <span className="text-2xl">👥</span>
               </div>

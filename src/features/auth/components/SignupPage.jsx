@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
+import { invitationAPI } from '../../../services/api';
 
 const SignupPage = () => {
   const [currentPage, setCurrentPage] = useState('login');
@@ -9,9 +10,32 @@ const SignupPage = () => {
   const { isAuthenticated } = useAuth();
 
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/home', { replace: true });
-    }
+    const handlePendingInvitation = async () => {
+      if (isAuthenticated) {
+        // Check for pending invitation
+        const pendingToken = localStorage.getItem('pending_invitation_token');
+        if (pendingToken) {
+          try {
+            // Try to accept the invitation
+            const response = await invitationAPI.acceptInvitation(pendingToken);
+            if (response.data.success) {
+              localStorage.removeItem('pending_invitation_token');
+              if (response.data.board) {
+                navigate(`/whiteboard/${response.data.board.id}`, { replace: true });
+                return;
+              }
+            }
+          } catch (error) {
+            console.error('Error accepting pending invitation:', error);
+            // If it fails, just remove the token and continue to home
+            localStorage.removeItem('pending_invitation_token');
+          }
+        }
+        navigate('/home', { replace: true });
+      }
+    };
+
+    handlePendingInvitation();
   }, [isAuthenticated, navigate]);
 
   return (

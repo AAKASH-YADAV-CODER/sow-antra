@@ -9,6 +9,8 @@ import ErrorBoundary from "./components/common/ErrorBoundary";
 const SignupPage = lazy(() => import("./features/auth/components/SignupPage"));
 const HomePage = lazy(() => import("./pages/HomePage"));
 const MainPage = lazy(() => import("./pages/MainPage"));
+const WhiteboardPage = lazy(() => import("./pages/WhiteboardPage"));
+const InviteAcceptPage = lazy(() => import("./pages/InviteAcceptPage"));
 
 function App() {
   return (
@@ -33,6 +35,18 @@ function App() {
                     <MainPage />
                   </ProtectedRoute>
                 } 
+              />
+              <Route 
+                path="/whiteboard/:boardId" 
+                element={
+                  <ProtectedRoute>
+                    <WhiteboardPage />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/invite/:token" 
+                element={<InviteAcceptPage />} 
               />
             </Routes>
           </Suspense>

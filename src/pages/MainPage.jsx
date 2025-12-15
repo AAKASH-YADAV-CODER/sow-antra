@@ -46,8 +46,10 @@ import { useProjectManager } from '../features/canvas/hooks/useProjectManager';
 import { useTemplates } from '../features/canvas/hooks/useTemplates';
 import { useKeyboardShortcuts } from '../features/canvas/hooks/useKeyboardShortcuts';
 import { useHelpers } from '../features/canvas/hooks/useHelpers';
+import useCollaboration from '../features/canvas/hooks/useCollaboration';
 // UI Helper Components
 import TransliterationToggle from '../features/canvas/components/TransliterationToggle';
+import CollaborationPresence from '../features/collaboration/components/CollaborationPresence';
 
 
 const Sowntra = () => {
@@ -56,6 +58,8 @@ const Sowntra = () => {
   const [searchParams] = useSearchParams();
   const { logout, currentUser } = useAuth();
   const currentProjectId = searchParams.get('project');
+  // Check if we're in collaborative mode (boardId from URL or projectId)
+  const isCollaborative = !!currentProjectId;
   const [selectedElement, setSelectedElement] = useState(null);
   const [selectedElements, setSelectedElements] = useState(new Set());
   // isDragging, isResizing, isRotating, isPanning, dragStart, showAlignmentLines, alignmentLines now managed by useCanvasInteraction hook
@@ -172,30 +176,44 @@ const Sowntra = () => {
   // Load project if projectId is provided
   useEffect(() => {
     const loadProject = async () => {
-      if (currentProjectId) {
-        try {
-          const response = await projectAPI.loadProject(currentProjectId);
-          const { projectData } = response.data;
-          
-          if (projectData) {
-            if (projectData.pages) setPages(projectData.pages);
-            if (projectData.currentPage) setCurrentPage(projectData.currentPage);
-            if (projectData.canvasSize) setCanvasSize(projectData.canvasSize);
-            if (projectData.zoomLevel) setZoomLevel(projectData.zoomLevel);
-            if (projectData.canvasOffset) setCanvasOffset(projectData.canvasOffset);
-            if (projectData.showGrid !== undefined) setShowGrid(projectData.showGrid);
-            if (projectData.snapToGrid !== undefined) setSnapToGrid(projectData.snapToGrid);
-            if (projectData.currentLanguage) setCurrentLanguage(projectData.currentLanguage);
-            if (projectData.textDirection) setTextDirection(projectData.textDirection);
-          }
-        } catch (error) {
-          console.error('Error loading project:', error);
+      if (!currentProjectId || !currentUser) {
+        return; // Wait for user to be authenticated
+      }
+
+      try {
+        // Ensure auth is ready before making the request
+        const { auth } = await import('../config/firebase');
+        if (!auth.currentUser) {
+          console.warn('User not authenticated, skipping project load');
+          return;
+        }
+
+        const response = await projectAPI.loadProject(currentProjectId);
+        const { projectData } = response.data;
+        
+        if (projectData) {
+          if (projectData.pages) setPages(projectData.pages);
+          if (projectData.currentPage) setCurrentPage(projectData.currentPage);
+          if (projectData.canvasSize) setCanvasSize(projectData.canvasSize);
+          if (projectData.zoomLevel) setZoomLevel(projectData.zoomLevel);
+          if (projectData.canvasOffset) setCanvasOffset(projectData.canvasOffset);
+          if (projectData.showGrid !== undefined) setShowGrid(projectData.showGrid);
+          if (projectData.snapToGrid !== undefined) setSnapToGrid(projectData.snapToGrid);
+          if (projectData.currentLanguage) setCurrentLanguage(projectData.currentLanguage);
+          if (projectData.textDirection) setTextDirection(projectData.textDirection);
+        }
+      } catch (error) {
+        console.error('Error loading project:', error);
+        // Log more details for debugging
+        if (error.response) {
+          console.error('Response status:', error.response.status);
+          console.error('Response data:', error.response.data);
         }
       }
     };
 
     loadProject();
-  }, [currentProjectId]);
+  }, [currentProjectId, currentUser]);
 
   // Load transliteration data
   useEffect(() => {
@@ -373,27 +391,74 @@ const Sowntra = () => {
   // Calculate selectedElementData (now that getCurrentPageElements is available)
   const selectedElementData = getCurrentPageElements().find(el => el.id === selectedElement);
 
+  // Collaboration Hook
+  const {
+    activeUsers,
+    cursors,
+    handleCursorMove
+  } = useCollaboration({
+    boardId: currentProjectId,
+    currentUser,
+    pages,
+    setPages,
+    currentPage,
+    getCurrentPageElements,
+    setCurrentPageElements,
+    addElement,
+    updateElement,
+    deleteElement,
+    isCollaborative
+  });
+
+  // Enhanced cursor tracking for canvas
+  const handleCanvasMouseMoveForCollaboration = useCallback((e) => {
+    if (isCollaborative && handleCursorMove && canvasRef.current) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      handleCursorMove(x, y);
+    }
+  }, [isCollaborative, handleCursorMove]);
+
   // Update text direction when language changes
   useEffect(() => {
     setTextDirection(supportedLanguages[currentLanguage]?.direction || 'ltr');
     
     // Update text elements with new language font
-    const currentElements = getCurrentPageElements();
-    const updatedElements = currentElements.map(el => {
-      if (el.type === 'text') {
-        return {
-          ...el,
-          fontFamily: supportedLanguages[currentLanguage]?.font || 'Arial',
-          textAlign: supportedLanguages[currentLanguage]?.direction === 'rtl' ? 'right' : el.textAlign
-        };
+    // Use pages state directly to avoid infinite loop
+    const currentPageData = pages.find(p => p.id === currentPage);
+    if (currentPageData) {
+      const currentElements = currentPageData.elements || [];
+      const hasTextElements = currentElements.some(el => el.type === 'text');
+      
+      // Only update if there are text elements to update
+      if (hasTextElements) {
+        const updatedElements = currentElements.map(el => {
+          if (el.type === 'text') {
+            return {
+              ...el,
+              fontFamily: supportedLanguages[currentLanguage]?.font || 'Arial',
+              textAlign: supportedLanguages[currentLanguage]?.direction === 'rtl' ? 'right' : el.textAlign
+            };
+          }
+          return el;
+        });
+        
+        // Use functional update to avoid dependency on pages
+        setPages(prevPages => 
+          prevPages.map(page => 
+            page.id === currentPage 
+              ? { ...page, elements: updatedElements } 
+              : page
+          )
+        );
       }
-      return el;
-    });
-    setCurrentPageElements(updatedElements);
+    }
     
     // Force gradient picker to re-render
     setGradientPickerKey(prev => prev + 1);
-  }, [currentLanguage, getCurrentPageElements, setCurrentPageElements]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentLanguage, currentPage]);
 
   // NOTE: The following functions are now provided by useCanvasInteraction hook:
   // - calculateAlignmentLines
@@ -790,6 +855,7 @@ const Sowntra = () => {
             drawingPath={drawingPath}
             showAlignmentLines={showAlignmentLines}
             alignmentLines={alignmentLines}
+            onMouseMove={handleCanvasMouseMoveForCollaboration}
           />
 
           {/* Right Properties Panel - Hidden on mobile */}
@@ -1065,6 +1131,17 @@ const Sowntra = () => {
           setProjectName={setProjectName}
           confirmSave={confirmSave}
         />
+
+        {/* Collaboration Presence - Show active users and cursors */}
+        {isCollaborative && (
+          <CollaborationPresence
+            activeUsers={activeUsers}
+            cursors={cursors}
+            currentUser={currentUser}
+            zoomLevel={zoomLevel}
+            canvasOffset={canvasOffset}
+          />
+        )}
       </div>
     </>
   );
