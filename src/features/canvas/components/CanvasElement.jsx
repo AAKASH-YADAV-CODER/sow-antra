@@ -176,20 +176,14 @@ const CanvasElement = ({
         suppressContentEditableWarning={true}
         onBlur={(e) => {
           const newContent = e.target.textContent || '';
-          updateElement(element.id, { content: newContent });
+          const newHeight = Math.max(element.fontSize * 2, e.target.scrollHeight);
+          updateElement(element.id, { content: newContent, height: newHeight });
           setTextEditing(null);
         }}
         onInput={(e) => {
-          // Auto-adjust height based on content
-          if (isEditing) {
-            const newContent = e.target.textContent || '';
-            const newHeight = Math.max(element.fontSize * 2, e.target.scrollHeight);
-            // Update content in real-time during editing (not just on blur)
-            updateElement(element.id, { 
-              content: newContent,
-              height: newHeight 
-            });
-          }
+          // Don't update element state during typing to prevent sync conflicts
+          // Just let the contentEditable handle the input naturally
+          // Height will be updated on blur
         }}
         onKeyDown={(e) => {
           // Prevent deletion of the entire element

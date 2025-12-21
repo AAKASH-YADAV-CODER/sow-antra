@@ -407,7 +407,8 @@ const Sowntra = () => {
     addElement,
     updateElement,
     deleteElement,
-    isCollaborative
+    isCollaborative,
+    textEditing
   });
 
   // Enhanced cursor tracking for canvas

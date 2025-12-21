@@ -17,7 +17,8 @@ const useCollaboration = ({
   addElement,
   updateElement,
   deleteElement,
-  isCollaborative = false
+  isCollaborative = false,
+  textEditing = null
 }) => {
   const [activeUsers, setActiveUsers] = useState([]);
   const [cursors, setCursors] = useState(new Map());
@@ -361,8 +362,15 @@ const useCollaboration = ({
                 // Only update if the element exists in local, otherwise add it
                 // This prevents overwriting local elements that are being synced
                 if (elementMap.has(el.id)) {
-                  // Remote takes precedence for existing elements (updates from other users)
-                  elementMap.set(el.id, el);
+                  // If this element is currently being edited, preserve its local content
+                  if (textEditing && el.id === textEditing) {
+                    const localEl = elementMap.get(el.id);
+                    // Keep local content during editing, but accept other property updates
+                    elementMap.set(el.id, { ...el, content: localEl.content });
+                  } else {
+                    // Remote takes precedence for existing elements (updates from other users)
+                    elementMap.set(el.id, el);
+                  }
                 } else {
                   // New element from remote - add it
                   elementMap.set(el.id, el);
@@ -427,8 +435,15 @@ const useCollaboration = ({
           // Then add/update with remote elements
           remoteElements.forEach(el => {
             if (elementMap.has(el.id)) {
-              // Remote takes precedence for existing elements
-              elementMap.set(el.id, el);
+              // If this element is currently being edited, preserve its local content
+              if (textEditing && el.id === textEditing) {
+                const localEl = elementMap.get(el.id);
+                // Keep local content during editing, but accept other property updates
+                elementMap.set(el.id, { ...el, content: localEl.content });
+              } else {
+                // Remote takes precedence for existing elements
+                elementMap.set(el.id, el);
+              }
             } else {
               // New element from remote
               elementMap.set(el.id, el);
@@ -458,7 +473,7 @@ const useCollaboration = ({
       console.error('Error syncing from Yjs:', error);
       isApplyingRemoteChangeRef.current = false;
     }
-  }, [currentPage, getCurrentPageElements, setCurrentPageElements, setPages]);
+  }, [currentPage, getCurrentPageElements, setCurrentPageElements, setPages, textEditing]);
 
   // Track cursor movement (throttled)
   const handleCursorMove = useCallback((x, y) => {
