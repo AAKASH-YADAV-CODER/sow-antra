@@ -414,11 +414,13 @@ const Sowntra = () => {
   const handleCanvasMouseMoveForCollaboration = useCallback((e) => {
     if (isCollaborative && handleCursorMove && canvasRef.current) {
       const rect = canvasRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      // Convert screen coordinates to canvas-space coordinates
+      // Account for zoom level and canvas offset (pan)
+      const x = (e.clientX - rect.left - canvasOffset.x) / zoomLevel;
+      const y = (e.clientY - rect.top - canvasOffset.y) / zoomLevel;
       handleCursorMove(x, y);
     }
-  }, [isCollaborative, handleCursorMove]);
+  }, [isCollaborative, handleCursorMove, zoomLevel, canvasOffset]);
 
   // Update text direction when language changes
   useEffect(() => {

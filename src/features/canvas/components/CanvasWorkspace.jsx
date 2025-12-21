@@ -45,11 +45,9 @@ const CanvasWorkspace = ({
   onMouseMove
 }) => {
   const handleMouseMoveCallback = (e) => {
-    if (onMouseMove && canvasRef.current) {
-      const rect = canvasRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      onMouseMove(x, y);
+    if (onMouseMove) {
+      // Pass the event directly, let the handler calculate coordinates
+      onMouseMove(e);
     }
   };
   return (

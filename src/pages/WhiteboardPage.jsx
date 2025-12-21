@@ -5,7 +5,7 @@ import { boardAPI, invitationAPI, projectAPI } from '../services/api';
 import collaborationService from '../services/collaboration';
 import MainPage from './MainPage';
 import { 
-  Users, Mail, ArrowLeft
+  Mail, ArrowLeft
 } from 'lucide-react';
 import ActiveUsersList from '../features/collaboration/components/ActiveUsersList';
 
