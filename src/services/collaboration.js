@@ -6,8 +6,8 @@ const getWebSocketURL = () => {
   if (process.env.REACT_APP_WS_URL) {
     return process.env.REACT_APP_WS_URL;
   }
-  // Default to port 4001 to match backend
-  const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:4001';
+  // Default to production backend
+  const apiUrl = process.env.REACT_APP_API_URL || 'https://api.sowntra.com';
   // Convert http:// to ws:// for WebSocket connection
   // Ensure we use ws:// for localhost, wss:// for https
   const wsUrl = apiUrl.replace(/^http/, 'ws');
