@@ -5,7 +5,7 @@ import ProtectedRoute from "./features/auth/components/ProtectedRoute";
 import LoadingSpinner from "./components/common/LoadingSpinner";
 import ErrorBoundary from "./components/common/ErrorBoundary";
 
-// Lazy load route components for better performance
+// Lazy load route components for better 
 const SignupPage = lazy(() => import("./features/auth/components/SignupPage"));
 const HomePage = lazy(() => import("./pages/HomePage"));
 const MainPage = lazy(() => import("./pages/MainPage"));
