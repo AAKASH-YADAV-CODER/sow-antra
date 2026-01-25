@@ -12,21 +12,32 @@ const EffectsPanel = ({
   if (!show || !selectedElementData) return null;
   
   return (
-    <div className="fixed right-4 top-20 bg-white shadow-2xl rounded-lg w-80 z-40 
-                    max-h-[80vh] overflow-y-auto
-                    md:right-80 md:w-80
-                    sm:right-2 sm:left-2 sm:w-auto sm:top-16">
-      <div className="sticky top-0 bg-white z-10 p-4 border-b flex justify-between items-center
-                      md:p-4 sm:p-3">
-        <h3 className="font-bold text-lg md:text-xl sm:text-base">Effects</h3>
-        <button 
-          onClick={onClose}
-          className="p-1 rounded-lg hover:bg-gray-200 transition-colors"
-          aria-label="Close"
-        >
-          <X size={20} />
-        </button>
-      </div>
+    <>
+      {/* Backdrop overlay */}
+      <div 
+        className="fixed inset-0 bg-black/30 backdrop-blur-sm"
+        style={{ zIndex: 9998 }}
+        onClick={onClose}
+      />
+      
+      {/* Effects Panel - Centered below header */}
+      <div 
+        className="fixed left-1/2 top-24 -translate-x-1/2 bg-white shadow-2xl rounded-lg w-[90vw] max-w-md 
+                   max-h-[calc(100vh-8rem)] overflow-y-auto
+                   sm:w-[95vw] sm:top-20"
+        style={{ zIndex: 9999 }}
+      >
+        <div className="sticky top-0 bg-white z-10 p-4 border-b flex justify-between items-center
+                        md:p-4 sm:p-3">
+          <h3 className="font-bold text-lg md:text-xl sm:text-base">Effects</h3>
+          <button 
+            onClick={onClose}
+            className="p-1 rounded-lg hover:bg-gray-200 transition-colors"
+            aria-label="Close"
+          >
+            <X size={20} />
+          </button>
+        </div>
 
       <div className="p-4 md:p-4 sm:p-3 space-y-4">
         {/* Text Effects */}
@@ -134,6 +145,7 @@ const EffectsPanel = ({
         </div>
       </div>
     </div>
+    </>
   );
 };
 
