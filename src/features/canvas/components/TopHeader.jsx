@@ -52,116 +52,116 @@ const TopHeader = ({
   handleLogout
 }) => {
   return (
-    <div className="main-header flex">
+    <div className="main-header">
       {/* Left Section: Logo and Zoom Controls */}
-      <div className="flex items-center space-x-2 md:space-x-4">
+      <div className="flex items-center gap-1 md:gap-2 min-w-0 flex-shrink-0">
         <button
           onClick={() => navigate('/home')}
-          className="flex items-center text-gray-600 hover:text-gray-900 transition-colors p-2 touch-manipulation"
+          className="flex items-center text-gray-600 hover:text-gray-900 transition-colors p-2 touch-manipulation flex-shrink-0"
           title="Back to Home"
         >
-          <ArrowLeft className="w-5 h-5 md:mr-1" />
+          <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
         </button>
         
-        <h1 className="text-base md:text-xl font-bold flex items-center">
-          <span className="handwritten-logo">Sowntra</span>
+        <h1 className="text-sm md:text-xl font-bold flex items-center flex-shrink-0">
+          <span className="handwritten-logo text-base md:text-2xl">Sowntra</span>
         </h1>
         
         {/* Desktop Zoom Controls */}
-        <div className="hidden md:flex space-x-2">
+        <div className="hidden lg:flex items-center gap-1 ml-2">
           <button
             onClick={() => zoom('in')}
-            className="p-2 rounded hover:bg-white/20 touch-manipulation"
+            className="p-1.5 rounded hover:bg-white/20 touch-manipulation"
             title="Zoom In"
           >
-            <ZoomIn size={18} />
+            <ZoomIn size={16} />
           </button>
           <button
             onClick={() => zoom('out')}
-            className="p-2 rounded hover:bg-white/20 touch-manipulation"
+            className="p-1.5 rounded hover:bg-white/20 touch-manipulation"
             title="Zoom Out"
           >
-            <ZoomOut size={18} />
+            <ZoomOut size={16} />
           </button>
           <button
             onClick={centerCanvas}
-            className="p-2 rounded hover:bg-white/20 touch-manipulation"
+            className="p-1.5 rounded hover:bg-white/20 touch-manipulation"
             title="Fit to Viewport"
           >
-            <Maximize size={18} />
+            <Maximize size={16} />
           </button>
-          <span className="px-2 py-1 bg-white/20 rounded text-sm">
+          <span className="px-2 py-1 bg-white/20 rounded text-xs font-medium">
             {Math.round(zoomLevel * 100)}%
           </span>
         </div>
       </div>
 
       {/* Center Section: Templates, Effects, Animations, Recording */}
-      <div className="hidden md:flex space-x-2">
+      <div className="hidden lg:flex items-center gap-1.5 flex-shrink min-w-0">
         <button
           onClick={() => setShowTemplates(!showTemplates)}
-          className={`px-3 py-2 rounded flex items-center touch-manipulation ${showTemplates ? 'bg-white text-purple-600' : 'bg-white/20 hover:bg-white/30'}`}
+          className={`px-2 py-1.5 rounded flex items-center touch-manipulation text-sm whitespace-nowrap ${showTemplates ? 'bg-white text-purple-600' : 'bg-white/20 hover:bg-white/30'}`}
         >
-          <Layers size={16} className="mr-1" />
-          {t('toolbar.templates')}
+          <Layers size={14} className="mr-1" />
+          <span className="hidden xl:inline">{t('toolbar.templates')}</span>
         </button>
         
         <button
           onClick={() => setShowEffectsPanel(!showEffectsPanel)}
-          className={`px-3 py-2 rounded flex items-center touch-manipulation ${showEffectsPanel ? 'bg-white text-purple-600' : 'bg-white/20 hover:bg-white/30'}`}
+          className={`px-2 py-1.5 rounded flex items-center touch-manipulation text-sm whitespace-nowrap ${showEffectsPanel ? 'bg-white text-purple-600' : 'bg-white/20 hover:bg-white/30'}`}
         >
-          <Sparkles size={16} className="mr-1" />
-          {t('toolbar.effects')}
+          <Sparkles size={14} className="mr-1" />
+          <span className="hidden xl:inline">{t('toolbar.effects')}</span>
         </button>
         
         <button
           onClick={playAnimations}
           disabled={isPlaying}
-          className="px-3 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50 flex items-center touch-manipulation"
+          className="px-2 py-1.5 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50 flex items-center touch-manipulation text-sm whitespace-nowrap"
         >
-          <Play size={16} className="mr-1" />
-          {t('toolbar.play')}
+          <Play size={14} className="xl:mr-1" />
+          <span className="hidden xl:inline">{t('toolbar.play')}</span>
         </button>
         
         <button
           onClick={resetAnimations}
-          className="px-3 py-2 bg-white/20 text-white rounded hover:bg-white/30 flex items-center touch-manipulation"
+          className="px-2 py-1.5 bg-white/20 text-white rounded hover:bg-white/30 flex items-center touch-manipulation text-sm whitespace-nowrap"
         >
-          <Pause size={16} className="mr-1" />
-          {t('toolbar.reset')}
+          <Pause size={14} className="xl:mr-1" />
+          <span className="hidden xl:inline">{t('toolbar.reset')}</span>
         </button>
         
         {recording ? (
           <button
             onClick={stopRecording}
-            className="px-3 py-2 bg-red-500 text-white rounded hover:bg-red-600 flex items-center touch-manipulation"
+            className="px-2 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 flex items-center touch-manipulation text-sm whitespace-nowrap"
           >
-            <div className="w-2 h-2 bg-white rounded-full mr-2 animate-pulse"></div>
-            <Square size={16} className="mr-1" />
-            Stop ({Math.floor(recordingTimeElapsed / 60)}:{(recordingTimeElapsed % 60).toString().padStart(2, '0')})
+            <div className="w-1.5 h-1.5 bg-white rounded-full mr-1.5 animate-pulse"></div>
+            <Square size={14} className="xl:mr-1" />
+            <span className="hidden xl:inline">Stop ({Math.floor(recordingTimeElapsed / 60)}:{(recordingTimeElapsed % 60).toString().padStart(2, '0')})</span>
           </button>
         ) : (
           <button
             onClick={startRecording}
-            className="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center touch-manipulation"
+            className="px-2 py-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center touch-manipulation text-sm whitespace-nowrap"
           >
-            <Film size={16} className="mr-1" />
-            {t('toolbar.record')}
+            <Film size={14} className="xl:mr-1" />
+            <span className="hidden xl:inline">{t('toolbar.record')}</span>
           </button>
         )}
       </div>
 
       {/* Right Section: Language Selector, Share, Account */}
-      <div className="flex items-center space-x-1 md:space-x-2">
+      <div className="flex items-center gap-1 md:gap-1.5 flex-shrink-0 ml-auto">
         {/* Language Selector */}
         <div className="relative">
           <button
             onClick={() => setShowLanguageMenu(!showLanguageMenu)}
-            className="px-2 md:px-3 py-1.5 md:py-2 rounded bg-white/10 hover:bg-white/20 flex items-center gap-1 md:gap-2 touch-manipulation transition-colors"
+            className="px-2 py-1.5 rounded bg-white/10 hover:bg-white/20 flex items-center gap-1 touch-manipulation transition-colors"
             title="Language"
           >
-            <Languages size={16} className="md:w-[18px] md:h-[18px]" />
-            <span className="text-xs md:text-sm font-medium hidden sm:inline">
+            <Languages size={16} className="flex-shrink-0" />
+            <span className="text-xs font-medium hidden md:inline truncate max-w-[60px]">
               {supportedLanguages[currentLanguage]?.name}
             </span>
           </button>
@@ -232,18 +232,18 @@ const TopHeader = ({
           url={window.location.href}
           title="Check out my design on Sowntra!"
           text="I created this amazing design on Sowntra. Check it out!"
-          className="px-2 md:px-3 py-1.5 hidden md:flex"
+          className="px-2 py-1.5 hidden lg:flex"
         />
         
         {/* Account Menu */}
         <div className="relative">
           <button
             onClick={() => setShowAccountMenu(!showAccountMenu)}
-            className="px-2 md:px-3 py-1.5 md:py-2 rounded bg-white/10 hover:bg-white/20 flex items-center gap-1 md:gap-2 touch-manipulation transition-colors min-h-[36px]"
+            className="px-2 py-1.5 rounded bg-white/10 hover:bg-white/20 flex items-center gap-1 touch-manipulation transition-colors"
             title="Account"
           >
-            <User size={16} className="md:w-[18px] md:h-[18px]" />
-            <span className="text-xs md:text-sm font-medium hidden sm:inline truncate max-w-[60px] sm:max-w-[80px] md:max-w-[100px] lg:max-w-[120px]">
+            <User size={16} className="flex-shrink-0" />
+            <span className="text-xs font-medium hidden lg:inline truncate max-w-[80px]">
               {currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Account'}
             </span>
           </button>
