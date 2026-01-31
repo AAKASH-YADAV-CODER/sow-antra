@@ -6,7 +6,7 @@ import {
   Copy, Trash2,
  MinusCircle, PlusCircle, 
  Lock,
- Group, Ungroup, ZoomIn
+ Group, Ungroup
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -25,10 +25,10 @@ import TopHeader from '../features/canvas/components/TopHeader';
 import ToolsSidebar from '../features/canvas/components/ToolsSidebar';
 import PagesNavigator from '../features/canvas/components/PagesNavigator';
 import CanvasWorkspace from '../features/canvas/components/CanvasWorkspace';
+import BottomZoomControl from '../features/canvas/components/BottomZoomControl';
 // Style imports
 import styles from '../styles/MainPage.module.css';
 import '../styles/MainPageAnimations.css';
-import * as styleHelpers from '../utils/styleHelpers';
 // Utility imports
 import { 
   getFilterCSS, 
@@ -111,14 +111,12 @@ const Sowntra = () => {
   const [touchStartDistance, setTouchStartDistance] = useState(0);
   const [initialZoomLevel, setInitialZoomLevel] = useState(1);
   const [lastTouchEnd, setLastTouchEnd] = useState(0);
-  const [showZoomIndicator, setShowZoomIndicator] = useState(false);
 
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
   const floatingToolbarRef = useRef(null);
   const canvasContainerRef = useRef(null);
   const loadProjectInputRef = useRef(null);
-  const zoomIndicatorTimeoutRef = useRef(null);
 
 
   // getCurrentPageElements will be provided by useElements hook below
@@ -256,15 +254,6 @@ const Sowntra = () => {
   }, [currentLanguage]);
 
 
-  // Cleanup zoom indicator timeout on unmount
-  useEffect(() => {
-    const timeoutRef = zoomIndicatorTimeoutRef.current;
-    return () => {
-      if (timeoutRef) {
-        clearTimeout(timeoutRef);
-      }
-    };
-  }, []);
 
   // socialMediaTemplates, stickerOptions, animations, filterOptions imported from constants.js
 
@@ -383,9 +372,7 @@ const Sowntra = () => {
     zoomLevel,
     setZoomLevel,
     isPlaying,
-    setIsPlaying,
-    setShowZoomIndicator,
-    zoomIndicatorTimeoutRef
+    setIsPlaying
   });
 
   // Calculate selectedElementData (now that getCurrentPageElements is available)
@@ -772,9 +759,6 @@ const Sowntra = () => {
         <TopHeader
           t={t}
           navigate={navigate}
-          zoom={zoom}
-          zoomLevel={zoomLevel}
-          centerCanvas={centerCanvas}
           showTemplates={showTemplates}
           setShowTemplates={setShowTemplates}
           showEffectsPanel={showEffectsPanel}
@@ -1062,23 +1046,15 @@ const Sowntra = () => {
           recordingTimeElapsed={recordingTimeElapsed}
         />
 
-        {/* Mobile Zoom Indicator - Auto-hides after 10 seconds */}
-        {showZoomIndicator && (
-          <div 
-            className={`${styles.zoomIndicator || ''} md:hidden`}
-            style={styleHelpers.getZoomIndicatorStyle(showZoomIndicator)}
-          >
-            <div className="flex items-center gap-2">
-              <ZoomIn size={16} />
-              <span className="font-medium">{Math.round(zoomLevel * 100)}%</span>
-            </div>
-          </div>
-        )}
+        {/* Bottom Zoom Control - Canva-style */}
+        <BottomZoomControl
+          zoomLevel={zoomLevel}
+          setZoomLevel={setZoomLevel}
+          centerCanvas={centerCanvas}
+        />
 
         {/* Mobile Floating Action Buttons */}
         <MobileFABButtons
-          zoom={zoom}
-          centerCanvas={centerCanvas}
           setShowMobileProperties={setShowMobileProperties}
           selectedElement={selectedElement}
         />

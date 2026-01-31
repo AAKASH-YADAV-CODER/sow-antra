@@ -1,24 +1,19 @@
 import React from 'react';
 import {
-  ArrowLeft, ZoomIn, ZoomOut, Maximize, Layers, Sparkles, Play, Pause,
+  ArrowLeft, Layers, Sparkles, Play, Pause,
   Square, Film, Languages, User, LogOut, Settings, HelpCircle
 } from 'lucide-react';
 import ShareButton from '../../../components/common/ShareButton';
 
 /**
  * TopHeader Component
- * Main header with navigation, zoom controls, templates, recording, language selector, and account menu
+ * Main header with navigation, templates, recording, language selector, and account menu
  * Responsive design for both desktop and mobile
  */
 const TopHeader = ({
   // Navigation
   t,
   navigate,
-  
-  // Zoom controls
-  zoom,
-  zoomLevel,
-  centerCanvas,
   
   // Templates & Effects
   showTemplates,
@@ -53,7 +48,7 @@ const TopHeader = ({
 }) => {
   return (
     <div className="main-header">
-      {/* Left Section: Logo and Zoom Controls */}
+      {/* Left Section: Logo */}
       <div className="flex items-center gap-1 md:gap-2 min-w-0 flex-shrink-0">
         <button
           onClick={() => navigate('/home')}
@@ -66,34 +61,6 @@ const TopHeader = ({
         <h1 className="text-sm md:text-xl font-bold flex items-center flex-shrink-0">
           <span className="handwritten-logo text-base md:text-2xl">Sowntra</span>
         </h1>
-        
-        {/* Desktop Zoom Controls */}
-        <div className="hidden lg:flex items-center gap-1 ml-2">
-          <button
-            onClick={() => zoom('in')}
-            className="p-1.5 rounded hover:bg-white/20 touch-manipulation"
-            title="Zoom In"
-          >
-            <ZoomIn size={16} />
-          </button>
-          <button
-            onClick={() => zoom('out')}
-            className="p-1.5 rounded hover:bg-white/20 touch-manipulation"
-            title="Zoom Out"
-          >
-            <ZoomOut size={16} />
-          </button>
-          <button
-            onClick={centerCanvas}
-            className="p-1.5 rounded hover:bg-white/20 touch-manipulation"
-            title="Fit to Viewport"
-          >
-            <Maximize size={16} />
-          </button>
-          <span className="px-2 py-1 bg-white/20 rounded text-xs font-medium">
-            {Math.round(zoomLevel * 100)}%
-          </span>
-        </div>
       </div>
 
       {/* Center Section: Templates, Effects, Animations, Recording */}

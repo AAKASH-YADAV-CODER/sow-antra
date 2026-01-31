@@ -16,8 +16,6 @@ import { useCallback } from 'react';
  * @param {Function} params.setZoomLevel - Update zoom level
  * @param {boolean} params.isPlaying - Animation playing state
  * @param {Function} params.setIsPlaying - Set animation playing state
- * @param {Function} params.setShowZoomIndicator - Show zoom indicator
- * @param {Object} params.zoomIndicatorTimeoutRef - Zoom indicator timeout ref
  * @returns {Object} Canvas utility handlers
  */
 export const useCanvasUtils = ({
@@ -31,9 +29,7 @@ export const useCanvasUtils = ({
   zoomLevel,
   setZoomLevel,
   isPlaying,
-  setIsPlaying,
-  setShowZoomIndicator,
-  zoomIndicatorTimeoutRef
+  setIsPlaying
 }) => {
   // Add new page
   const addNewPage = useCallback(() => {
@@ -111,20 +107,7 @@ export const useCanvasUtils = ({
     }
     
     setZoomLevel(newZoom);
-    
-    // Show zoom indicator on mobile
-    setShowZoomIndicator(true);
-    
-    // Clear existing timeout
-    if (zoomIndicatorTimeoutRef.current) {
-      clearTimeout(zoomIndicatorTimeoutRef.current);
-    }
-    
-    // Hide after 10 seconds
-    zoomIndicatorTimeoutRef.current = setTimeout(() => {
-      setShowZoomIndicator(false);
-    }, 10000);
-  }, [zoomLevel, setZoomLevel, setShowZoomIndicator, zoomIndicatorTimeoutRef]);
+  }, [zoomLevel, setZoomLevel]);
 
   return {
     // Page management
