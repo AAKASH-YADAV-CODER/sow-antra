@@ -1,0 +1,890 @@
+/* MainPage.module.css */
+/* Organized CSS styles for MainPage component */
+
+/* ============================================
+   LAYOUT & CONTAINERS
+   ============================================ */
+
+.mainContainer {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+}
+
+.canvasContainer {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.canvasWrapper {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  background: #f5f5f5;
+}
+
+.canvasScrollArea {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ============================================
+   CANVAS ELEMENTS
+   ============================================ */
+
+.canvas {
+  position: relative;
+  background: white;
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+  transform-origin: center;
+  cursor: default;
+  user-select: none;
+}
+
+.canvasElement {
+  position: absolute;
+  cursor: move;
+  user-select: none;
+  pointer-events: auto;
+}
+
+.canvasElement.multiSelected {
+  outline: 2px dashed #8b5cf6;
+  outline-offset: 2px;
+}
+
+/* ============================================
+   TEXT ELEMENTS
+   ============================================ */
+
+.textElement {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  padding: 4px;
+}
+
+.textElement.editing {
+  outline: 2px solid #3b82f6;
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.textInput {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  font-weight: inherit;
+  font-style: inherit;
+  text-decoration: inherit;
+  text-align: inherit;
+  padding: 0;
+}
+
+/* ============================================
+   IMAGE ELEMENTS
+   ============================================ */
+
+.imageElement {
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.imageElement.draggable {
+  pointer-events: auto;
+}
+
+/* ============================================
+   SHAPE ELEMENTS
+   ============================================ */
+
+.shapeElement {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shapeElement svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* ============================================
+   SELECTION HANDLES
+   ============================================ */
+
+.selectionBox {
+  position: absolute;
+  pointer-events: none;
+  /* Wrapper for selection handles and border */
+}
+
+.resizeHandle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: white;
+  border: 2px solid #3b82f6;
+  border-radius: 50%;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.resizeHandle.nw { top: -5px; left: -5px; cursor: nw-resize; }
+.resizeHandle.ne { top: -5px; right: -5px; cursor: ne-resize; }
+.resizeHandle.sw { bottom: -5px; left: -5px; cursor: sw-resize; }
+.resizeHandle.se { bottom: -5px; right: -5px; cursor: se-resize; }
+.resizeHandle.n { top: -5px; left: 50%; transform: translateX(-50%); cursor: n-resize; }
+.resizeHandle.s { bottom: -5px; left: 50%; transform: translateX(-50%); cursor: s-resize; }
+.resizeHandle.e { top: 50%; right: -5px; transform: translateY(-50%); cursor: e-resize; }
+.resizeHandle.w { top: 50%; left: -5px; transform: translateY(-50%); cursor: w-resize; }
+
+.rotateHandle {
+  position: absolute;
+  top: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 20px;
+  background: white;
+  border: 2px solid #3b82f6;
+  border-radius: 50%;
+  cursor: pointer;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rotateHandle::before {
+  content: '↻';
+  font-size: 14px;
+  color: #3b82f6;
+}
+
+/* ============================================
+   GRID OVERLAY
+   ============================================ */
+
+.gridOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  background-size: 20px 20px;
+  background-image:
+    linear-gradient(to right, #e5e7eb 1px, transparent 1px),
+    linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);
+  opacity: 0.5;
+}
+
+/* ============================================
+   ALIGNMENT GUIDES
+   ============================================ */
+
+.alignmentLine {
+  position: absolute;
+  background: #ef4444;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.alignmentLine.vertical {
+  width: 1px;
+  height: 100%;
+  top: 0;
+}
+
+.alignmentLine.horizontal {
+  height: 1px;
+  width: 100%;
+  left: 0;
+}
+
+/* ============================================
+   TOOLBAR & PANELS
+   ============================================ */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.toolButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.toolButton:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.toolButton.active {
+  background: #3b82f6;
+  color: white;
+  border-color: #3b82f6;
+}
+
+.toolButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ============================================
+   SIDEBAR PANELS
+   ============================================ */
+
+.sidebar {
+  width: 280px;
+  background: white;
+  border-left: 1px solid #e5e7eb;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.sidebarSection {
+  padding: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.sidebarSection:last-child {
+  border-bottom: none;
+}
+
+.sidebarTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ============================================
+   MOBILE LAYOUT
+   ============================================ */
+
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 50;
+    width: 100%;
+    max-width: 320px;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .toolButton {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* ============================================
+   FLOATING ACTION BUTTONS (FAB)
+   ============================================ */
+
+.fabContainer {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  z-index: 40;
+}
+
+.fab {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #3b82f6;
+  color: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.fab:hover {
+  background: #2563eb;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  transform: scale(1.05);
+}
+
+.fab:active {
+  transform: scale(0.95);
+}
+
+@media (max-width: 768px) {
+  .fabContainer {
+    bottom: 6rem;
+    right: 1rem;
+  }
+
+  .fab {
+    width: 48px;
+    height: 48px;
+  }
+}
+
+/* ============================================
+   MODALS & OVERLAYS
+   ============================================ */
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 1rem;
+}
+
+.modalContent {
+  background: white;
+  border-radius: 0.75rem;
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow: auto;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.modalBody {
+  padding: 1.5rem;
+}
+
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* ============================================
+   ZOOM CONTROLS
+   ============================================ */
+
+.zoomControls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: white;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.zoomButton {
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.zoomButton:hover {
+  background: #f3f4f6;
+}
+
+.zoomLevel {
+  font-size: 0.875rem;
+  font-weight: 600;
+  min-width: 60px;
+  text-align: center;
+  color: #374151;
+}
+
+/* Mobile Zoom Indicator */
+.zoomIndicator {
+  position: fixed;
+  top: 5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.75);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  z-index: 1000;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+@media (min-width: 768px) {
+  .zoomIndicator {
+    display: none;
+  }
+}
+
+/* ============================================
+   RECORDING STATUS
+   ============================================ */
+
+.recordingIndicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #ef4444;
+  color: white;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.recordingDot {
+  width: 8px;
+  height: 8px;
+  background: white;
+  border-radius: 50%;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ============================================
+   TEMPLATES GRID
+   ============================================ */
+
+.templatesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1rem;
+  padding: 1rem;
+}
+
+@media (max-width: 768px) {
+  .templatesGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+}
+
+.templateCard {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid #e5e7eb;
+  transition: all 0.2s;
+}
+
+.templateCard:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+  transform: translateY(-2px);
+}
+
+.templateCard.selected {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.templateImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.templateLabel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
+  color: white;
+  padding: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* ============================================
+   EFFECTS PANEL
+   ============================================ */
+
+.effectsPanel {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+.effectCard {
+  padding: 1rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.effectCard:hover {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+
+.effectCard.active {
+  border-color: #3b82f6;
+  background: #dbeafe;
+}
+
+.effectIcon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.effectName {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+/* ============================================
+   COLOR PICKER
+   ============================================ */
+
+.colorPicker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.colorPreview {
+  width: 100%;
+  height: 60px;
+  border-radius: 0.5rem;
+  border: 2px solid #e5e7eb;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.colorPreview:hover {
+  border-color: #d1d5db;
+}
+
+.colorSwatches {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 0.5rem;
+}
+
+.colorSwatch {
+  aspect-ratio: 1;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.colorSwatch:hover {
+  transform: scale(1.1);
+}
+
+.colorSwatch.selected {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+/* ============================================
+   GRADIENT PICKER
+   ============================================ */
+
+.gradientPreview {
+  width: 100%;
+  height: 80px;
+  border-radius: 0.5rem;
+  border: 2px solid #e5e7eb;
+  cursor: pointer;
+}
+
+.gradientControls {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.gradientSlider {
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 4px;
+  background: #e5e7eb;
+  outline: none;
+}
+
+.gradientSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.gradientSlider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #3b82f6;
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* ============================================
+   LOADING STATES
+   ============================================ */
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e5e7eb;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+.noSelect {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.pointerEventsNone {
+  pointer-events: none;
+}
+
+.pointerEventsAuto {
+  pointer-events: auto;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* ============================================
+   SCROLLBAR STYLING
+   ============================================ */
+
+.customScrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.customScrollbar::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 4px;
+}
+
+.customScrollbar::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+
+.customScrollbar::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* ============================================
+   RESPONSIVE BREAKPOINTS
+   ============================================ */
+
+@media (max-width: 640px) {
+  .hideOnMobile {
+    display: none !important;
+  }
+}
+
+@media (min-width: 641px) {
+  .showOnMobileOnly {
+    display: none !important;
+  }
+}
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+
+@media print {
+  .noPrint {
+    display: none !important;
+  }
+  
+  .canvas {
+    box-shadow: none;
+  }
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInDown {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.fadeIn {
+  animation: fadeIn 0.3s ease;
+}
+
+.slideInUp {
+  animation: slideInUp 0.3s ease;
+}
+
+.slideInDown {
+  animation: slideInDown 0.3s ease;
+}
+
+/* ============================================
+   ACCESSIBILITY
+   ============================================ */
+
+.focusVisible:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* ============================================
+   TOUCH OPTIMIZATION
+   ============================================ */
+
+@media (hover: none) and (pointer: coarse) {
+  .touchOptimized {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 12px;
+  }
+}
+
+/* Prevent text selection during drag */
+.dragging * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
