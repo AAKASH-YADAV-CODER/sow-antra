@@ -8,7 +8,7 @@ import { socialMediaTemplates } from '../../../utils/constants';
  * @param {Object} params - Hook parameters
  * @returns {Object} Template management functions
  */
-export const useTemplates = ({
+const useTemplates = ({
   setCanvasSize,
   centerCanvas,
   setShowTemplates,
@@ -22,17 +22,12 @@ export const useTemplates = ({
       setShowCustomTemplateModal(true);
       return;
     }
-    
     const template = socialMediaTemplates[platform];
     if (template) {
       // Set the new canvas size
       setCanvasSize({ width: template.width, height: template.height });
-      
-      // Center and zoom to fit after a short delay for DOM update
-      setTimeout(() => {
-        centerCanvas();
-      }, 100);
-      
+      // Force center and fit
+      setTimeout(centerCanvas, 50);
       setShowTemplates(false);
     }
   }, [setCanvasSize, centerCanvas, setShowTemplates, setShowCustomTemplateModal]);
@@ -44,11 +39,7 @@ export const useTemplates = ({
         width: customTemplateSize.width,
         height: customTemplateSize.height
       });
-      
-      setTimeout(() => {
-        centerCanvas();
-      }, 100);
-      
+      setTimeout(centerCanvas, 50);
       setShowCustomTemplateModal(false);
       setShowTemplates(false);
     }

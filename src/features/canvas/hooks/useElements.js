@@ -38,9 +38,11 @@ const useElements = ({
   textDirection,
   t,
   filterOptions,
-  supportedLanguages
+  supportedLanguages,
+  canvasSize // Add this
 }) => {
-  
+
+
   // Generate unique ID
   const generateId = () => Math.random().toString(36).substr(2, 9);
 
@@ -52,7 +54,8 @@ const useElements = ({
 
   // Set current page elements
   const setCurrentPageElements = useCallback((newElements) => {
-    setPages(pages.map(page => 
+    setPages(pages.map(page =>
+
       page.id === currentPage ? { ...page, elements: newElements } : page
     ));
   }, [pages, currentPage, setPages]);
@@ -60,25 +63,51 @@ const useElements = ({
   // Add element to canvas
   const addElement = useCallback((type, properties = {}) => {
     const currentElements = getCurrentPageElements();
+
+    // Normalized Scale Factor (Base: 1000px)
+    // This ensures elements look the same relative size on screen regardless of canvas resolution
+    const baseDimension = 1000;
+    const scaleFactor = Math.max(canvasSize.width, canvasSize.height) / baseDimension;
+
+    // Proportional sizing
+    const standardSize = Math.round(200 * scaleFactor); // 200px on a 1000px canvas baseline
+
+    // Calculate final width and height
+    // If props provide width/height, we scale them by the factor (assuming they are in 'base' units)
+    let width = properties.width ? properties.width * scaleFactor : standardSize;
+    let height = properties.height ? properties.height * scaleFactor : standardSize;
+
+    // Type-specific baseline adjustments
+    if (type === 'text' && !properties.width) {
+      width = Math.round(canvasSize.width * 0.5);
+      height = Math.round(canvasSize.height * 0.08);
+    } else if (type === 'line' && !properties.width) {
+      width = Math.round(canvasSize.width * 0.2);
+      height = 2 * scaleFactor;
+    }
+
     const newElement = {
       id: generateId(),
       type,
-      x: 100,
-      y: 100,
-      width: type === 'text' ? 300 : type === 'line' ? 150 : 100,
-      height: type === 'text' ? 100 : type === 'line' ? 2 : 100,
+      // Center the element
+      x: properties.x !== undefined ? properties.x : Math.round((canvasSize.width - width) / 2),
+      y: properties.y !== undefined ? properties.y : Math.round((canvasSize.height - height) / 2),
+      width,
+      height,
+
       rotation: 0,
       animation: null,
       zIndex: currentElements.length,
       locked: false,
       filters: JSON.parse(JSON.stringify(filterOptions)),
-      fill: properties.fill || (type === 'rectangle' ? '#3b82f6' : 
-                              type === 'circle' ? '#ef4444' : 
-                              type === 'triangle' ? 'transparent' : 
-                              type === 'star' ? 'transparent' : 
-                              type === 'hexagon' ? '#8b5cf6' : '#3b82f6'),
+      fill: properties.fill || (type === 'rectangle' ? '#3b82f6' :
+        type === 'circle' ? '#ef4444' :
+          type === 'triangle' ? 'transparent' :
+            type === 'star' ? 'transparent' :
+              type === 'hexagon' ? '#8b5cf6' : '#3b82f6'),
       stroke: properties.stroke || (type === 'image' ? 'transparent' : '#000000'),
-      strokeWidth: properties.strokeWidth || (type === 'image' ? 0 : 2),
+      strokeWidth: (properties.strokeWidth !== undefined ? properties.strokeWidth : (type === 'image' ? 0 : 2)) * scaleFactor,
+
       fillType: properties.fillType || (type === 'triangle' || type === 'star' ? 'none' : 'solid'),
       gradient: properties.gradient || {
         type: 'linear',
@@ -92,40 +121,42 @@ const useElements = ({
       shapeEffect: 'none',
       specialEffect: 'none',
       effectSettings: {},
-      borderRadius: properties.borderRadius || 0,
+      borderRadius: (properties.borderRadius || 0) * scaleFactor,
       shadow: properties.shadow || null,
-      ...properties
+      ...properties,
+      // Ensure we don't accidentally overwrite the scaled values with the original base values from ...properties
+      width,
+      height,
+      strokeWidth: (properties.strokeWidth !== undefined ? properties.strokeWidth : (type === 'image' ? 0 : 2)) * scaleFactor,
+      borderRadius: (properties.borderRadius || 0) * scaleFactor
     };
 
     if (type === 'text') {
-      newElement.content = t('text.doubleClickToEdit');
-      newElement.fontSize = 24;
-      newElement.fontFamily = supportedLanguages[currentLanguage]?.font || 'Arial';
-      newElement.fontWeight = 'normal';
-      newElement.fontStyle = 'normal';
-      newElement.textDecoration = 'none';
-      newElement.color = '#000000';
-      newElement.textAlign = textDirection === 'rtl' ? 'right' : 'left';
-    } else if (type === 'rectangle') {
-      newElement.borderRadius = properties.borderRadius || 0;
+      newElement.content = properties.content || t('text.doubleClickToEdit');
+      // Proportional font size: 40px baseline on 1000px height
+      newElement.fontSize = (properties.fontSize || 40) * scaleFactor;
+      newElement.fontFamily = properties.fontFamily || (supportedLanguages[currentLanguage]?.font || 'Arial');
+      newElement.fontWeight = properties.fontWeight || 'normal';
+      newElement.fontStyle = properties.fontStyle || 'normal';
+      newElement.textDecoration = properties.textDecoration || 'none';
+      newElement.color = properties.color || '#000000';
+      newElement.textAlign = properties.textAlign || (textDirection === 'rtl' ? 'right' : 'left');
     } else if (type === 'image') {
       newElement.src = properties.src || '';
-      newElement.borderRadius = properties.borderRadius || 0;
+      newElement.borderRadius = (properties.borderRadius || 0) * scaleFactor;
       newElement.stroke = properties.stroke || 'transparent';
-      newElement.strokeWidth = properties.strokeWidth || 0;
-    } else if (type === 'arrow') {
-      newElement.fill = '#000000';
-    } else if (type === 'star') {
-      newElement.points = 5;
+      newElement.strokeWidth = (properties.strokeWidth || 0) * scaleFactor;
     } else if (type === 'drawing') {
       newElement.stroke = '#000000';
-      newElement.strokeWidth = 3;
+      newElement.strokeWidth = 3 * scaleFactor;
       newElement.path = properties.path || [];
-    } else if (type === 'sticker') {
-      newElement.sticker = properties.sticker || 'smile';
-      newElement.fill = properties.fill || '#f59e0b';
-      newElement.width = 80;
-      newElement.height = 80;
+    } else {
+      // For all other shapes
+      Object.assign(newElement, properties);
+      // Re-apply scaled properties if they were in the spread
+      newElement.width = width;
+      newElement.height = height;
+
     }
 
     const newElements = [...currentElements, newElement];
@@ -135,11 +166,13 @@ const useElements = ({
     setCurrentTool('select');
     saveToHistory(newElements);
   }, [
-    getCurrentPageElements, 
-    setCurrentPageElements, 
-    saveToHistory, 
-    currentLanguage, 
-    textDirection, 
+    canvasSize,
+    getCurrentPageElements,
+    setCurrentPageElements,
+    saveToHistory,
+    currentLanguage,
+    textDirection,
+
     t,
     filterOptions,
     supportedLanguages,
@@ -149,19 +182,40 @@ const useElements = ({
   ]);
 
   // Update element properties
-  const updateElement = useCallback((id, updates) => {
+  const updateElement = useCallback((id, updates, shouldSaveHistory = true) => {
     const currentElements = getCurrentPageElements();
-    const newElements = currentElements.map(el => 
+    const newElements = currentElements.map(el =>
       el.id === id ? { ...el, ...updates } : el
     );
     setCurrentPageElements(newElements);
-    saveToHistory(newElements);
+    if (shouldSaveHistory) {
+      saveToHistory(newElements);
+    }
+  }, [getCurrentPageElements, setCurrentPageElements, saveToHistory]);
+
+  // Batch update elements
+  const updateElements = useCallback((updatesArray, shouldSaveHistory = true) => {
+    const currentElements = getCurrentPageElements();
+    // updatesArray can be [{id, updates}, ...]
+    const newElements = currentElements.map(el => {
+      const update = updatesArray.find(u => u.id === el.id);
+      if (update) {
+        return { ...el, ...update.updates };
+      }
+      return el;
+    });
+    setCurrentPageElements(newElements);
+    if (shouldSaveHistory) {
+      saveToHistory(newElements);
+    }
+
   }, [getCurrentPageElements, setCurrentPageElements, saveToHistory]);
 
   // Delete element
   const deleteElement = useCallback((id) => {
     if (lockedElements.has(id)) return;
-    
+
+
     const currentElements = getCurrentPageElements();
     const newElements = currentElements.filter(el => el.id !== id);
     setCurrentPageElements(newElements);
@@ -171,11 +225,12 @@ const useElements = ({
     setSelectedElements(newSelected);
     saveToHistory(newElements);
   }, [
-    lockedElements, 
-    getCurrentPageElements, 
-    setCurrentPageElements, 
-    selectedElement, 
-    selectedElements, 
+    lockedElements,
+    getCurrentPageElements,
+    setCurrentPageElements,
+    selectedElement,
+    selectedElements,
+
     saveToHistory,
     setSelectedElement,
     setSelectedElements
@@ -184,7 +239,8 @@ const useElements = ({
   // Duplicate element
   const duplicateElement = useCallback((id) => {
     if (lockedElements.has(id)) return;
-    
+
+
     const currentElements = getCurrentPageElements();
     const element = currentElements.find(el => el.id === id);
     if (element) {
@@ -202,9 +258,10 @@ const useElements = ({
       saveToHistory(newElements);
     }
   }, [
-    lockedElements, 
-    getCurrentPageElements, 
-    setCurrentPageElements, 
+    lockedElements,
+    getCurrentPageElements,
+    setCurrentPageElements,
+
     saveToHistory,
     setSelectedElement,
     setSelectedElements
@@ -240,16 +297,18 @@ const useElements = ({
   const groupElements = useCallback(() => {
     const currentElements = getCurrentPageElements();
     if (selectedElements.size < 2) return;
-    
+
     const groupId = generateId();
     const selectedIds = Array.from(selectedElements);
     const selectedEls = currentElements.filter(el => selectedIds.includes(el.id));
-    
+
+
     const minX = Math.min(...selectedEls.map(el => el.x));
     const minY = Math.min(...selectedEls.map(el => el.y));
     const maxX = Math.max(...selectedEls.map(el => el.x + el.width));
     const maxY = Math.max(...selectedEls.map(el => el.y + el.height));
-    
+
+
     const group = {
       id: groupId,
       type: 'group',
@@ -265,7 +324,8 @@ const useElements = ({
       strokeWidth: 2,
       strokeDasharray: '5,5'
     };
-    
+
+
     const updatedElements = currentElements.map(el => {
       if (selectedIds.includes(el.id)) {
         return {
@@ -278,16 +338,18 @@ const useElements = ({
       }
       return el;
     });
-    
+
+
     const newElements = [...updatedElements, group];
     setCurrentPageElements(newElements);
     setSelectedElement(groupId);
     setSelectedElements(new Set([groupId]));
     saveToHistory(newElements);
   }, [
-    getCurrentPageElements, 
-    selectedElements, 
-    setCurrentPageElements, 
+    getCurrentPageElements,
+    selectedElements,
+    setCurrentPageElements,
+
     saveToHistory,
     setSelectedElement,
     setSelectedElements
@@ -298,7 +360,8 @@ const useElements = ({
     const currentElements = getCurrentPageElements();
     const group = currentElements.find(el => el.id === groupId);
     if (!group || group.type !== 'group') return;
-    
+
+
     const updatedElements = currentElements.map(el => {
       if (el.groupId === groupId) {
         const { groupId: _, relativeX, relativeY, relativeRotation, ...rest } = el;
@@ -311,14 +374,16 @@ const useElements = ({
       }
       return el;
     }).filter(el => el.id !== groupId);
-    
+
+
     setCurrentPageElements(updatedElements);
     setSelectedElement(null);
     setSelectedElements(new Set());
     saveToHistory(updatedElements);
   }, [
-    getCurrentPageElements, 
-    setCurrentPageElements, 
+    getCurrentPageElements,
+    setCurrentPageElements,
+
     saveToHistory,
     setSelectedElement,
     setSelectedElements
@@ -327,11 +392,12 @@ const useElements = ({
   // Change element z-index
   const changeZIndex = useCallback((id, direction) => {
     if (lockedElements.has(id)) return;
-    
+
     const currentElements = getCurrentPageElements();
     const elementIndex = currentElements.findIndex(el => el.id === id);
     if (elementIndex === -1) return;
-    
+
+
     let newIndex;
     if (direction === 'front') {
       newIndex = currentElements.length - 1;
@@ -344,16 +410,98 @@ const useElements = ({
     } else {
       return;
     }
-    
+
     const newElements = [...currentElements];
     const [element] = newElements.splice(elementIndex, 1);
     newElements.splice(newIndex, 0, element);
-    
+
+
     const updatedElements = newElements.map((el, idx) => ({
       ...el,
       zIndex: idx
     }));
-    
+
+    setCurrentPageElements(updatedElements);
+    saveToHistory(updatedElements);
+  }, [lockedElements, getCurrentPageElements, setCurrentPageElements, saveToHistory]);
+
+  // Align elements
+  const alignElements = useCallback((ids, alignType) => {
+    const currentElements = getCurrentPageElements();
+    const targetElements = currentElements.filter(el => ids.includes(el.id) && !lockedElements.has(el.id));
+
+    if (targetElements.length === 0) return;
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    targetElements.forEach(el => {
+      minX = Math.min(minX, el.x);
+      minY = Math.min(minY, el.y);
+      maxX = Math.max(maxX, el.x + el.width);
+      maxY = Math.max(maxY, el.y + el.height);
+    });
+
+    const canvasW = canvasSize.width;
+    const canvasH = canvasSize.height;
+
+    const newElements = currentElements.map(el => {
+      if (!ids.includes(el.id) || lockedElements.has(el.id)) return el;
+
+      let newX = el.x;
+      let newY = el.y;
+
+      switch (alignType) {
+        case 'left':
+          newX = targetElements.length > 1 ? minX : 0;
+          break;
+        case 'center':
+          newX = targetElements.length > 1 ? (minX + maxX) / 2 - el.width / 2 : canvasW / 2 - el.width / 2;
+          break;
+        case 'right':
+          newX = targetElements.length > 1 ? maxX - el.width : canvasW - el.width;
+          break;
+        case 'top':
+          newY = targetElements.length > 1 ? minY : 0;
+          break;
+        case 'middle':
+          newY = targetElements.length > 1 ? (minY + maxY) / 2 - el.height / 2 : canvasH / 2 - el.height / 2;
+          break;
+        case 'bottom':
+          newY = targetElements.length > 1 ? maxY - el.height : canvasH - el.height;
+          break;
+        default:
+          break;
+      }
+
+      return { ...el, x: newX, y: newY };
+    });
+
+    setCurrentPageElements(newElements);
+    saveToHistory(newElements);
+  }, [lockedElements, getCurrentPageElements, setCurrentPageElements, saveToHistory, canvasSize]);
+
+  // Reorder element to specific index (for Drag and Drop)
+  const reorderElement = useCallback((id, newIndex) => {
+    if (lockedElements.has(id)) return;
+
+    const currentElements = getCurrentPageElements();
+    const elementIndex = currentElements.findIndex(el => el.id === id);
+    if (elementIndex === -1) return;
+
+    // Clamp newIndex
+    const targetIndex = Math.max(0, Math.min(newIndex, currentElements.length - 1));
+    if (elementIndex === targetIndex) return;
+
+    const newElements = [...currentElements];
+    const [element] = newElements.splice(elementIndex, 1);
+    newElements.splice(targetIndex, 0, element);
+
+    // Update z-indicies if needed (though array order is source of truth)
+    const updatedElements = newElements.map((el, idx) => ({
+      ...el,
+      zIndex: idx
+    }));
+
+
     setCurrentPageElements(updatedElements);
     saveToHistory(updatedElements);
   }, [lockedElements, getCurrentPageElements, setCurrentPageElements, saveToHistory]);
@@ -363,13 +511,18 @@ const useElements = ({
     setCurrentPageElements,
     addElement,
     updateElement,
+    updateElements,
+
     deleteElement,
     duplicateElement,
     toggleElementLock,
     updateFilter,
     groupElements,
     ungroupElements,
-    changeZIndex
+    changeZIndex,
+    reorderElement,
+    alignElements
+
   };
 };
 

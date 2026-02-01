@@ -1,13 +1,14 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { textEffects,imageEffects,fontFamilies,supportedLanguages,specialEffects,stickerOptions,filterOptions,animations, shapeEffects } from '../types/types.js';
+import { textEffects, imageEffects, fontFamilies, supportedLanguages, specialEffects, stickerOptions, filterOptions, animations, shapeEffects } from '../types/types.js';
 import "../styles/MainPageStyles.css";
 
-import {  
+import {
   Copy, Trash2,
- MinusCircle, PlusCircle, 
- Lock,
- Group, Ungroup
+  Lock,
+  Group, Ungroup, ZoomIn
 } from 'lucide-react';
+import FloatingToolbar from '../components/FloatingToolbar';
+
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -17,23 +18,27 @@ import { projectAPI } from '../services/api';
 import RecordingStatus from '../features/canvas/components/RecordingStatus';
 import ModalsContainer from '../features/canvas/components/ModalsContainer';
 import EffectsPanel from '../features/canvas/components/EffectsPanel';
-import PropertiesPanel from '../features/canvas/components/PropertiesPanel';
+
+
 import { MobilePropertiesDrawer } from '../features/canvas/components/MobileDrawers';
 import MobileToolsBar from '../features/canvas/components/MobileToolsBar';
 import MobileFABButtons from '../features/canvas/components/MobileFABButtons';
 import TopHeader from '../features/canvas/components/TopHeader';
 import ToolsSidebar from '../features/canvas/components/ToolsSidebar';
+import CommentPopup from '../features/canvas/components/CommentPopup';
 import PagesNavigator from '../features/canvas/components/PagesNavigator';
 import CanvasWorkspace from '../features/canvas/components/CanvasWorkspace';
-import BottomZoomControl from '../features/canvas/components/BottomZoomControl';
+import ContextualToolbar from '../features/canvas/components/ContextualToolbar';
 // Style imports
 import styles from '../styles/MainPage.module.css';
 import '../styles/MainPageAnimations.css';
+import * as styleHelpers from '../utils/styleHelpers';
 // Utility imports
-import { 
-  getFilterCSS, 
-  getBackgroundStyle, 
-  parseCSS 
+import {
+  getFilterCSS,
+  getBackgroundStyle,
+  parseCSS
+
 } from '../utils/helpers';
 // Custom hooks
 import useElements from '../features/canvas/hooks/useElements';
@@ -41,11 +46,13 @@ import useHistory from '../features/canvas/hooks/useHistory';
 import { useCanvasInteraction } from '../features/canvas/hooks/useCanvasInteraction';
 import { useRecording } from '../features/canvas/hooks/useRecording';
 import { useCanvasUtils } from '../features/canvas/hooks/useCanvasUtils';
-import { useExport } from '../features/canvas/hooks/useExport';
-import { useProjectManager } from '../features/canvas/hooks/useProjectManager';
-import { useTemplates } from '../features/canvas/hooks/useTemplates';
-import { useKeyboardShortcuts } from '../features/canvas/hooks/useKeyboardShortcuts';
-import { useHelpers } from '../features/canvas/hooks/useHelpers';
+import useExport from '../features/canvas/hooks/useExport';
+import useProjectManager from '../features/canvas/hooks/useProjectManager';
+import useClipboard from '../features/canvas/hooks/useClipboard';
+import useTemplates from '../features/canvas/hooks/useTemplates';
+import useKeyboardShortcuts from '../features/canvas/hooks/useKeyboardShortcuts';
+import useHelpers from '../features/canvas/hooks/useHelpers';
+
 import useCollaboration from '../features/canvas/hooks/useCollaboration';
 // UI Helper Components
 import TransliterationToggle from '../features/canvas/components/TransliterationToggle';
@@ -65,6 +72,8 @@ const Sowntra = () => {
   // isDragging, isResizing, isRotating, isPanning, dragStart, showAlignmentLines, alignmentLines now managed by useCanvasInteraction hook
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
   const [isPlaying, setIsPlaying] = useState(false);
+  const [showCommentPopup, setShowCommentPopup] = useState(false);
+
   const [currentTool, setCurrentTool] = useState('select');
   const [zoomLevel, setZoomLevel] = useState(1);
   const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
@@ -94,7 +103,10 @@ const Sowntra = () => {
   const [showEffectsPanel, setShowEffectsPanel] = useState(false);
   // const [resizeDirection, setResizeDirection] = useState('');
   // const [canvasHighlighted, setCanvasHighlighted] = useState(false);
-  
+  const [canvasHighlighted, setCanvasHighlighted] = useState(false);
+  const [uploads, setUploads] = useState([]);
+
+
   // New state for custom template
   const [showCustomTemplateModal, setShowCustomTemplateModal] = useState(false);
   const [customTemplateSize, setCustomTemplateSize] = useState({
@@ -102,7 +114,8 @@ const Sowntra = () => {
     height: 600,
     unit: 'px'
   });
-  
+
+
   // Mobile panel states
   const [showMobileTools] = useState(false);
   const [showMobileProperties, setShowMobileProperties] = useState(false);
@@ -111,41 +124,55 @@ const Sowntra = () => {
   const [touchStartDistance, setTouchStartDistance] = useState(0);
   const [initialZoomLevel, setInitialZoomLevel] = useState(1);
   const [lastTouchEnd, setLastTouchEnd] = useState(0);
+  const [showZoomIndicator, setShowZoomIndicator] = useState(false);
+
 
   const canvasRef = useRef(null);
   const fileInputRef = useRef(null);
   const floatingToolbarRef = useRef(null);
   const canvasContainerRef = useRef(null);
   const loadProjectInputRef = useRef(null);
+  const zoomIndicatorTimeoutRef = useRef(null);
 
 
   // getCurrentPageElements will be provided by useElements hook below
-  
+
+
   // All constants (supportedLanguages, textEffects, imageEffects, shapeEffects, specialEffects, etc.) imported from constants.js
 
 
   // Center canvas function - maximizes canvas size while maintaining aspect ratio
+  const updatePageBackground = useCallback((color) => {
+    setPages(prevPages => prevPages.map(page =>
+      page.id === currentPage ? { ...page, backgroundColor: color } : page
+    ));
+    // Note: History saving for page background requires updating history hook to track page props,
+    // which is out of scope for this immediate task but should be added later.
+  }, [currentPage]);
+
+
   const centerCanvas = useCallback(() => {
     const canvasContainer = canvasContainerRef.current;
     if (!canvasContainer) return;
 
     const containerWidth = canvasContainer.clientWidth;
     const containerHeight = canvasContainer.clientHeight;
-    
-    // Calculate available space with minimal padding (just 10px on each side)
-    const availableWidth = containerWidth - 20; // Minimal padding
-    const availableHeight = containerHeight - 20;
-    
+
+    // Calculate available space with comfortable padding (40px on each side)
+    const availableWidth = containerWidth - 80;
+    const availableHeight = containerHeight - 80;
+
     // Calculate zoom ratios to fill available space
     const widthRatio = availableWidth / canvasSize.width;
     const heightRatio = availableHeight / canvasSize.height;
-    
+
     // Use the smaller ratio to ensure entire canvas fits while maximizing size
     const optimalZoom = Math.min(widthRatio, heightRatio);
-    
+
     // Set the zoom level with generous bounds for user control
     setZoomLevel(Math.max(0.1, Math.min(5, optimalZoom)));
-    
+
+
     // Reset canvas offset to center
     setCanvasOffset({ x: 0, y: 0 });
   }, [canvasSize]);
@@ -155,6 +182,14 @@ const Sowntra = () => {
     i18n.changeLanguage(currentLanguage);
   }, [currentLanguage, i18n]);
 
+  // Comment click handler
+  const handleCommentClick = useCallback((el) => {
+    setSelectedElement(el.id);
+    setSelectedElements(new Set([el.id]));
+    setShowCommentPopup(true);
+  }, []);
+
+
   // Auto-fit canvas to screen on mount and resize
   useEffect(() => {
     const handleResize = () => {
@@ -163,12 +198,28 @@ const Sowntra = () => {
         centerCanvas();
       }, 100);
     };
-    
+
     // Fit canvas on initial mount
     handleResize();
-    
+
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+
+    // Observe container resizing (crucial for auto-zoom when sidebar opens)
+    let resizeObserver;
+    if (canvasContainerRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        handleResize();
+      });
+      resizeObserver.observe(canvasContainerRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+    };
+
   }, [centerCanvas]);
 
   // Load project if projectId is provided
@@ -188,7 +239,8 @@ const Sowntra = () => {
 
         const response = await projectAPI.loadProject(currentProjectId);
         const { projectData } = response.data;
-        
+
+
         if (projectData) {
           if (projectData.pages) setPages(projectData.pages);
           if (projectData.currentPage) setCurrentPage(projectData.currentPage);
@@ -226,7 +278,8 @@ const Sowntra = () => {
         //   's': 'ச', 'sh': 'ஷ', 'S': 'ஸ', 'h': 'ஹ', 'q': 'க்', 'w': 'ங்', 'E': 'ச்', 'r^': 'ன்',
         //   't^': 'ண்', 'y^': 'ம்', 'u^': 'ப்', 'i^': 'வ்'
         // };
-        
+
+
         // Hindi transliteration map (English to Devanagari)
         // const hindiMap = {
         //   'a': 'अ', 'aa': 'आ', 'i': 'इ', 'ee': 'ई', 'u': 'उ', 'oo': 'ऊ', 'e': 'ए', 'ai': 'ऐ',
@@ -236,7 +289,8 @@ const Sowntra = () => {
         //   'b': 'ब', 'bh': 'भ', 'm': 'म', 'y': 'य', 'r': 'र', 'l': 'ल', 'v': 'व', 'sh': 'श',
         //   'shh': 'ष', 's': 'س', 'h': 'ह'
         // };
-        
+
+
         // Set the appropriate map based on current language
         // if (currentLanguage === 'ta') {
         //   setTransliterationMap(tamilMap);
@@ -249,19 +303,30 @@ const Sowntra = () => {
         console.error('Error loading transliteration data:', error);
       }
     };
-    
+
+
     loadTransliterationData();
   }, [currentLanguage]);
 
 
+  // Cleanup zoom indicator timeout on unmount
+  useEffect(() => {
+    const timeoutRef = zoomIndicatorTimeoutRef.current;
+    return () => {
+      if (timeoutRef) {
+        clearTimeout(timeoutRef);
+      }
+    };
+  }, []);
 
   // socialMediaTemplates, stickerOptions, animations, filterOptions imported from constants.js
 
- 
+
 
   // Helper function for setCurrentPageElements (needed before hooks)
   const setCurrentPageElements = useCallback((newElements) => {
-    setPages(pages.map(page => 
+    setPages(pages.map(page =>
+
       page.id === currentPage ? { ...page, elements: newElements } : page
     ));
   }, [pages, currentPage]);
@@ -280,13 +345,18 @@ const Sowntra = () => {
     getCurrentPageElements,
     addElement,
     updateElement,
+    updateElements,
+
     deleteElement,
     duplicateElement,
     toggleElementLock,
     updateFilter,
     groupElements,
     ungroupElements,
-    changeZIndex
+    changeZIndex,
+    reorderElement,
+    alignElements
+
   } = useElements({
     pages,
     currentPage,
@@ -303,7 +373,9 @@ const Sowntra = () => {
     textDirection,
     t,
     filterOptions,
-    supportedLanguages
+    supportedLanguages,
+    canvasSize
+
   });
 
   // Custom Hooks - Canvas Interaction
@@ -335,7 +407,9 @@ const Sowntra = () => {
     setCanvasOffset,
     snapToGrid,
     canvasRef,
-    setTextEditing
+    setTextEditing,
+    currentPage // Add this
+
   });
 
   // Custom Hooks - Recording
@@ -372,7 +446,10 @@ const Sowntra = () => {
     zoomLevel,
     setZoomLevel,
     isPlaying,
-    setIsPlaying
+    setIsPlaying,
+    setShowZoomIndicator,
+    zoomIndicatorTimeoutRef
+
   });
 
   // Calculate selectedElementData (now that getCurrentPageElements is available)
@@ -410,17 +487,27 @@ const Sowntra = () => {
     }
   }, [isCollaborative, handleCursorMove, zoomLevel, canvasOffset]);
 
-  // Update text direction when language changes
+  const handleSendComment = (elementId, comment) => {
+    const el = getCurrentPageElements().find(e => e.id === elementId);
+    if (el) {
+      const existingComments = el.comments || [];
+      updateElement(elementId, {
+        comments: [...existingComments, comment]
+      });
+    }
+  };
   useEffect(() => {
     setTextDirection(supportedLanguages[currentLanguage]?.direction || 'ltr');
-    
+
+
     // Update text elements with new language font
     // Use pages state directly to avoid infinite loop
     const currentPageData = pages.find(p => p.id === currentPage);
     if (currentPageData) {
       const currentElements = currentPageData.elements || [];
       const hasTextElements = currentElements.some(el => el.type === 'text');
-      
+
+
       // Only update if there are text elements to update
       if (hasTextElements) {
         const updatedElements = currentElements.map(el => {
@@ -433,18 +520,20 @@ const Sowntra = () => {
           }
           return el;
         });
-        
+
         // Use functional update to avoid dependency on pages
-        setPages(prevPages => 
-          prevPages.map(page => 
-            page.id === currentPage 
-              ? { ...page, elements: updatedElements } 
+        setPages(prevPages =>
+          prevPages.map(page =>
+            page.id === currentPage
+              ? { ...page, elements: updatedElements }
+
               : page
           )
         );
       }
     }
-    
+
+
     // Force gradient picker to re-render
     setGradientPickerKey(prev => prev + 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -503,7 +592,9 @@ const Sowntra = () => {
   // Custom Hooks - Export Management
   const {
     exportAsImage,
-    exportAsPDF
+    exportAsPDF,
+    exportAsVideo
+
   } = useExport({
     getCurrentPageElements,
     canvasSize,
@@ -544,7 +635,12 @@ const Sowntra = () => {
     getFilterCSS,
     parseCSS,
     logout,
-    navigate
+    navigate,
+    setUploads,
+    setCanvasHighlighted,
+    zoom: zoomLevel,
+    onCommentClick: handleCommentClick
+
   });
 
   // Custom Hooks - Template Management
@@ -593,7 +689,9 @@ const Sowntra = () => {
     setTextDirection,
     setSelectedElement,
     setSelectedElements,
-    loadProjectInputRef
+    loadProjectInputRef,
+    centerCanvas
+
   });
 
   // NOTE: The following functions are now provided by useProjectManager hook:
@@ -610,6 +708,25 @@ const Sowntra = () => {
   // CustomTemplateModal is now imported from components
 
   // NOTE: renderElement and renderDrawingPath functions now provided by useHelpers hook
+
+  // Custom Hooks - Clipboard
+  const {
+    copyElements,
+    copyStyle,
+    pasteElements,
+    pasteStyle,
+    hasClipboard,
+    hasStyleClipboard
+  } = useClipboard({
+    selectedElements,
+    getCurrentPageElements,
+    setCurrentPageElements,
+    setSelectedElement,
+    setSelectedElements,
+    updateElement,
+    saveToHistory
+  });
+
 
   // Custom Hooks - Keyboard Shortcuts
   useKeyboardShortcuts({
@@ -629,7 +746,10 @@ const Sowntra = () => {
     toggleElementLock,
     setTextEditing,
     showEffectsPanel,
-    setShowEffectsPanel
+    setShowEffectsPanel,
+    copyElements,
+    pasteElements
+
   });
 
   // NOTE: Keyboard shortcuts handler now provided by useKeyboardShortcuts hook
@@ -752,6 +872,14 @@ const Sowntra = () => {
     };
   }, [handleMouseMove, handleMouseUp]);
 
+  // Handle clicking outside the canvas paper (the gray area)
+  const handleContainerMouseDown = useCallback((e) => {
+    // We rely on stopPropagation in children (Canvas Paper, Elements) to prevent this from triggering wrongly
+    setSelectedElement(null);
+    setSelectedElements(new Set());
+  }, [setSelectedElement, setSelectedElements]);
+
+
   return (
     <>
       <div className={`h-screen flex flex-col ${textDirection === 'rtl' ? 'rtl-layout' : ''}`}>
@@ -759,6 +887,10 @@ const Sowntra = () => {
         <TopHeader
           t={t}
           navigate={navigate}
+          zoom={zoom}
+          zoomLevel={zoomLevel}
+          centerCanvas={centerCanvas}
+
           showTemplates={showTemplates}
           setShowTemplates={setShowTemplates}
           showEffectsPanel={showEffectsPanel}
@@ -782,6 +914,19 @@ const Sowntra = () => {
           showAccountMenu={showAccountMenu}
           setShowAccountMenu={setShowAccountMenu}
           handleLogout={handleLogout}
+          // Export Props
+          exportAsImage={exportAsImage}
+          exportAsPDF={exportAsPDF}
+          exportAsVideo={exportAsVideo}
+          videoFormat={videoFormat}
+          setVideoFormat={setVideoFormat}
+          videoQuality={videoQuality}
+          setVideoQuality={setVideoQuality}
+          recordingDuration={recordingDuration}
+          setRecordingDuration={setRecordingDuration}
+          onSaveProject={handleSaveClick}
+          loadProject={loadProject}
+
         />
 
         {/* Pages Navigation - Responsive */}
@@ -815,75 +960,103 @@ const Sowntra = () => {
             setShowGrid={setShowGrid}
             snapToGrid={snapToGrid}
             setSnapToGrid={setSnapToGrid}
+            uploads={uploads}
           />
+
+          {/* FloatingToolbar for Selected Elements - Hidden when commenting */}
+          {!showCommentPopup && (
+            <FloatingToolbar
+              selectedElements={selectedElements}
+              pages={pages}
+              currentPage={currentPage}
+              groupElements={groupElements}
+              ungroupElements={ungroupElements}
+              duplicateElement={duplicateElement}
+              toggleElementLock={toggleElementLock}
+              deleteElement={deleteElement}
+              lockedElements={lockedElements}
+              zoomLevel={zoomLevel}
+              canvasOffset={canvasOffset}
+              canvasRef={canvasRef}
+              canvasSize={canvasSize}
+              onCommentClick={() => setShowCommentPopup(true)}
+              alignElements={alignElements}
+              changeZIndex={changeZIndex}
+              copyElements={copyElements}
+              copyStyle={copyStyle}
+              pasteElements={pasteElements}
+              pasteStyle={pasteStyle}
+              hasClipboard={hasClipboard}
+              hasStyleClipboard={hasStyleClipboard}
+            />
+          )}
 
           {/* Canvas Area - FILLS SCREEN */}
-          <CanvasWorkspace
-            canvasContainerRef={canvasContainerRef}
-            canvasRef={canvasRef}
-            canvasSize={canvasSize}
-            zoomLevel={zoomLevel}
-            canvasOffset={canvasOffset}
-            handleCanvasMouseDown={handleCanvasMouseDown}
-            handleCanvasMouseEnter={handleCanvasMouseEnter}
-            handleCanvasMouseLeave={handleCanvasMouseLeave}
-            touchStartDistance={touchStartDistance}
-            setTouchStartDistance={setTouchStartDistance}
-            initialZoomLevel={initialZoomLevel}
-            setInitialZoomLevel={setInitialZoomLevel}
-            lastTouchEnd={lastTouchEnd}
-            setLastTouchEnd={setLastTouchEnd}
-            zoom={zoom}
-            setZoomLevel={setZoomLevel}
-            showGrid={showGrid}
-            getCurrentPageElements={getCurrentPageElements}
-            renderElement={renderElement}
-            renderDrawingPath={renderDrawingPath}
-            drawingPath={drawingPath}
-            showAlignmentLines={showAlignmentLines}
-            alignmentLines={alignmentLines}
-            onMouseMove={handleCanvasMouseMoveForCollaboration}
-          />
+          <div className="flex flex-col flex-1 h-full min-h-0 overflow-hidden relative bg-gray-100">
+            <ContextualToolbar
+              selectedElement={selectedElement}
+              selectedElementData={selectedElementData}
+              updateElement={updateElement}
+              updateElements={updateElements}
+              toggleElementLock={toggleElementLock}
+              lockedElements={lockedElements}
+              fontFamilies={fontFamilies}
+              animations={animations}
+              showEffectsPanel={showEffectsPanel}
+              setShowEffectsPanel={setShowEffectsPanel}
+              currentPage={currentPage}
+              pages={pages}
+              setPages={setPages}
+              canvasBackgroundColor={(pages.find(p => p.id === currentPage) || {}).backgroundColor}
+              setCanvasBackgroundColor={updatePageBackground}
+              changeZIndex={changeZIndex}
+              // Filter Props
+              filterOptions={filterOptions}
+              updateFilter={updateFilter}
+              alignElements={alignElements}
+              setSelectedElement={setSelectedElement}
+              reorderElement={reorderElement}
+            />
+            <CanvasWorkspace
+              canvasContainerRef={canvasContainerRef}
+              canvasRef={canvasRef}
+              canvasSize={canvasSize}
+              zoomLevel={zoomLevel}
+              canvasOffset={canvasOffset}
+              handleCanvasMouseDown={handleCanvasMouseDown}
+              handleCanvasMouseEnter={handleCanvasMouseEnter}
+              handleCanvasMouseLeave={handleCanvasMouseLeave}
+              touchStartDistance={touchStartDistance}
+              setTouchStartDistance={setTouchStartDistance}
+              initialZoomLevel={initialZoomLevel}
+              setInitialZoomLevel={setInitialZoomLevel}
+              lastTouchEnd={lastTouchEnd}
+              setLastTouchEnd={setLastTouchEnd}
+              zoom={zoom}
+              setZoomLevel={setZoomLevel}
+              showGrid={showGrid}
+              getCurrentPageElements={getCurrentPageElements}
+              renderElement={renderElement}
+              renderDrawingPath={renderDrawingPath}
+              drawingPath={drawingPath}
+              showAlignmentLines={showAlignmentLines}
+              alignmentLines={alignmentLines}
+              onMouseMove={handleCanvasMouseMoveForCollaboration}
+              canvasHighlighted={canvasHighlighted}
+              canvasBackgroundColor={(pages.find(p => p.id === currentPage) || {}).backgroundColor}
+              handleContainerMouseDown={handleContainerMouseDown}
+            />
+          </div>
 
           {/* Right Properties Panel - Hidden on mobile */}
-          <PropertiesPanel
-            selectedElement={selectedElement}
-            selectedElementData={selectedElementData}
-            animations={animations}
-            filterOptions={filterOptions}
-            fontFamilies={fontFamilies}
-            stickerOptions={stickerOptions}
-            showEffectsPanel={showEffectsPanel}
-            setShowEffectsPanel={setShowEffectsPanel}
-            gradientPickerKey={gradientPickerKey}
-            lockedElements={lockedElements}
-            updateElement={updateElement}
-            updateFilter={updateFilter}
-            duplicateElement={duplicateElement}
-            deleteElement={deleteElement}
-            toggleElementLock={toggleElementLock}
-            changeZIndex={changeZIndex}
-            exportAsImage={exportAsImage}
-            exportAsPDF={exportAsPDF}
-            handleSaveClick={handleSaveClick}
-            loadProject={loadProject}
-            TransliterationToggle={TransliterationToggle}
-            recording={recording}
-            startRecording={startRecording}
-            stopRecording={stopRecording}
-            recordingTimeElapsed={recordingTimeElapsed}
-            videoFormat={videoFormat}
-            setVideoFormat={setVideoFormat}
-            videoQuality={videoQuality}
-            setVideoQuality={setVideoQuality}
-            recordingDuration={recordingDuration}
-            setRecordingDuration={setRecordingDuration}
-          />
+
+
         </div>
 
 
         {/* Effects Panel */}
-        <EffectsPanel 
+        <EffectsPanel
+
           show={showEffectsPanel}
           selectedElement={selectedElement}
           selectedElementData={selectedElementData}
@@ -891,170 +1064,62 @@ const Sowntra = () => {
           onClose={() => setShowEffectsPanel(false)}
         />
 
-        {/* Floating Toolbar for Selected Elements */}
-        {selectedElements.size > 0 && selectedElementData && !(showMobileTools || showMobileProperties) && (() => {
-          // Calculate toolbar position with bounds checking
-          const isMobile = window.innerWidth <= 768;
-          const toolbarWidth = 300; // Approximate toolbar width
-          const toolbarHeight = 50; // Approximate toolbar height
-          const padding = 10;
-          
-          let left, top, bottom, transformValue;
-          
-          if (isMobile && selectedElementData) {
-            // Calculate horizontal position
-            const elementCenterX = selectedElementData.x + (selectedElementData.width / 2);
-            left = Math.max(
-              padding + (toolbarWidth / 2), 
-              Math.min(elementCenterX, window.innerWidth - (toolbarWidth / 2) - padding)
-            );
-            
-            // Calculate vertical position - try above element first
-            let calculatedTop = selectedElementData.y - toolbarHeight - 10;
-            
-            // If toolbar would go off top, position below element
-            if (calculatedTop < padding) {
-              calculatedTop = selectedElementData.y + selectedElementData.height + 10;
-            }
-            
-            // If still off bottom, clamp it
-            if (calculatedTop + toolbarHeight > window.innerHeight - padding) {
-              calculatedTop = window.innerHeight - toolbarHeight - padding;
-            }
-            
-            top = `${Math.max(padding, calculatedTop)}px`;
-            bottom = 'auto';
-            transformValue = 'translateX(-50%)';
-          } else {
-            // Desktop positioning
-            left = '50%';
-            top = 'auto';
-            bottom = '1rem';
-            transformValue = 'translateX(-50%)';
-          }
-          
-          return (
-            <div
-              ref={floatingToolbarRef}
-              className={`${styles.toolbar || ''} floating-toolbar transition-all duration-300`}
-              style={{ 
-                zIndex: 1000,
-                position: 'fixed',
-                left: typeof left === 'number' ? `${left}px` : left,
-                top,
-                bottom,
-                transform: transformValue
-              }}
-            >
-            <button
-              onClick={() => {
-                if (selectedElements.size > 1) {
-                  groupElements();
-                }
-              }}
-              className="toolbar-button"
-              title="Group"
-              disabled={selectedElements.size < 2}
-            >
-              <Group size={18} />
-            </button>
-            <button
-              onClick={() => {
-                if (selectedElementData?.type === 'group') {
-                  ungroupElements(selectedElement);
-                }
-              }}
-              className="toolbar-button"
-              title="Ungroup"
-              disabled={selectedElementData?.type !== 'group'}
-            >
-              <Ungroup size={18} />
-            </button>
-            <button
-              onClick={() => {
-                Array.from(selectedElements).forEach(id => {
-                  if (!lockedElements.has(id)) {
-                    changeZIndex(id, 'forward');
-                  }
-                });
-              }}
-              className="toolbar-button"
-              title="Bring Forward"
-            >
-              <PlusCircle size={18} />
-            </button>
-            <button
-              onClick={() => {
-                Array.from(selectedElements).forEach(id => {
-                  if (!lockedElements.has(id)) {
-                    changeZIndex(id, 'backward');
-                  }
-                });
-              }}
-              className="toolbar-button"
-              title="Send Backward"
-            >
-              <MinusCircle size={18} />
-            </button>
-            <button
-              onClick={() => {
-                Array.from(selectedElements).forEach(id => {
-                  if (!lockedElements.has(id)) {
-                    toggleElementLock(id);
-                  }
-                });
-              }}
-              className="toolbar-button"
-              title="Toggle Lock"
-            >
-              <Lock size={18} />
-            </button>
-            <button
-              onClick={() => {
-                Array.from(selectedElements).forEach(id => {
-                  if (!lockedElements.has(id)) {
-                    duplicateElement(id);
-                  }
-                });
-              }}
-              className="toolbar-button"
-              title="Duplicate"
-            >
-              <Copy size={18} />
-            </button>
-            <button
-              onClick={() => {
-                Array.from(selectedElements).forEach(id => {
-                  if (!lockedElements.has(id)) {
-                    deleteElement(id);
-                  }
-                });
-              }}
-              className="toolbar-button text-red-500"
-              title="Delete"
-            >
-              <Trash2 size={18} />
-            </button>
-          </div>
-          );
-        })()}
+        {/* Floating Toolbar for Selected Elements - Hidden when commenting */}
+        {!showCommentPopup && (
+          <FloatingToolbar
+            selectedElements={selectedElements}
+            pages={pages}
+            currentPage={currentPage}
+            groupElements={groupElements}
+            ungroupElements={ungroupElements}
+            duplicateElement={duplicateElement}
+            toggleElementLock={toggleElementLock}
+            deleteElement={deleteElement}
+            lockedElements={lockedElements}
+            zoomLevel={zoomLevel}
+            canvasOffset={canvasOffset}
+            canvasRef={canvasRef}
+            canvasSize={canvasSize}
+            onCommentClick={() => setShowCommentPopup(true)}
+            alignElements={alignElements}
+            changeZIndex={changeZIndex}
+            copyElements={copyElements}
+            copyStyle={copyStyle}
+            pasteElements={pasteElements}
+            pasteStyle={pasteStyle}
+            hasClipboard={hasClipboard}
+            hasStyleClipboard={hasStyleClipboard}
+          />
+        )}
+
+        {showCommentPopup && selectedElementData && (
+          <CommentPopup
+            element={selectedElementData}
+            currentUser={currentUser}
+            onClose={() => setShowCommentPopup(false)}
+            onSendComment={handleSendComment}
+            position={{
+              left: (canvasRef.current?.getBoundingClientRect().left || 0) + ((selectedElementData.x + selectedElementData.width / 2) * (canvasRef.current?.getBoundingClientRect().width / canvasSize.width || 1)),
+              top: (canvasRef.current?.getBoundingClientRect().top || 0) + (selectedElementData.y * (canvasRef.current?.getBoundingClientRect().height / canvasSize.height || 1))
+            }}
+          />
+        )}
 
         {/* Language Help Modal */}
         {/* Recording Status */}
-        <RecordingStatus 
+        <RecordingStatus
+
           recording={recording}
           recordingTimeElapsed={recordingTimeElapsed}
         />
 
-        {/* Bottom Zoom Control - Canva-style */}
-        <BottomZoomControl
-          zoomLevel={zoomLevel}
-          setZoomLevel={setZoomLevel}
-          centerCanvas={centerCanvas}
-        />
+
 
         {/* Mobile Floating Action Buttons */}
         <MobileFABButtons
+          zoom={zoom}
+          centerCanvas={centerCanvas}
+
           setShowMobileProperties={setShowMobileProperties}
           selectedElement={selectedElement}
         />
@@ -1078,6 +1143,8 @@ const Sowntra = () => {
         />
 
         {/* Mobile Properties Drawer */}
+        {/* Mobile Properties Drawer - Kept for mobile users if needed, or remove if fully migrating */}
+
         <MobilePropertiesDrawer
           showMobileProperties={showMobileProperties}
           setShowMobileProperties={setShowMobileProperties}

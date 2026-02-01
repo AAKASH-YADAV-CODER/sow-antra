@@ -14,7 +14,7 @@ import { useEffect } from 'react';
  * 
  * @param {Object} params - Hook parameters
  */
-export const useKeyboardShortcuts = ({
+const useKeyboardShortcuts = ({
   textEditing,
   selectedElements,
   selectedElement,
@@ -31,17 +31,19 @@ export const useKeyboardShortcuts = ({
   toggleElementLock,
   setTextEditing,
   showEffectsPanel,
-  setShowEffectsPanel
+  setShowEffectsPanel,
+  copyElements,
+  pasteElements
 }) => {
-  
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       // Don't handle shortcuts when editing text
       if (textEditing) return;
-      
+
       // Don't handle shortcuts when typing in input fields
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-      
+
       // Delete/Backspace: Delete selected elements
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedElements.size > 0) {
@@ -55,35 +57,33 @@ export const useKeyboardShortcuts = ({
           saveToHistory(newElements);
         }
       }
-      
       // Ctrl/Cmd+Z: Undo
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
         undo();
       }
-      
       // Ctrl/Cmd+Y: Redo
       if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
         e.preventDefault();
         redo();
       }
-      
       // Ctrl/Cmd+Shift+Z: Redo (alternative)
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) {
         e.preventDefault();
         redo();
       }
-      
-      // Ctrl/Cmd+C: Copy (placeholder for future implementation)
+      // Ctrl/Cmd+C: Copy
       if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
         e.preventDefault();
+        copyElements();
       }
-      
-      // Ctrl/Cmd+V: Paste (placeholder for future implementation)
+
+      // Ctrl/Cmd+V: Paste
       if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
         e.preventDefault();
+        pasteElements();
       }
-      
+
       // Arrow keys: Move selected elements
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         if (selectedElements.size > 0) {
@@ -91,7 +91,6 @@ export const useKeyboardShortcuts = ({
           const delta = e.shiftKey ? 10 : 1;
           const moveX = e.key === 'ArrowLeft' ? -delta : e.key === 'ArrowRight' ? delta : 0;
           const moveY = e.key === 'ArrowUp' ? -delta : e.key === 'ArrowDown' ? delta : 0;
-          
           const currentElements = getCurrentPageElements();
           const newElements = currentElements.map(el => {
             if (selectedElements.has(el.id) && !lockedElements.has(el.id)) {
@@ -103,12 +102,10 @@ export const useKeyboardShortcuts = ({
             }
             return el;
           });
-          
           setCurrentPageElements(newElements);
           saveToHistory(newElements);
         }
       }
-  
       // Escape: Clear selection and close effects panel
       if (e.key === 'Escape') {
         setSelectedElement(null);
@@ -116,7 +113,6 @@ export const useKeyboardShortcuts = ({
         setTextEditing(null);
         setShowEffectsPanel(false);
       }
-  
       // Ctrl/Cmd+G: Group/ungroup elements
       if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
         e.preventDefault();
@@ -130,7 +126,6 @@ export const useKeyboardShortcuts = ({
           }
         }
       }
-  
       // Ctrl/Cmd+L: Lock/unlock element
       if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
         e.preventDefault();
@@ -147,7 +142,7 @@ export const useKeyboardShortcuts = ({
         }
       }
     };
-  
+
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
@@ -169,7 +164,9 @@ export const useKeyboardShortcuts = ({
     toggleElementLock,
     setTextEditing,
     showEffectsPanel,
-    setShowEffectsPanel
+    setShowEffectsPanel,
+    copyElements,
+    pasteElements
   ]);
 };
 
