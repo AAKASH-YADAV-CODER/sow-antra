@@ -8,7 +8,7 @@ import { projectAPI } from '../../../services/api';
  * @param {Object} params - Hook parameters
  * @returns {Object} Project management functions
  */
-export const useProjectManager = ({
+const useProjectManager = ({
   pages,
   currentPage,
   canvasSize,
@@ -32,7 +32,8 @@ export const useProjectManager = ({
   setTextDirection,
   setSelectedElement,
   setSelectedElements,
-  loadProjectInputRef
+  loadProjectInputRef,
+  centerCanvas
 }) => {
 
   // Show save dialog with default project name
@@ -63,7 +64,6 @@ export const useProjectManager = ({
       // Save to cloud
       // eslint-disable-next-line no-unused-vars
       const response = await projectAPI.saveProject(projectData);
-      
       // Also save locally as backup
       const dataStr = JSON.stringify(projectData, null, 2);
       const dataBlob = new Blob([dataStr], { type: 'application/json' });
@@ -75,12 +75,10 @@ export const useProjectManager = ({
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      
       alert('Project saved successfully to cloud and locally!');
     } catch (error) {
       console.error('Error saving project:', error);
       alert('Error saving project to cloud. Saving locally only...');
-      
       // Fallback to local save only
       try {
         const projectData = {
@@ -107,7 +105,6 @@ export const useProjectManager = ({
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
-        
         alert('Project saved locally!');
       } catch (localError) {
         console.error('Error saving locally:', localError);
@@ -122,7 +119,6 @@ export const useProjectManager = ({
       alert('Please enter a project name');
       return;
     }
-    
     setShowSaveDialog(false);
     await saveProject(projectName.trim());
   }, [projectName, saveProject, setShowSaveDialog]);
@@ -140,7 +136,6 @@ export const useProjectManager = ({
       reader.onload = (e) => {
         try {
           const projectData = JSON.parse(e.target.result);
-          
           // Validate project data
           if (!projectData.version || !projectData.pages) {
             throw new Error('Invalid project file');
@@ -156,11 +151,13 @@ export const useProjectManager = ({
           setSnapToGrid(projectData.snapToGrid || false);
           setCurrentLanguage(projectData.currentLanguage || 'en');
           setTextDirection(projectData.textDirection || 'ltr');
-          
           // Clear selections
           setSelectedElement(null);
           setSelectedElements(new Set());
-          
+
+          // Force center and fit
+          setTimeout(centerCanvas, 50);
+
           alert('Project loaded successfully!');
         } catch (error) {
           console.error('Error loading project:', error);
@@ -169,10 +166,9 @@ export const useProjectManager = ({
       };
       reader.readAsText(file);
     }
-    
     // Reset the input value so the same file can be loaded again
     event.target.value = '';
-  }, [setPages, setCurrentPage, setCanvasSize, setZoomLevel, setCanvasOffset, setShowGrid, setSnapToGrid, setCurrentLanguage, setTextDirection, setSelectedElement, setSelectedElements]);
+  }, [setPages, setCurrentPage, setCanvasSize, setZoomLevel, setCanvasOffset, setShowGrid, setSnapToGrid, setCurrentLanguage, setTextDirection, setSelectedElement, setSelectedElements, centerCanvas]);
 
   return {
     handleSaveClick,

@@ -19,7 +19,9 @@ const CanvasWorkspace = ({
   handleCanvasMouseDown,
   handleCanvasMouseEnter,
   handleCanvasMouseLeave,
-  
+  canvasHighlighted,
+
+
   // Touch handlers
   touchStartDistance,
   setTouchStartDistance,
@@ -29,20 +31,24 @@ const CanvasWorkspace = ({
   setLastTouchEnd,
   zoom,
   setZoomLevel,
-  
+
+
   // Grid and elements
   showGrid,
   getCurrentPageElements,
   renderElement,
   renderDrawingPath,
   drawingPath,
-  
+
   // Alignment lines
   showAlignmentLines,
   alignmentLines,
-  
+
   // Collaboration
-  onMouseMove
+  onMouseMove,
+  canvasBackgroundColor,
+  handleContainerMouseDown // Add this
+
 }) => {
   const handleMouseMoveCallback = (e) => {
     if (onMouseMove) {
@@ -52,19 +58,23 @@ const CanvasWorkspace = ({
   };
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <div 
+      <div
         className="canvas-container"
         ref={canvasContainerRef}
+        onMouseDown={handleContainerMouseDown}
+
         style={{
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
           flex: 1,
           overflow: 'hidden',
-          backgroundColor: '#f0f0f0',
-          padding: '5px',
+          backgroundColor: '#ebedef', // Neutral gray
+          padding: '40px', // More breathing room
           width: '100%',
-          height: '100%'
+          height: '100%',
+          transition: 'background-color 0.3s ease'
+
         }}
       >
         <div
@@ -85,10 +95,16 @@ const CanvasWorkspace = ({
               transform: `scale(${zoomLevel}) translate(${canvasOffset.x / zoomLevel}px, ${canvasOffset.y / zoomLevel}px)`,
               transformOrigin: 'center center',
               position: 'relative',
-              backgroundColor: 'white',
-              boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
-              transition: 'transform 0.2s ease-out',
-              touchAction: 'none'
+              backgroundColor: canvasBackgroundColor || 'white',
+              boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)',
+              transition: 'outline 0.2s ease-in-out',
+              touchAction: 'none',
+              overflow: 'hidden',
+              outline: canvasHighlighted ? `${Math.max(3, 3 / zoomLevel)}px solid #8b3dffaa` : 'none',
+              outlineOffset: `-${Math.max(3, 3 / zoomLevel)}px`,
+              flexShrink: 0, // CRITICAL: Stop flexbox from squishing the canvas
+              borderRadius: '1px' // Sharp precise corners
+
             }}
             ref={canvasRef}
             onMouseDown={handleCanvasMouseDown}
@@ -111,7 +127,8 @@ const CanvasWorkspace = ({
                 // Single touch - convert to mouse event for element interaction
                 const touch = e.touches[0];
                 const now = Date.now();
-                
+
+
                 // Detect double-tap to zoom
                 if (now - lastTouchEnd < 300) {
                   e.preventDefault();
@@ -125,7 +142,8 @@ const CanvasWorkspace = ({
                   return;
                 }
                 setLastTouchEnd(now);
-                
+
+
                 const mouseEvent = new MouseEvent('mousedown', {
                   clientX: touch.clientX,
                   clientY: touch.clientY,
@@ -144,7 +162,8 @@ const CanvasWorkspace = ({
                   touch2.clientX - touch1.clientX,
                   touch2.clientY - touch1.clientY
                 );
-                
+
+
                 if (touchStartDistance > 0) {
                   const scale = distance / touchStartDistance;
                   const newZoom = Math.max(0.1, Math.min(5, initialZoomLevel * scale));
@@ -166,7 +185,8 @@ const CanvasWorkspace = ({
                 // All touches ended
                 setTouchStartDistance(0);
                 setInitialZoomLevel(zoomLevel);
-                
+
+
                 // Dispatch mouseup event
                 const mouseEvent = new MouseEvent('mouseup', {
                   bubbles: true
@@ -180,7 +200,8 @@ const CanvasWorkspace = ({
           >
             {/* Grid */}
             {showGrid && (
-              <div 
+              <div
+
                 style={{
                   position: 'absolute',
                   top: 0,
@@ -193,13 +214,14 @@ const CanvasWorkspace = ({
                 }}
               />
             )}
-            
+
             {/* Render Elements */}
             {getCurrentPageElements().map(renderElement)}
-            
+
             {/* Render Drawing Path */}
             {renderDrawingPath(drawingPath)}
-            
+
+
             {/* Alignment Lines */}
             {showAlignmentLines && (
               <>
@@ -210,7 +232,8 @@ const CanvasWorkspace = ({
                       position: 'absolute',
                       left: x,
                       top: 0,
-                      width: 1,
+                      width: Math.max(1, 1 / zoomLevel),
+
                       height: '100%',
                       backgroundColor: '#cb0ee4ff',
                       pointerEvents: 'none',
@@ -226,7 +249,8 @@ const CanvasWorkspace = ({
                       left: 0,
                       top: y,
                       width: '100%',
-                      height: 1,
+                      height: Math.max(1, 1 / zoomLevel),
+
                       backgroundColor: '#cb0ee4ff',
                       pointerEvents: 'none',
                       zIndex: 10000

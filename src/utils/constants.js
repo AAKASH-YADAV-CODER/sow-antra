@@ -1,8 +1,8 @@
 import React from 'react';
-import { 
-  Square, Type, Image, Smartphone, MessageCircle, 
-  Monitor, Film, FileText, Printer, Heart, Music, Zap, CreditCard, 
-  Tv, Megaphone, Users, BookOpen 
+import {
+  Square, Type, Image, Smartphone, MessageCircle,
+  Monitor, Film, FileText, Printer, Heart, Music, Zap, CreditCard,
+  Tv, Megaphone, Users, BookOpen
 } from 'lucide-react';
 
 // Font families with Indian language support
@@ -14,7 +14,7 @@ export const fontFamilies = [
   'Source Sans Pro', 'Raleway', 'Merriweather', 'Playfair Display',
   'Ubuntu', 'Nunito', 'Inter', 'Fira Sans', 'Noto Sans',
   // Indian language fonts
-  'Noto Sans Devanagari', 'Noto Sans Tamil', 'Noto Sans Telugu', 
+  'Noto Sans Devanagari', 'Noto Sans Tamil', 'Noto Sans Telugu',
   'Noto Sans Bengali', 'Noto Sans Gurmukhi', 'Noto Sans Gujarati',
   'Noto Sans Kannada', 'Noto Sans Malayalam', 'Noto Sans Oriya',
   'Mangal', 'Lohit Devanagari', 'FreeSans', 'Kalimati', 'Lohit Tamil',
@@ -40,45 +40,45 @@ export const supportedLanguages = {
 // Enhanced Text Effects
 export const textEffects = {
   none: { name: 'None', css: '' },
-  shadow: { 
-    name: 'Shadow', 
-    css: 'text-shadow: 2px 2px 4px rgba(0,0,0,0.5);' 
+  shadow: {
+    name: 'Shadow',
+    css: 'text-shadow: 2px 2px 4px rgba(0,0,0,0.5);'
   },
-  lift: { 
-    name: 'Lift', 
-    css: 'text-shadow: 0 4px 8px rgba(0,0,0,0.3), 0 6px 20px rgba(0,0,0,0.15);' 
+  lift: {
+    name: 'Lift',
+    css: 'text-shadow: 0 4px 8px rgba(0,0,0,0.3), 0 6px 20px rgba(0,0,0,0.15);'
   },
-  hollow: { 
-    name: 'Hollow', 
-    css: 'color: transparent; -webkit-text-stroke: 2px #000;' 
+  hollow: {
+    name: 'Hollow',
+    css: 'color: transparent; -webkit-text-stroke: 2px #000;'
   },
-  splice: { 
-    name: 'Splice', 
-    css: 'background: linear-gradient(45deg, #ff6b6b, #4ecdc4); -webkit-background-clip: text; -webkit-text-fill-color: transparent;' 
+  splice: {
+    name: 'Splice',
+    css: 'background: linear-gradient(45deg, #ff6b6b, #4ecdc4); -webkit-background-clip: text; -webkit-text-fill-color: transparent;'
   },
-  neon: { 
-    name: 'Neon', 
-    css: 'color: #fff; text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #ff00de, 0 0 20px #ff00de;' 
+  neon: {
+    name: 'Neon',
+    css: 'color: #fff; text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #ff00de, 0 0 20px #ff00de;'
   },
-  glitch: { 
-    name: 'Glitch', 
-    css: 'text-shadow: 2px 2px 0 #ff00de, -2px -2px 0 #00fff7; animation: glitch-text 0.3s infinite;' 
+  glitch: {
+    name: 'Glitch',
+    css: 'text-shadow: 2px 2px 0 #ff00de, -2px -2px 0 #00fff7; animation: glitch-text 0.3s infinite;'
   },
-  background: { 
-    name: 'Background', 
-    css: 'background: rgba(0,0,0,0.8); color: white; padding: 4px 8px; border-radius: 4px;' 
+  background: {
+    name: 'Background',
+    css: 'background: rgba(0,0,0,0.8); color: white; padding: 4px 8px; border-radius: 4px;'
   },
-  retro: { 
-    name: 'Retro', 
-    css: 'color: #ff6b6b; text-shadow: 3px 3px 0 #4ecdc4, 6px 6px 0 #45b7aa;' 
+  retro: {
+    name: 'Retro',
+    css: 'color: #ff6b6b; text-shadow: 3px 3px 0 #4ecdc4, 6px 6px 0 #45b7aa;'
   },
-  gradient: { 
-    name: 'Gradient', 
-    css: 'background: linear-gradient(45deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent;' 
+  gradient: {
+    name: 'Gradient',
+    css: 'background: linear-gradient(45deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent;'
   },
-  metallic: { 
-    name: 'Metallic', 
-    css: 'background: linear-gradient(45deg, #bdc3c7, #2c3e50); -webkit-background-clip: text; -webkit-text-fill-color: transparent;' 
+  metallic: {
+    name: 'Metallic',
+    css: 'background: linear-gradient(45deg, #bdc3c7, #2c3e50); -webkit-background-clip: text; -webkit-text-fill-color: transparent;'
   }
 };
 
@@ -124,131 +124,138 @@ export const specialEffects = {
 
 // Social media templates with correct dimensions
 export const socialMediaTemplates = {
-  instagramPost: { 
-    width: 1080, 
-    height: 1080, 
-    name: 'Instagram Post', 
+  instagramPost: {
+    width: 1080,
+    height: 1080,
+    name: 'Instagram Post',
     icon: <Square size={16} />,
-    aspectRatio: 1 
+    aspectRatio: 1
   },
-  instagramStory: { 
-    width: 1080, 
-    height: 1920, 
-    name: 'Instagram Story', 
+  instagramStory: {
+    width: 1080,
+    height: 1920,
+    name: 'Instagram Story',
     icon: <Smartphone size={16} />,
-    aspectRatio: 9/16 
+    aspectRatio: 9 / 16
   },
-  facebookPost: { 
-    width: 940, 
-    height: 788, 
-    name: 'Facebook Post', 
+  facebookPost: {
+    width: 940,
+    height: 788,
+    name: 'Facebook Post',
     icon: <MessageCircle size={16} />,
-    aspectRatio: 940/788 
+    aspectRatio: 940 / 788
   },
-  facebookCover: { 
-    width: 820, 
-    height: 312, 
-    name: 'Facebook Cover', 
+  facebookCover: {
+    width: 820,
+    height: 312,
+    name: 'Facebook Cover',
     icon: <Image size={16} />,
-    aspectRatio: 820/312 
+    aspectRatio: 820 / 312
   },
-  twitterPost: { 
-    width: 1024, 
-    height: 512, 
-    name: 'Twitter Post', 
+  twitterPost: {
+    width: 1024,
+    height: 512,
+    name: 'Twitter Post',
     icon: <Type size={16} />,
-    aspectRatio: 2 
+    aspectRatio: 2
   },
-  twitterHeader: { 
-    width: 1500, 
-    height: 500, 
-    name: 'Twitter Header', 
+  twitterHeader: {
+    width: 1500,
+    height: 500,
+    name: 'Twitter Header',
     icon: <Monitor size={16} />,
-    aspectRatio: 3 
+    aspectRatio: 3
   },
-  linkedinPost: { 
-    width: 1200, 
-    height: 1200, 
-    name: 'LinkedIn Post', 
+  linkedinPost: {
+    width: 1200,
+    height: 1200,
+    name: 'LinkedIn Post',
     icon: <Users size={16} />,
-    aspectRatio: 1 
+    aspectRatio: 1
   },
-  linkedinBanner: { 
-    width: 1584, 
-    height: 396, 
-    name: 'LinkedIn Banner', 
+  linkedinBanner: {
+    width: 1584,
+    height: 396,
+    name: 'LinkedIn Banner',
     icon: <Monitor size={16} />,
-    aspectRatio: 4 
+    aspectRatio: 4
   },
-  youtubeThumbnail: { 
-    width: 1280, 
-    height: 720, 
-    name: 'YouTube Thumbnail', 
+  youtubeThumbnail: {
+    width: 1280,
+    height: 720,
+    name: 'YouTube Thumbnail',
     icon: <Film size={16} />,
-    aspectRatio: 16/9 
+    aspectRatio: 16 / 9
   },
-  youtubeChannelArt: { 
-    width: 2560, 
-    height: 1440, 
-    name: 'YouTube Channel Art', 
+  youtubeChannelArt: {
+    width: 2560,
+    height: 1440,
+    name: 'YouTube Channel Art',
     icon: <Tv size={16} />,
-    aspectRatio: 16/9 
+    aspectRatio: 16 / 9
   },
-  tiktok: { 
-    width: 1080, 
-    height: 1920, 
-    name: 'TikTok Video', 
+  tiktok: {
+    width: 1080,
+    height: 1920,
+    name: 'TikTok Video',
     icon: <Music size={16} />,
-    aspectRatio: 9/16 
+    aspectRatio: 9 / 16
   },
-  snapchat: { 
-    width: 1080, 
-    height: 1920, 
-    name: 'Snapchat', 
+  snapchat: {
+    width: 1080,
+    height: 1920,
+    name: 'Snapchat',
     icon: <Zap size={16} />,
-    aspectRatio: 9/16 
+    aspectRatio: 9 / 16
   },
-  a4Poster: { 
-    width: 2480, 
-    height: 3508, 
-    name: 'A4 Poster', 
+  presentation: {
+    width: 1920,
+    height: 1080,
+    name: 'Presentation',
+    icon: <Monitor size={16} />,
+    aspectRatio: 16 / 9
+  },
+  a4Document: {
+    width: 2480,
+    height: 3508,
+    name: 'A4 Document',
     icon: <FileText size={16} />,
-    aspectRatio: 2480/3508 
+    aspectRatio: 2480 / 3508
   },
-  a3Poster: { 
-    width: 3508, 
-    height: 4961, 
-    name: 'A3 Poster', 
+  a3Poster: {
+    width: 3508,
+    height: 4961,
+    name: 'A3 Poster',
     icon: <Printer size={16} />,
-    aspectRatio: 3508/4961 
+    aspectRatio: 3508 / 4961
   },
-  a5Flyer: { 
-    width: 1748, 
-    height: 2480, 
-    name: 'A5 Flyer', 
+  a5Flyer: {
+    width: 1748,
+    height: 2480,
+    name: 'A5 Flyer',
     icon: <Megaphone size={16} />,
-    aspectRatio: 1748/2480 
+    aspectRatio: 1748 / 2480
   },
-  businessCard: { 
-    width: 1050, 
-    height: 600, 
-    name: 'Business Card', 
+  businessCard: {
+    width: 1050,
+    height: 600,
+    name: 'Business Card',
     icon: <CreditCard size={16} />,
-    aspectRatio: 7/4 
+    aspectRatio: 7 / 4
   },
-  invitationCard: { 
-    width: 1200, 
-    height: 1800, 
-    name: 'Invitation Card', 
+  invitationCard: {
+    width: 1200,
+    height: 1800,
+    name: 'Invitation Card',
     icon: <Heart size={16} />,
-    aspectRatio: 2/3 
+    aspectRatio: 2 / 3
   },
-  brochure: { 
-    width: 2480, 
-    height: 3508, 
-    name: 'Brochure', 
+  brochure: {
+    width: 2480,
+    height: 3508,
+    name: 'Brochure',
     icon: <BookOpen size={16} />,
-    aspectRatio: 2480/3508 
+    aspectRatio: 2480 / 3508
   }
 };
 

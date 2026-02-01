@@ -16,6 +16,9 @@ import { useCallback } from 'react';
  * @param {Function} params.setZoomLevel - Update zoom level
  * @param {boolean} params.isPlaying - Animation playing state
  * @param {Function} params.setIsPlaying - Set animation playing state
+ * @param {Function} params.setShowZoomIndicator - Show zoom indicator
+ * @param {Object} params.zoomIndicatorTimeoutRef - Zoom indicator timeout ref
+
  * @returns {Object} Canvas utility handlers
  */
 export const useCanvasUtils = ({
@@ -29,7 +32,10 @@ export const useCanvasUtils = ({
   zoomLevel,
   setZoomLevel,
   isPlaying,
-  setIsPlaying
+  setIsPlaying,
+  setShowZoomIndicator,
+  zoomIndicatorTimeoutRef
+
 }) => {
   // Add new page
   const addNewPage = useCallback(() => {
@@ -54,7 +60,8 @@ export const useCanvasUtils = ({
   const renameCurrentPage = useCallback(() => {
     const newName = prompt('Enter new page name:', pages.find(p => p.id === currentPage)?.name || 'Page');
     if (newName) {
-      setPages(pages.map(page => 
+      setPages(pages.map(page =>
+
         page.id === currentPage ? { ...page, name: newName } : page
       ));
     }
@@ -64,19 +71,44 @@ export const useCanvasUtils = ({
   const playAnimations = useCallback(() => {
     setIsPlaying(true);
     const currentElements = getCurrentPageElements();
+
+    // Reset animations first
+    currentElements.forEach(element => {
+      const elementDOM = document.getElementById(`element-${element.id}`);
+      if (elementDOM) {
+        elementDOM.style.animation = 'none';
+        void elementDOM.offsetWidth; // Force reflow
+      }
+    });
+
+    // Apply animations
+
     currentElements.forEach((element, index) => {
       if (element.animation) {
         const elementDOM = document.getElementById(`element-${element.id}`);
         if (elementDOM) {
-          elementDOM.style.animation = 'none';
+          const anim = typeof element.animation === 'object' ? element.animation : { type: element.animation, duration: 1, delay: 0 };
+          let animName = anim.type;
+
+          // Safety mapping to match CanvasElement logic
+          // Safety mapping to match CanvasElement logic (Use wipe for everything to avoid reflows)
+          if (animName === 'typewriter') {
+            animName = 'wipe';
+          }
+
+          const duration = anim.duration || 1;
+          const delay = (anim.delay || 0); // Use explicit delay set by AnimationPane
+
           setTimeout(() => {
-            elementDOM.style.animation = `${element.animation} 1s ease-out forwards`;
-          }, index * 200);
+            elementDOM.style.animation = `${animName} ${duration}s ease-out forwards`;
+          }, delay * 1000);
         }
       }
     });
-    
-    setTimeout(() => setIsPlaying(false), currentElements.length * 200 + 1000);
+
+    // Auto stop after max duration (approx)
+    setTimeout(() => setIsPlaying(false), 5000);
+
   }, [getCurrentPageElements, setIsPlaying]);
 
   // Reset animations
@@ -94,7 +126,8 @@ export const useCanvasUtils = ({
   // Zoom in/out
   const zoom = useCallback((direction) => {
     let newZoom;
-    
+
+
     if (typeof direction === 'number') {
       // Direct zoom level passed
       newZoom = Math.max(0.1, Math.min(5, direction));
@@ -105,20 +138,35 @@ export const useCanvasUtils = ({
     } else {
       newZoom = zoomLevel;
     }
-    
+
     setZoomLevel(newZoom);
-  }, [zoomLevel, setZoomLevel]);
+
+    // Show zoom indicator on mobile
+    setShowZoomIndicator(true);
+
+    // Clear existing timeout
+    if (zoomIndicatorTimeoutRef.current) {
+      clearTimeout(zoomIndicatorTimeoutRef.current);
+    }
+
+    // Hide after 10 seconds
+    zoomIndicatorTimeoutRef.current = setTimeout(() => {
+      setShowZoomIndicator(false);
+    }, 10000);
+  }, [zoomLevel, setZoomLevel, setShowZoomIndicator, zoomIndicatorTimeoutRef]);
+
 
   return {
     // Page management
     addNewPage,
     deleteCurrentPage,
     renameCurrentPage,
-    
+
     // Animation control
     playAnimations,
     resetAnimations,
-    
+
+
     // Zoom control
     zoom
   };

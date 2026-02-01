@@ -9,7 +9,7 @@ import CanvasElement from '../components/CanvasElement';
  * @param {Object} params - Hook parameters
  * @returns {Object} Helper functions
  */
-export const useHelpers = ({
+const useHelpers = ({
   // Constants for effects
   textEffects,
   imageEffects,
@@ -41,14 +41,18 @@ export const useHelpers = ({
   parseCSS,
   // Auth and navigation
   logout,
-  navigate
+  navigate,
+  setUploads,
+  setCanvasHighlighted,
+  zoom,
+  onCommentClick
 }) => {
 
   // Wrapper for getEffectCSS with all effect types
   const getEffectCSSWrapper = useCallback((element) => {
     return getEffectCSS(element, textEffects, imageEffects, shapeEffects, specialEffects);
   }, [textEffects, imageEffects, shapeEffects, specialEffects]);
-  
+
   // Wrapper for getCanvasEffects
   const getCanvasEffectsWrapper = useCallback((element) => {
     return getCanvasEffects(element, imageEffects);
@@ -60,11 +64,19 @@ export const useHelpers = ({
     if (file) {
       const reader = new FileReader();
       reader.onload = (e) => {
-        addElement('image', { src: e.target.result });
+        const src = e.target.result;
+        addElement('image', { src });
+        // Add to uploads gallery
+        if (setUploads) {
+          setUploads(prev => [
+            { id: Date.now(), src, name: file.name, type: file.type },
+            ...prev
+          ]);
+        }
       };
       reader.readAsDataURL(file);
     }
-  }, [addElement]);
+  }, [addElement, setUploads]);
 
   // Logout handler with navigation
   const handleLogout = useCallback(async () => {
@@ -76,14 +88,14 @@ export const useHelpers = ({
     }
   }, [logout, navigate]);
 
-  // Canvas mouse enter/leave handlers (for future highlighting feature)
+  // Canvas mouse enter/leave handlers
   const handleCanvasMouseEnter = useCallback(() => {
-    // setCanvasHighlighted(true);
-  }, []);
+    if (setCanvasHighlighted) setCanvasHighlighted(true);
+  }, [setCanvasHighlighted]);
 
   const handleCanvasMouseLeave = useCallback(() => {
-    // setCanvasHighlighted(false);
-  }, []);
+    if (setCanvasHighlighted) setCanvasHighlighted(false);
+  }, [setCanvasHighlighted]);
 
   // Render element using CanvasElement component
   const renderElement = useCallback((element) => {
@@ -111,6 +123,8 @@ export const useHelpers = ({
         parseCSS={parseCSS}
         renderSelectionHandles={renderSelectionHandles}
         handleTextEdit={handleTextEdit}
+        onCommentClick={onCommentClick}
+        zoom={zoom}
       />
     );
   }, [
@@ -133,18 +147,18 @@ export const useHelpers = ({
     getEffectCSSWrapper,
     parseCSS,
     renderSelectionHandles,
-    handleTextEdit
+    handleTextEdit,
+    onCommentClick,
+    zoom
   ]);
 
   // Render drawing path in progress
   const renderDrawingPath = useCallback((drawingPath) => {
     if (drawingPath.length < 2) return null;
-    
     let pathData = 'M ' + drawingPath[0].x + ' ' + drawingPath[0].y;
     for (let i = 1; i < drawingPath.length; i++) {
       pathData += ' L ' + drawingPath[i].x + ' ' + drawingPath[i].y;
     }
-    
     return (
       <svg
         style={{

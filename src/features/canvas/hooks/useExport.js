@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { 
+import {
   exportAsImage as exportAsImageUtil,
   exportAsPDF as exportAsPDFUtil,
   exportAsSVG as exportAsSVGUtil
@@ -14,8 +14,8 @@ import {
  * @param {Object} imageEffects - Image effects configuration
  * @returns {Object} Export functions
  */
-export const useExport = ({ getCurrentPageElements, canvasSize, imageEffects }) => {
-  
+const useExport = ({ getCurrentPageElements, canvasSize, imageEffects }) => {
+
   // Export as SVG
   const exportAsSVG = useCallback(() => {
     const currentElements = getCurrentPageElements();
@@ -41,14 +41,12 @@ export const useExport = ({ getCurrentPageElements, canvasSize, imageEffects }) 
   // Get export-ready elements with proper filtering
   const getExportReadyElements = useCallback(() => {
     const currentElements = getCurrentPageElements();
-    
     return [...currentElements]
       .sort((a, b) => {
         // First, sort by zIndex
         if (a.zIndex !== b.zIndex) {
           return a.zIndex - b.zIndex;
         }
-        
         // If same zIndex, maintain original order
         return currentElements.indexOf(a) - currentElements.indexOf(b);
       })
@@ -62,6 +60,12 @@ export const useExport = ({ getCurrentPageElements, canvasSize, imageEffects }) 
     exportAsSVG,
     exportAsImage,
     exportAsPDF,
+    exportAsVideo: useCallback((duration, onProgress) => {
+      const currentElements = getCurrentPageElements();
+      return import('../../../utils/canvasExport').then(module => {
+        return module.exportAsVideo(currentElements, canvasSize, imageEffects, duration, onProgress);
+      });
+    }, [getCurrentPageElements, canvasSize, imageEffects]),
     getExportReadyElements
   };
 };

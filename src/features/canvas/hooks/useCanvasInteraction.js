@@ -42,7 +42,9 @@ export const useCanvasInteraction = ({
   setCanvasOffset,
   snapToGrid,
   canvasRef,
-  setTextEditing
+  setTextEditing,
+  currentPage // Add this
+
 }) => {
   // Interaction states
   const [isDragging, setIsDragging] = useState(false);
@@ -51,10 +53,11 @@ export const useCanvasInteraction = ({
   const [isPanning, setIsPanning] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawingPath, setDrawingPath] = useState([]);
-  const [dragStart, setDragStart] = useState({ 
-    x: 0, 
-    y: 0, 
-    elementX: 0, 
+  const [dragStart, setDragStart] = useState({
+    x: 0,
+    y: 0,
+    elementX: 0,
+
     elementY: 0,
     elementWidth: 0,
     elementHeight: 0,
@@ -100,12 +103,13 @@ export const useCanvasInteraction = ({
   // Handle selection
   const handleSelectElement = useCallback((e, elementId) => {
     e.stopPropagation();
-    
+
     const currentElements = getCurrentPageElements();
     const element = currentElements.find(el => el.id === elementId);
-    
+
     if (!element) return;
-    
+
+
     // If element is in a group, select the group instead
     if (element.groupId && !selectedElements.has(element.groupId)) {
       const groupElement = currentElements.find(el => el.id === element.groupId);
@@ -127,13 +131,15 @@ export const useCanvasInteraction = ({
         return;
       }
     }
-    
+
+
     if (lockedElements.has(elementId)) {
       setSelectedElement(elementId);
       setSelectedElements(new Set([elementId]));
       return;
     }
-    
+
+
     if (e.ctrlKey || e.metaKey) {
       const newSelected = new Set(selectedElements);
       if (newSelected.has(elementId)) {
@@ -157,18 +163,20 @@ export const useCanvasInteraction = ({
   // Handle drawing with pen tool
   const handleDrawing = useCallback((e) => {
     if (currentTool !== 'pen' || !isDrawing || !canvasRef.current) return;
-    
+
     const rect = canvasRef.current.getBoundingClientRect();
     const x = (e.clientX - rect.left - canvasOffset.x) / zoomLevel;
     const y = (e.clientY - rect.top - canvasOffset.y) / zoomLevel;
-    
+
+
     setDrawingPath(prev => [...prev, { x, y }]);
   }, [currentTool, isDrawing, zoomLevel, canvasOffset, canvasRef]);
 
   // Finish drawing and create a path element
   const finishDrawing = useCallback(() => {
     if (currentTool !== 'pen' || drawingPath.length === 0) return;
-    
+
+
     addElement('drawing', { path: [...drawingPath] });
     setDrawingPath([]);
     setIsDrawing(false);
@@ -178,22 +186,26 @@ export const useCanvasInteraction = ({
   const handleMouseDown = useCallback((e, elementId, action = 'drag', direction = '') => {
     e.stopPropagation();
     e.preventDefault();
-    
+
+
     const currentElements = getCurrentPageElements();
     const element = currentElements.find(el => el.id === elementId);
     if (!element) return;
 
     // If element is in a group, use the group for operations
-    const targetElement = element.groupId 
-      ? currentElements.find(el => el.id === element.groupId) 
+    const targetElement = element.groupId
+      ? currentElements.find(el => el.id === element.groupId)
       : element;
-    
+
     if (!targetElement || (lockedElements.has(targetElement.id) && action !== 'select')) return;
 
     handleSelectElement(e, targetElement.id);
-    
+
     const rect = canvasRef.current.getBoundingClientRect();
-    
+    const x = (e.clientX - rect.left - canvasOffset.x) / zoomLevel;
+    const y = (e.clientY - rect.top - canvasOffset.y) / zoomLevel;
+
+
     if (action === 'drag' && !lockedElements.has(targetElement.id)) {
       setIsDragging(true);
       setShowAlignmentLines(true);
@@ -204,8 +216,9 @@ export const useCanvasInteraction = ({
     }
 
     setDragStart({
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
+      x,
+      y,
+
       elementX: targetElement.x,
       elementY: targetElement.y,
       elementWidth: targetElement.width,
@@ -213,7 +226,8 @@ export const useCanvasInteraction = ({
       elementRotation: targetElement.rotation,
       resizeDirection: direction
     });
-  }, [getCurrentPageElements, lockedElements, handleSelectElement, canvasRef]);
+  }, [getCurrentPageElements, lockedElements, handleSelectElement, canvasRef, canvasOffset, zoomLevel]);
+
 
   // Enhanced mouse move handler with directional resizing
   const handleMouseMove = useCallback((e) => {
@@ -229,7 +243,8 @@ export const useCanvasInteraction = ({
     const rect = canvasRef.current.getBoundingClientRect();
     const mouseX = (e.clientX - rect.left - canvasOffset.x) / zoomLevel;
     const mouseY = (e.clientY - rect.top - canvasOffset.y) / zoomLevel;
-    
+
+
     if (isPanning) {
       setCanvasOffset({
         x: canvasOffset.x + e.movementX,
@@ -237,24 +252,27 @@ export const useCanvasInteraction = ({
       });
       return;
     }
-    
+
     const currentElements = getCurrentPageElements();
     const element = currentElements.find(el => el.id === selectedElement);
     if (!element) return;
-    
+
+
     // Handle group movement
     if (element.type === 'group' && isDragging) {
       const deltaX = mouseX - dragStart.x;
       const deltaY = mouseY - dragStart.y;
-      
+
       let newX = dragStart.elementX + deltaX;
       let newY = dragStart.elementY + deltaY;
-      
+
+
       if (snapToGrid) {
         newX = Math.round(newX / 10) * 10;
         newY = Math.round(newY / 10) * 10;
       }
-      
+
+
       // Move all children of the group
       const newElements = currentElements.map(el => {
         if (el.groupId === selectedElement) {
@@ -272,29 +290,33 @@ export const useCanvasInteraction = ({
         }
         return el;
       });
-      
+
       setCurrentPageElements(newElements);
-      saveToHistory(newElements);
+      // saveToHistory(newElements); // Remove this, save on up
+
       calculateAlignmentLines({ ...element, x: newX, y: newY });
     } else if (isDragging) {
       const deltaX = mouseX - dragStart.x;
       const deltaY = mouseY - dragStart.y;
-      
+
       let newX = dragStart.elementX + deltaX;
       let newY = dragStart.elementY + deltaY;
-      
+
+
       if (snapToGrid) {
         newX = Math.round(newX / 10) * 10;
         newY = Math.round(newY / 10) * 10;
       }
-      
+
       if (selectedElements.size === 1) {
-        updateElement(selectedElement, { x: newX, y: newY });
+        updateElement(selectedElement, { x: newX, y: newY }, false);
+
         calculateAlignmentLines({ ...element, x: newX, y: newY });
       } else {
         const deltaMoveX = newX - element.x;
         const deltaMoveY = newY - element.y;
-        
+
+
         const newElements = currentElements.map(el => {
           if (selectedElements.has(el.id) && !lockedElements.has(el.id)) {
             return {
@@ -305,14 +327,16 @@ export const useCanvasInteraction = ({
           }
           return el;
         });
-        
+
         setCurrentPageElements(newElements);
-        saveToHistory(newElements);
+        // saveToHistory(newElements); // Remove this, save on up
+
       }
     } else if (isResizing) {
       const deltaX = mouseX - dragStart.x;
       const deltaY = mouseY - dragStart.y;
-      
+
+
       let newX = dragStart.elementX;
       let newY = dragStart.elementY;
       let newWidth = dragStart.elementWidth;
@@ -358,17 +382,19 @@ export const useCanvasInteraction = ({
           break;
       }
 
-      updateElement(selectedElement, { 
-        x: newX, 
-        y: newY, 
-        width: newWidth, 
-        height: newHeight 
+      updateElement(selectedElement, {
+        x: newX,
+        y: newY,
+        width: newWidth,
+        height: newHeight
+
       });
     } else if (isRotating) {
       const centerX = element.x + element.width / 2;
       const centerY = element.y + element.height / 2;
       const angle = Math.atan2(mouseY - centerY, mouseX - centerX) * 180 / Math.PI;
-      updateElement(selectedElement, { rotation: angle });
+      updateElement(selectedElement, { rotation: angle }, false);
+
     }
   }, [selectedElement, isDragging, isResizing, isRotating, isPanning, dragStart, getCurrentPageElements, calculateAlignmentLines, zoomLevel, canvasOffset, selectedElements, snapToGrid, updateElement, saveToHistory, currentTool, isDrawing, handleDrawing, lockedElements, setCurrentPageElements, setCanvasOffset, canvasRef]);
 
@@ -377,52 +403,102 @@ export const useCanvasInteraction = ({
     if (currentTool === 'pen' && isDrawing) {
       finishDrawing();
     }
-    
+
+    // Auto-masking logic: if an image is dropped over a frame
+    if (isDragging && selectedElement && selectedElements.size === 1) {
+      const elements = getCurrentPageElements();
+      const movingElement = elements.find(el => el.id === selectedElement);
+
+      if (movingElement && (movingElement.type === 'image' || movingElement.type === 'video')) {
+        // Look for a frame underneath (simple bounding box intersection)
+        const frame = elements.find(el =>
+          el.type === 'frame' &&
+          el.id !== movingElement.id &&
+          movingElement.x < el.x + el.width &&
+          movingElement.x + movingElement.width > el.x &&
+          movingElement.y < el.y + el.height &&
+          movingElement.y + movingElement.height > el.y
+        );
+
+        if (frame) {
+          // Found an overlap! Mask the content into the frame
+          const newElements = elements.filter(el => el.id !== movingElement.id).map(el => {
+            if (el.id === frame.id) {
+              return {
+                ...el,
+                content: movingElement.type === 'image' ? movingElement.src : movingElement.content,
+                contentType: movingElement.type
+              };
+            }
+            return el;
+          });
+          setCurrentPageElements(newElements);
+          saveToHistory(newElements);
+          setSelectedElement(null);
+          setSelectedElements(new Set());
+        }
+      }
+    }
+
+    // Final history save on interaction finish
+    if (isDragging || isResizing || isRotating) {
+      saveToHistory(getCurrentPageElements());
+    }
+
+
     setIsDragging(false);
     setIsResizing(false);
     setIsRotating(false);
     setIsPanning(false);
     setShowAlignmentLines(false);
     setAlignmentLines({ vertical: [], horizontal: [] });
-  }, [currentTool, isDrawing, finishDrawing]);
+  }, [currentTool, isDrawing, finishDrawing, isDragging, selectedElement, selectedElements, getCurrentPageElements, setCurrentPageElements, saveToHistory, setSelectedElement, setSelectedElements]);
 
   // Canvas panning
   const handleCanvasMouseDown = useCallback((e) => {
+    e.stopPropagation(); // Stop bubbling to container (which would deselect)
+
+
     if (currentTool === 'pen') {
       setIsDrawing(true);
       setDrawingPath([]);
       return;
     }
-    
+
+
     if (e.button === 1 || (e.button === 0 && e.altKey)) {
       e.preventDefault();
       setIsPanning(true);
       return;
     }
-    
+
     if (e.target === canvasRef.current) {
-      setSelectedElement(null);
-      setSelectedElements(new Set());
+      setSelectedElement(currentPage); // Select the page instead of null
+      setSelectedElements(new Set()); // Clear element selection
       setTextEditing(null);
     }
-  }, [currentTool, canvasRef, setSelectedElement, setSelectedElements, setTextEditing]);
+  }, [currentTool, canvasRef, setSelectedElement, setSelectedElements, setTextEditing, currentPage]);
+
 
   // Handle text editing
   const handleTextEdit = useCallback((e, elementId) => {
     if (lockedElements.has(elementId)) return;
-    
+
+
     e.stopPropagation();
     setTextEditing(elementId);
     setSelectedElement(elementId);
     setSelectedElements(new Set([elementId]));
-    
+
+
     setTimeout(() => {
       const element = document.getElementById(`element-${elementId}`);
       if (element) {
         element.focus();
         const range = document.createRange();
         const selection = window.getSelection();
-        
+
+
         if (element.childNodes.length > 0) {
           range.setStart(element, element.childNodes.length);
           range.collapse(true);
@@ -437,38 +513,48 @@ export const useCanvasInteraction = ({
   const renderSelectionHandles = useCallback((element) => {
     if (!element || lockedElements.has(element.id)) return null;
 
-    const handleSize = 12;
-    const handleBorder = 2;
-    const slotSize = 8;
+    // Calculate visual scale factor to keep handles consistent on screen
+    const visualScale = 1 / zoomLevel;
+    const baseHandleSize = 14;
+    const handleSize = baseHandleSize * visualScale;
+    const handleBorder = 2 * visualScale;
+    const slotWidth = 20 * visualScale;
+    const slotHeight = 6 * visualScale;
     const connectionLineColor = '#8b5cf6';
     const handleColor = '#ffffff';
     const handleBorderColor = '#8b5cf6';
+    const selectionBorderWidth = 2 * visualScale;
+    const padding = 10 * visualScale;
 
     const handles = [
       // Corner handles (white circles with purple border)
-      { x: -handleSize/2, y: -handleSize/2, cursor: 'nw-resize', type: 'nw' },
-      { x: element.width - handleSize/2, y: -handleSize/2, cursor: 'ne-resize', type: 'ne' },
-      { x: -handleSize/2, y: element.height - handleSize/2, cursor: 'sw-resize', type: 'sw' },
-      { x: element.width - handleSize/2, y: element.height - handleSize/2, cursor: 'se-resize', type: 'se' },
-      
+      { x: -handleSize / 2, y: -handleSize / 2, cursor: 'nw-resize', type: 'nw' },
+      { x: element.width - handleSize / 2, y: -handleSize / 2, cursor: 'ne-resize', type: 'ne' },
+      { x: -handleSize / 2, y: element.height - handleSize / 2, cursor: 'sw-resize', type: 'sw' },
+      { x: element.width - handleSize / 2, y: element.height - handleSize / 2, cursor: 'se-resize', type: 'se' },
+
       // Center slot handles (purple slots)
-      { x: element.width/2 - slotSize/2, y: -slotSize/2, cursor: 'n-resize', type: 'n', isSlot: true },
-      { x: element.width/2 - slotSize/2, y: element.height - slotSize/2, cursor: 's-resize', type: 's', isSlot: true },
-      { x: -slotSize/2, y: element.height/2 - slotSize/2, cursor: 'w-resize', type: 'w', isSlot: true },
-      { x: element.width - slotSize/2, y: element.height/2 - slotSize/2, cursor: 'e-resize', type: 'e', isSlot: true }
+      { x: element.width / 2 - slotWidth / 2, y: -slotHeight / 2, cursor: 'n-resize', type: 'n', isSlot: true },
+      { x: element.width / 2 - slotWidth / 2, y: element.height - slotHeight / 2, cursor: 's-resize', type: 's', isSlot: true },
+      { x: -slotHeight / 2, y: element.height / 2 - slotWidth / 2, cursor: 'w-resize', type: 'w', isSlot: true },
+      { x: element.width - slotHeight / 2, y: element.height / 2 - slotWidth / 2, cursor: 'e-resize', type: 'e', isSlot: true }
+
     ];
 
     const handleMouseDownLocal = (e, action, direction = '') => {
       e.stopPropagation();
       e.preventDefault();
-      
+
+      const rect = canvasRef.current.getBoundingClientRect();
+      const mouseX = (e.clientX - rect.left - canvasOffset.x) / zoomLevel;
+      const mouseY = (e.clientY - rect.top - canvasOffset.y) / zoomLevel;
+
       if (action === 'resize') {
         setIsResizing(true);
-        
-        const rect = canvasRef.current.getBoundingClientRect();
         setDragStart({
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top,
+          x: mouseX,
+          y: mouseY,
+
           elementX: element.x,
           elementY: element.y,
           elementWidth: element.width,
@@ -478,11 +564,10 @@ export const useCanvasInteraction = ({
         });
       } else if (action === 'rotate') {
         setIsRotating(true);
-        
-        const rect = canvasRef.current.getBoundingClientRect();
         setDragStart({
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top,
+          x: mouseX,
+          y: mouseY,
+
           elementX: element.x,
           elementY: element.y,
           elementWidth: element.width,
@@ -493,28 +578,27 @@ export const useCanvasInteraction = ({
     };
 
     // Selection box must rotate around the element's center point
-    // Element center relative to selection box's top-left:
-    // X: element.width/2 + 10 (half width + 10px padding)
-    // Y: element.height/2 + 10 (half height + 10px padding)
     const selectionBoxStyle = {
       position: 'absolute',
-      left: element.x - 10,
-      top: element.y - 10,
-      width: element.width + 20,
-      height: element.height + 20,
+      left: element.x - padding,
+      top: element.y - padding,
+      width: element.width + padding * 2,
+      height: element.height + padding * 2,
       pointerEvents: 'none',
       transform: `rotate(${element.rotation || 0}deg)`,
-      transformOrigin: `${element.width / 2 + 10}px ${element.height / 2 + 10}px`,
+      transformOrigin: `${element.width / 2 + padding}px ${element.height / 2 + padding}px`,
+
       zIndex: element.zIndex + 1000
     };
 
     const selectionBorderStyle = {
       position: 'absolute',
-      left: 10,
-      top: 10,
+      left: padding,
+      top: padding,
       width: element.width,
       height: element.height,
-      border: `2px dashed ${connectionLineColor}`,
+      border: `${selectionBorderWidth}px solid ${connectionLineColor}`,
+
       borderRadius: '2px',
       pointerEvents: 'none'
     };
@@ -522,7 +606,7 @@ export const useCanvasInteraction = ({
     return (
       <div
         key={`selection-${element.id}`}
-        className={styles.selectionBox || ''}
+
         style={selectionBoxStyle}
       >
         {/* Selection border */}
@@ -530,24 +614,25 @@ export const useCanvasInteraction = ({
 
         {/* Handles */}
         {handles.map((handle, index) => {
+          const isHorizontalSlot = handle.type === 'n' || handle.type === 's';
           const handleStyle = {
             position: 'absolute',
-            left: handle.x + 10,
-            top: handle.y + 10,
-            width: handle.isSlot ? slotSize : handleSize,
-            height: handle.isSlot ? slotSize : handleSize,
+            left: handle.x + padding,
+            top: handle.y + padding,
+            width: handle.isSlot ? (isHorizontalSlot ? slotWidth : slotHeight) : handleSize,
+            height: handle.isSlot ? (isHorizontalSlot ? slotHeight : slotWidth) : handleSize,
             backgroundColor: handle.isSlot ? connectionLineColor : handleColor,
             border: handle.isSlot ? 'none' : `${handleBorder}px solid ${handleBorderColor}`,
-            borderRadius: handle.isSlot ? '1px' : '50%',
+            borderRadius: handle.isSlot ? `${2 * visualScale}px` : '50%',
             cursor: handle.cursor,
             pointerEvents: 'auto',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+            boxShadow: `0 ${1 * visualScale}px ${3 * visualScale}px rgba(0,0,0,0.3)`
           };
-          
+
           return (
             <div
               key={index}
-              className={styles.resizeHandle || ''}
+
               style={handleStyle}
               onMouseDown={(e) => handleMouseDownLocal(e, 'resize', handle.type)}
             />
@@ -556,20 +641,21 @@ export const useCanvasInteraction = ({
 
         {/* Rotate handle */}
         <div
-          className={styles.rotateHandle || ''}
           style={{
             position: 'absolute',
-            top: -30,
+            top: -(25 * visualScale) - (handleSize / 2),
+
             left: '50%',
             transform: 'translateX(-50%)',
             width: handleSize,
             height: handleSize,
-            backgroundColor: '#ef4444',
-            border: `2px solid #ffffff`,
+            backgroundColor: '#ffffff',
+            border: `${handleBorder}px solid #ef4444`,
             borderRadius: '50%',
             cursor: 'grab',
             pointerEvents: 'auto',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+            boxShadow: `0 ${1 * visualScale}px ${3 * visualScale}px rgba(0,0,0,0.3)`
+
           }}
           onMouseDown={(e) => handleMouseDownLocal(e, 'rotate')}
         />
@@ -578,19 +664,20 @@ export const useCanvasInteraction = ({
         <svg
           style={{
             position: 'absolute',
-            top: -25,
+            top: -(25 * visualScale),
             left: '50%',
             transform: 'translateX(-50%)',
-            width: 2,
-            height: 15,
+            width: 2 * visualScale,
+            height: 25 * visualScale,
             pointerEvents: 'none'
           }}
         >
-          <line x1="1" y1="0" x2="1" y2="15" stroke="#ef4444" strokeWidth="2" />
+          <line x1={visualScale} y1="0" x2={visualScale} y2={25 * visualScale} stroke="#ef4444" strokeWidth={2 * visualScale} />
         </svg>
       </div>
     );
-  }, [lockedElements, canvasRef, setIsResizing, setIsRotating, setDragStart]);
+  }, [lockedElements, canvasRef, setIsResizing, setIsRotating, setDragStart, zoomLevel, canvasOffset]);
+
 
   return {
     // State
@@ -602,7 +689,8 @@ export const useCanvasInteraction = ({
     drawingPath,
     showAlignmentLines,
     alignmentLines,
-    
+
+
     // Handlers
     handleMouseDown,
     handleMouseMove,
@@ -614,7 +702,8 @@ export const useCanvasInteraction = ({
     finishDrawing,
     calculateAlignmentLines,
     renderSelectionHandles,
-    
+
+
     // State setters (for external control if needed)
     setIsDrawing,
     setDrawingPath
