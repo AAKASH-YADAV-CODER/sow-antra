@@ -7,9 +7,8 @@
 import {
     Square, Circle, Triangle, Star, Hexagon,
     ArrowRight, Minus, MessageSquare, Heart,
-    Activity, Info, AlertCircle,
-    HelpCircle, CheckCircle, XCircle, MapPin, PlayCircle, PauseCircle,
-    Bookmark, Tag, CreditCard, Layout, Shield, Flag, Cloud, Search
+    XCircle, MapPin,
+    Bookmark, CreditCard, Layout, Shield, Flag, Cloud
 } from 'lucide-react';
 
 export const shapeCategories = [

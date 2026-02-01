@@ -1,5 +1,5 @@
 import React from 'react';
-import { Lock, Image as ImageIcon, Video as VideoIcon, Smartphone, Laptop, Monitor, Globe, MessageCircle } from 'lucide-react';
+import { Lock, Image as ImageIcon, MessageCircle } from 'lucide-react';
 
 import styles from '../../../styles/MainPage.module.css';
 

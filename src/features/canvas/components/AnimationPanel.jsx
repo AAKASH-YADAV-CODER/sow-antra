@@ -1,9 +1,5 @@
 import React, { useState } from 'react';
-import {
-    X, Play, StopCircle, Trash2,
-    Sparkles, Zap, Activity, Wind,
-    Move, Maximize, AppWindow
-} from 'lucide-react';
+import { X, Trash2, Sparkles } from 'lucide-react';
 import { animations } from '../../../types/types';
 
 const AnimationPanel = ({
