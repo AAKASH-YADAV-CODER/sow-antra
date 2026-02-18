@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { 
-  signInWithEmailAndPassword, 
+import {
+  signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInWithPopup,
   signOut,
@@ -27,8 +27,8 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const storedToken = localStorage.getItem('sowntra_auth_token');
     const storedUser = localStorage.getItem('sowntra_user');
-    
-    if (storedToken && storedUser) {
+
+    if (storedToken && storedUser && storedUser !== 'undefined') {
       try {
         setAuthToken(storedToken);
         setCurrentUser(JSON.parse(storedUser));
@@ -50,10 +50,10 @@ export const AuthProvider = ({ children }) => {
             photoURL: user.photoURL,
             emailVerified: user.emailVerified
           };
-          
+
           setCurrentUser(userData);
           setAuthToken(token);
-          
+
           localStorage.setItem('sowntra_auth_token', token);
           localStorage.setItem('sowntra_user', JSON.stringify(userData));
         } catch (error) {
@@ -74,11 +74,11 @@ export const AuthProvider = ({ children }) => {
   const signup = async (email, password, displayName) => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      
+
       if (displayName) {
         await updateProfile(userCredential.user, { displayName });
       }
-      
+
       const token = await userCredential.user.getIdToken();
       const userData = {
         uid: userCredential.user.uid,
@@ -87,13 +87,13 @@ export const AuthProvider = ({ children }) => {
         photoURL: userCredential.user.photoURL,
         emailVerified: userCredential.user.emailVerified
       };
-      
+
       setCurrentUser(userData);
       setAuthToken(token);
-      
+
       localStorage.setItem('sowntra_auth_token', token);
       localStorage.setItem('sowntra_user', JSON.stringify(userData));
-      
+
       return userCredential;
     } catch (error) {
       throw error;
@@ -111,13 +111,13 @@ export const AuthProvider = ({ children }) => {
         photoURL: userCredential.user.photoURL,
         emailVerified: userCredential.user.emailVerified
       };
-      
+
       setCurrentUser(userData);
       setAuthToken(token);
-      
+
       localStorage.setItem('sowntra_auth_token', token);
       localStorage.setItem('sowntra_user', JSON.stringify(userData));
-      
+
       return userCredential;
     } catch (error) {
       throw error;
@@ -135,13 +135,13 @@ export const AuthProvider = ({ children }) => {
         photoURL: userCredential.user.photoURL,
         emailVerified: userCredential.user.emailVerified
       };
-      
+
       setCurrentUser(userData);
       setAuthToken(token);
-      
+
       localStorage.setItem('sowntra_auth_token', token);
       localStorage.setItem('sowntra_user', JSON.stringify(userData));
-      
+
       return userCredential;
     } catch (error) {
       throw error;

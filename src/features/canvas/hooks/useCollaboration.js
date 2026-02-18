@@ -23,7 +23,7 @@ const useCollaboration = ({
   const [activeUsers, setActiveUsers] = useState([]);
   const [cursors, setCursors] = useState(new Map());
   const [isConnected, setIsConnected] = useState(false);
-  
+
   const yDocRef = useRef(null);
   const isInitializedRef = useRef(false);
   const lastUpdateRef = useRef(null);
@@ -73,18 +73,18 @@ const useCollaboration = ({
       console.log('👤 User joined:', user);
       setActiveUsers(prev => {
         // Avoid duplicates - check by socketId or userId
-        const exists = prev.find(u => 
-          u.socketId === user.socketId || 
+        const exists = prev.find(u =>
+          u.socketId === user.socketId ||
           (u.userId && user.userId && u.userId === user.userId) ||
           (u.userEmail && user.userEmail && u.userEmail === user.userEmail)
         );
         if (exists) {
           console.log('👤 User already in list, updating:', user.userName);
           // Update existing user
-          return prev.map(u => 
-            (u.socketId === user.socketId || 
-             (u.userId && user.userId && u.userId === user.userId)) 
-              ? { ...u, ...user } 
+          return prev.map(u =>
+            (u.socketId === user.socketId ||
+              (u.userId && user.userId && u.userId === user.userId))
+              ? { ...u, ...user }
               : u
           );
         }
@@ -95,7 +95,7 @@ const useCollaboration = ({
 
     const handleUserLeft = (data) => {
       console.log('👋 User left:', data);
-      setActiveUsers(prev => prev.filter(u => 
+      setActiveUsers(prev => prev.filter(u =>
         u.socketId !== data.socketId &&
         !(data.userId && u.userId === data.userId) &&
         !(data.userEmail && u.userEmail === data.userEmail)
@@ -105,8 +105,8 @@ const useCollaboration = ({
         // Remove cursor by socketId, userId, or userEmail
         for (const [key, cursor] of prev.entries()) {
           if (key === data.socketId ||
-              (data.userId && cursor.userId === data.userId) ||
-              (data.userEmail && cursor.userEmail === data.userEmail)) {
+            (data.userId && cursor.userId === data.userId) ||
+            (data.userEmail && cursor.userEmail === data.userEmail)) {
             newCursors.delete(key);
           }
         }
@@ -122,12 +122,12 @@ const useCollaboration = ({
       )) {
         return;
       }
-      
+
       setCursors(prev => {
         const newCursors = new Map(prev);
-        if (data.socketId && data.cursor && 
-            data.cursor.x !== undefined && data.cursor.y !== undefined &&
-            !isNaN(data.cursor.x) && !isNaN(data.cursor.y)) {
+        if (data.socketId && data.cursor &&
+          data.cursor.x !== undefined && data.cursor.y !== undefined &&
+          !isNaN(data.cursor.x) && !isNaN(data.cursor.y)) {
           newCursors.set(data.socketId, {
             x: data.cursor.x,
             y: data.cursor.y,
@@ -166,7 +166,7 @@ const useCollaboration = ({
     const handleConnected = () => {
       console.log('✅ Connected to collaboration server');
       setIsConnected(true);
-      
+
       // Request active users list after connection
       setTimeout(() => {
         if (collaborationService.isConnected()) {
@@ -219,7 +219,7 @@ const useCollaboration = ({
         }
       }, 200);
     };
-    
+
     pagesText.observe(observer);
 
     return () => {
@@ -242,7 +242,7 @@ const useCollaboration = ({
     // Don't block sync on remote changes - allow local updates to go through
     // This ensures drawing/dragging and adding multiple shapes works smoothly
     // The isApplyingRemoteChangeRef flag is only used to prevent sync loops in syncFromYjs, not block local actions
-    
+
     if (!yDocRef.current || !pages || !isCollaborative) return;
 
     try {
@@ -253,14 +253,14 @@ const useCollaboration = ({
         elements: page.elements || [],
         timestamp: Date.now()
       }));
-      
+
       // Validate data before stringifying
       const newData = JSON.stringify(pagesData);
-      
+
       // Use Yjs Text to store JSON data
       const pagesText = yDocRef.current.getText('pages');
       const currentData = pagesText.toString();
-      
+
       // Only update if data has changed (avoid infinite loops)
       // But don't check lastSyncRef here - let it update to allow initiator to see changes
       if (currentData !== newData) {
@@ -269,18 +269,18 @@ const useCollaboration = ({
           pagesText.delete(0, pagesText.length);
           pagesText.insert(0, newData);
         });
-        
+
         // Update lastSyncRef after successful sync
         lastSyncRef.current = newData;
         lastLocalSyncTimeRef.current = Date.now();
-        
+
         // Clear pending elements since they're now synced
         pendingLocalElementsRef.current.clear();
-        
+
         // Send update to server
         const update = Y.encodeStateAsUpdate(yDocRef.current);
         collaborationService.sendUpdate(update);
-        
+
         console.log('✅ Synced to Yjs:', { pageCount: pagesData.length, currentPage, elementCount: pagesData[0]?.elements?.length || 0 });
       }
     } catch (error) {
@@ -305,12 +305,12 @@ const useCollaboration = ({
     try {
       const pagesText = yDocRef.current.getText('pages');
       const pagesDataStr = pagesText.toString();
-      
+
       // Skip if this is the same data we already processed
       if (pagesDataStr === lastSyncRef.current && lastSyncRef.current) {
         return;
       }
-      
+
       // Always process updates from Yjs, even if they match lastSyncRef
       // This ensures the initiator can see their own changes reflected back
       if (pagesDataStr) {
@@ -318,8 +318,17 @@ const useCollaboration = ({
         let remotePages;
         try {
           // Try to parse the JSON
-          remotePages = JSON.parse(pagesDataStr);
-          
+          if (pagesDataStr && pagesDataStr !== 'undefined') {
+            try {
+              remotePages = JSON.parse(pagesDataStr);
+            } catch (e) {
+              console.error('Error parsing collaborative elements:', e);
+              return;
+            }
+          } else {
+            return;
+          }
+
           // Validate it's an array
           if (!Array.isArray(remotePages)) {
             console.warn('⚠️ Invalid pages data format, expected array');
@@ -334,10 +343,10 @@ const useCollaboration = ({
           isApplyingRemoteChangeRef.current = false;
           return;
         }
-        
+
         // Set flag to prevent sync loop
         isApplyingRemoteChangeRef.current = true;
-        
+
         // Merge with local pages, properly merging elements
         setPages(prevPages => {
           let hasChanges = false;
@@ -347,15 +356,15 @@ const useCollaboration = ({
               // Merge elements - combine unique elements from both local and remote
               const localElements = localPage.elements || [];
               const remoteElements = remotePage.elements || [];
-              
+
               // Create a map of elements by ID for efficient lookup
               const elementMap = new Map();
-              
+
               // Add local elements first - this preserves local changes that haven't been synced yet
               localElements.forEach(el => {
                 elementMap.set(el.id, el);
               });
-              
+
               // Add/update with remote elements (remote takes precedence for same ID)
               // This ensures remote updates are applied, but local elements are preserved
               remoteElements.forEach(el => {
@@ -376,14 +385,14 @@ const useCollaboration = ({
                   elementMap.set(el.id, el);
                 }
               });
-              
+
               // Convert back to array
               const mergedElements = Array.from(elementMap.values());
-              
+
               // Check if there are actual changes
               const localStr = JSON.stringify(localElements);
               const mergedStr = JSON.stringify(mergedElements);
-              
+
               if (localStr !== mergedStr) {
                 hasChanges = true;
                 console.log('🔄 Merging remote elements:', {
@@ -391,7 +400,7 @@ const useCollaboration = ({
                   remoteCount: remoteElements.length,
                   mergedCount: mergedElements.length
                 });
-                
+
                 return {
                   ...localPage,
                   elements: mergedElements,
@@ -401,7 +410,7 @@ const useCollaboration = ({
             }
             return localPage;
           });
-          
+
           // Add any new pages from remote
           remotePages.forEach(remotePage => {
             if (!updatedPages.find(p => p.id === remotePage.id)) {
@@ -414,7 +423,7 @@ const useCollaboration = ({
               });
             }
           });
-          
+
           // Only update if there are actual changes
           if (hasChanges) {
             return updatedPages;
@@ -427,7 +436,7 @@ const useCollaboration = ({
         if (currentPageData && currentPageData.elements) {
           const currentElements = getCurrentPageElements();
           const remoteElements = currentPageData.elements || [];
-          
+
           // Merge elements for current page - preserve local elements
           const elementMap = new Map();
           // Add local elements first to preserve them
@@ -450,20 +459,20 @@ const useCollaboration = ({
             }
           });
           const mergedElements = Array.from(elementMap.values());
-          
+
           const currentStr = JSON.stringify(currentElements);
           const mergedStr = JSON.stringify(mergedElements);
-          
+
           if (currentStr !== mergedStr) {
             console.log('🔄 Updating current page elements from remote');
             setCurrentPageElements(mergedElements);
           }
         }
-        
+
         // Update lastSyncRef to the current state after processing
         // This prevents duplicate processing but allows new changes to come through
         lastSyncRef.current = pagesDataStr;
-        
+
         // Reset flag after a short delay to allow state updates to complete
         setTimeout(() => {
           isApplyingRemoteChangeRef.current = false;
@@ -478,7 +487,7 @@ const useCollaboration = ({
   // Track cursor movement (throttled)
   const handleCursorMove = useCallback((x, y) => {
     if (!isCollaborative || !collaborationService.isConnected()) return;
-    
+
     // Throttle cursor updates to avoid too many messages
     if (!lastUpdateRef.current || Date.now() - lastUpdateRef.current > 50) {
       // Send cursor position
@@ -490,7 +499,7 @@ const useCollaboration = ({
   // Sync element changes when pages change
   useEffect(() => {
     if (!isCollaborative || !isInitializedRef.current) return;
-    
+
     // Track newly added elements to prevent them from being lost during sync
     const currentElements = getCurrentPageElements();
     currentElements.forEach(el => {
@@ -502,12 +511,14 @@ const useCollaboration = ({
         const lastSyncedData = lastSyncRef.current;
         if (lastSyncedData) {
           try {
-            const lastSyncedPages = JSON.parse(lastSyncedData);
-            const lastSyncedPage = lastSyncedPages.find(p => p.id === currentPage);
-            const lastSyncedElements = lastSyncedPage?.elements || [];
-            const existsInLastSync = lastSyncedElements.some(se => se.id === el.id);
-            if (!existsInLastSync) {
-              pendingLocalElementsRef.current.add(el.id);
+            if (lastSyncedData && lastSyncedData !== 'undefined') {
+              const lastSyncedPages = JSON.parse(lastSyncedData);
+              const lastSyncedPage = lastSyncedPages.find(p => p.id === currentPage);
+              const lastSyncedElements = lastSyncedPage?.elements || [];
+              const existsInLastSync = lastSyncedElements.some(se => se.id === el.id);
+              if (!existsInLastSync) {
+                pendingLocalElementsRef.current.add(el.id);
+              }
             }
           } catch (e) {
             // If we can't parse, assume it's new
@@ -519,7 +530,7 @@ const useCollaboration = ({
         }
       }
     });
-    
+
     // Debounce sync to avoid too many updates, but make it faster for real-time feel
     // Use shorter debounce for text editing (100ms) vs shapes (200ms)
     const timeoutId = setTimeout(() => {
@@ -532,7 +543,7 @@ const useCollaboration = ({
   // Sync when current page elements change - watch for element count changes
   useEffect(() => {
     if (!isCollaborative || !isInitializedRef.current) return;
-    
+
     // Sync immediately when elements are added/removed, debounce for updates
     // Use shorter debounce for faster real-time sync
     const timeoutId = setTimeout(() => {

@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
-import { getSortedElementsForExport, drawElementToCanvas as drawElementToCanvasUtil } from '../../../utils/canvasExport';
+import { getSortedElementsForExport, drawElementToCanvas as drawElementToCanvasUtil, preloadAllImages } from '../../../utils/canvasExport';
 
 /**
  * Custom hook for handling canvas recording functionality
@@ -20,7 +20,8 @@ export const useRecording = ({
   recordingDuration,
   videoQuality,
   videoFormat,
-  imageEffects
+  imageEffects,
+  canvasBackgroundColor = '#ffffff'
 }) => {
   // Recording state
   const [recording, setRecording] = useState(false);
@@ -32,19 +33,7 @@ export const useRecording = ({
   // Preload images for recording
   const preloadImages = useCallback(() => {
     const currentElements = getCurrentPageElements();
-    const imageElements = currentElements.filter(el => el.type === 'image');
-    
-    return Promise.all(
-      imageElements.map(element => {
-        return new Promise((resolve, reject) => {
-          const img = new window.Image();
-          img.crossOrigin = 'anonymous';
-          img.src = element.src;
-          img.onload = resolve;
-          img.onerror = reject;
-        });
-      })
-    );
+    return preloadAllImages(currentElements);
   }, [getCurrentPageElements]);
 
   // Wrapper for drawElementToCanvas from canvasExport utility with imageEffects
@@ -58,13 +47,13 @@ export const useRecording = ({
       alert('Your browser does not support video recording. Please try Chrome, Firefox, or Edge.');
       return false;
     }
-    
+
     const canvas = document.createElement('canvas');
     if (typeof canvas.captureStream !== 'function') {
       alert('Your browser does not support canvas recording. Please try Chrome or Firefox.');
       return false;
     }
-    
+
     return true;
   }, []);
 
@@ -77,22 +66,22 @@ export const useRecording = ({
       }
 
       if (!checkRecordingCompatibility()) return;
-      
+
       await preloadImages();
-      
+
       setRecording(true);
       setRecordingStartTime(Date.now());
       setRecordingTimeElapsed(0);
-      
+
       const canvas = document.createElement('canvas');
       canvas.width = canvasSize.width;
       canvas.height = canvasSize.height;
       const ctx = canvas.getContext('2d');
-      
+
       if (!ctx) {
         throw new Error('Could not get canvas context');
       }
-      
+
       let stream;
       try {
         stream = canvas.captureStream(30);
@@ -103,7 +92,7 @@ export const useRecording = ({
         setRecordingStartTime(null);
         return;
       }
-      
+
       // Enhanced MIME type detection with MP4 support
       const getSupportedMimeType = () => {
         const mimeTypes = [
@@ -111,44 +100,44 @@ export const useRecording = ({
           'video/mp4;codecs=h264',
           'video/mp4;codecs=avc1.42E01E',
           'video/mp4;codecs=avc1.42801E',
-          
+
           // WebM options (fallback)
           'video/webm;codecs=vp9',
           'video/webm;codecs=vp8',
           'video/webm'
         ];
-        
+
         // If user selected MP4, prioritize MP4 codecs
-        const preferredTypes = videoFormat === 'mp4' 
+        const preferredTypes = videoFormat === 'mp4'
           ? mimeTypes.filter(type => type.includes('mp4'))
           : mimeTypes.filter(type => type.includes('webm'));
-        
+
         // Add fallback types
         const allTypes = [...preferredTypes, ...mimeTypes];
-        
+
         for (let mimeType of allTypes) {
           if (MediaRecorder.isTypeSupported(mimeType)) {
             console.log('Supported MIME type:', mimeType);
             return mimeType;
           }
         }
-        
+
         return null;
       };
-      
+
       const mimeType = getSupportedMimeType();
-      
+
       if (!mimeType) {
         alert('Your browser does not support any video recording formats. Please try Chrome.');
         setRecording(false);
         setRecordingStartTime(null);
         return;
       }
-      
+
       const options = { mimeType };
-      
+
       // Set bitrate based on quality
-      switch(videoQuality) {
+      switch (videoQuality) {
         case 'low':
           options.videoBitsPerSecond = 1000000;
           break;
@@ -160,16 +149,16 @@ export const useRecording = ({
           options.videoBitsPerSecond = 5000000;
           break;
       }
-      
+
       const recorder = new MediaRecorder(stream, options);
-      
+
       const chunks = [];
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
           chunks.push(e.data);
         }
       };
-      
+
       recorder.onstop = () => {
         try {
           if (chunks.length === 0) {
@@ -181,7 +170,7 @@ export const useRecording = ({
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
-          
+
           // Determine correct file extension
           let extension = 'webm';
           if (mimeType.includes('mp4')) {
@@ -189,13 +178,13 @@ export const useRecording = ({
           } else if (videoFormat === 'gif') {
             extension = 'gif';
           }
-          
+
           a.download = `sowntra-animation-${new Date().getTime()}.${extension}`;
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
-          
+
           console.log('Recording saved successfully');
         } catch (error) {
           console.error('Error creating download:', error);
@@ -211,7 +200,7 @@ export const useRecording = ({
           }
         }
       };
-      
+
       recorder.onerror = (event) => {
         console.error('MediaRecorder error:', event.error);
         alert('Error during recording: ' + event.error.message);
@@ -224,46 +213,46 @@ export const useRecording = ({
           recordingIntervalRef.current = null;
         }
       };
-      
+
       recorder.start();
       setMediaRecorder(recorder);
-      
+
       // Elapsed time counter
       recordingIntervalRef.current = setInterval(() => {
         setRecordingTimeElapsed(prev => prev + 1);
       }, 1000);
-      
+
       let startTime = null;
       const frameDuration = 1000 / 30;
       let lastFrameTime = 0;
-      
+
       const drawAnimationFrame = (timestamp) => {
         if (!startTime) startTime = timestamp;
         const elapsed = timestamp - startTime;
-        
+
         if (recorder.state === 'recording') {
           if (timestamp - lastFrameTime >= frameDuration) {
             lastFrameTime = timestamp;
-            
-            ctx.fillStyle = '#ffffff';
+
+            ctx.fillStyle = canvasBackgroundColor || '#ffffff';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
+
             // Use proper zIndex sorting for recording
             const sortedElements = getSortedElementsForExport(getCurrentPageElements());
-            
+
             sortedElements.forEach((element, index) => {
               // Use recordingDuration for animation loop timing
               const animationProgress = (elapsed / 1000) % recordingDuration;
               drawElementToCanvas(ctx, element, animationProgress, index);
             });
           }
-          
+
           requestAnimationFrame(drawAnimationFrame);
         }
       };
-      
+
       requestAnimationFrame(drawAnimationFrame);
-      
+
     } catch (error) {
       console.error('Error starting recording:', error);
       alert('Error starting recording: ' + error.message);
@@ -281,7 +270,7 @@ export const useRecording = ({
   // Stop recording
   const stopRecording = useCallback(() => {
     console.log('Stop recording called, state:', mediaRecorder?.state);
-    
+
     if (!recording) {
       console.log('Not currently recording');
       return;
@@ -310,7 +299,7 @@ export const useRecording = ({
     mediaRecorder,
     recordingStartTime,
     recordingTimeElapsed,
-    
+
     // Handlers
     startRecording,
     stopRecording,

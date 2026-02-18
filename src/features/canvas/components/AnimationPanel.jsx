@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import {
-    X, Play, StopCircle, Trash2,
-    Sparkles, Zap, Activity, Wind,
-    Move, Maximize, AppWindow
+    X, Trash2,
+    Sparkles
 } from 'lucide-react';
-import { animations } from '../../../types/types';
+import { animations, pageAnimations } from '../../../utils/constants';
 
 const AnimationPanel = ({
     isOpen,
@@ -21,41 +20,45 @@ const AnimationPanel = ({
     if (!isOpen) return null;
 
     // Group animations for better UI organization (matching Canva-ish categories)
-    const animationCategories = {
-        'Basic': ['rise', 'pan', 'fade', 'pop', 'wipe', 'typewriter', 'drift', 'breathe'],
-        'Dynamic': ['bounce', 'tumble', 'zoomIn', 'zoomOut', 'flip', 'scrapbook'],
+    const elementAnimationCategories = {
+        'Basic': ['rise', 'pan', 'fade', 'pop', 'wipe', 'typewriter'],
+        'Dynamic': ['bounce', 'tumble', 'zoomIn', 'zoomOut', 'flip'],
         'Attention': ['flash', 'pulse', 'heartbeat', 'shake', 'jiggle', 'neon'],
         'Entrance': ['slideInLeft', 'slideInRight', 'slideInUp', 'slideInDown', 'blurIn']
     };
 
     const handleApplyAnimation = (animKey) => {
         if (mode === 'page') {
-            // Apply to ALL elements on the page (Page Animation)
-            // We only apply if they don't have a specific animation or if we want to overwrite
-            // Canva usually overwrites everything when you click a Page Animation
-            // Apply to ALL elements on the page (Page Animation)
-            // Batch update using updateElements
-            // Batch update using updateElements
-            // Sort elements by y-position (or x) to have a logical visual flow?
-            // User requested "ascending order wise". Simple index order might be creation order.
-            // Let's sort by Y then X for a natural "reading order" flow
+            // Smart Page Animation Logic
+            const preset = pageAnimations[animKey];
+            if (!preset) return;
+
+            // Sort elements by Y then X for natural flow
             const sortedElements = [...elements].sort((a, b) => {
                 const diffY = a.y - b.y;
                 if (Math.abs(diffY) > 10) return diffY; // Tolerance for row alignment
                 return a.x - b.x;
             });
 
-            const updates = sortedElements.map((el, index) => ({
-                id: el.id,
-                updates: {
-                    animation: {
-                        type: animKey,
-                        duration: 1.5,
-                        delay: index * 0.3, // Stagger by 0.3s for "one by one" feel
-                        iteration: 1
+            const updates = sortedElements.map((el, index) => {
+                // Determine animation based on element type
+                let recipe = preset.recipes.default;
+                if (el.type === 'text') recipe = preset.recipes.text;
+                else if (el.type === 'image') recipe = preset.recipes.image;
+                else if (['rectangle', 'circle', 'triangle', 'star', 'shape'].includes(el.type)) recipe = preset.recipes.shape;
+
+                return {
+                    id: el.id,
+                    updates: {
+                        animation: {
+                            type: recipe.type,
+                            duration: recipe.duration,
+                            delay: index * preset.stagger, // Staggered delay
+                            iteration: 1
+                        }
                     }
-                }
-            }));
+                };
+            });
 
             if (typeof updateElements === 'function') {
                 updateElements(updates);
@@ -99,7 +102,7 @@ const AnimationPanel = ({
     };
 
     return (
-        <div className="fixed left-0 top-[56px] bottom-0 w-80 bg-white shadow-xl z-40 flex flex-col border-r border-gray-200 animate-in slide-in-from-left duration-200">
+        <div className="absolute left-[72px] top-[64px] bottom-0 w-80 bg-white shadow-xl z-[100] flex flex-col border-r border-gray-200 animate-in slide-in-from-left duration-300">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
                 <h2 className="font-bold text-gray-800">
@@ -114,7 +117,7 @@ const AnimationPanel = ({
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar bg-gray-50 p-4">
+            <div className="flex-1 overflow-y-auto light-scrollbar bg-gray-50 p-4">
 
                 {/* Remove Button */}
                 <button
@@ -124,47 +127,70 @@ const AnimationPanel = ({
                     <Trash2 size={16} /> Remove all animations
                 </button>
 
-                {/* Categories */}
-                {Object.entries(animationCategories).map(([category, animKeys]) => (
-                    <div key={category} className="mb-6">
-                        <h3 className="text-xs font-bold text-gray-500 uppercase mb-3 px-1">{category}</h3>
-                        <div className="grid grid-cols-3 gap-3">
-                            {animKeys.map(key => {
-                                const animDef = animations[key];
-                                if (!animDef) return null;
-
-                                return (
-                                    <div
-                                        key={key}
-                                        onClick={() => handleApplyAnimation(key)}
-                                        onMouseEnter={() => setHoveredAnim(key)}
-                                        onMouseLeave={() => setHoveredAnim(null)}
-                                        className="group cursor-pointer flex flex-col items-center gap-2"
-                                    >
-                                        <div className={`
-                                    w-full aspect-square bg-white rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden transition-all
-                                    group-hover:border-purple-500 group-hover:shadow-md
-                                    ${hoveredAnim === key ? 'scale-105' : ''}
-                                `}>
-                                            {/* Preview Block */}
-                                            <div
-                                                className="w-8 h-8 bg-purple-100 rounded text-purple-600 flex items-center justify-center"
-                                                style={{
-                                                    animation: hoveredAnim === key ? `${animDef.keyframes} 1s infinite` : 'none'
-                                                }}
-                                            >
-                                                <Sparkles size={16} />
-                                            </div>
-                                        </div>
-                                        <span className="text-[10px] text-center text-gray-600 font-medium group-hover:text-purple-600 transition-colors">
-                                            {animDef.name}
-                                        </span>
+                {mode === 'page' ? (
+                    /* Page Animations Grid */
+                    <div className="grid grid-cols-2 gap-3">
+                        {Object.entries(pageAnimations).map(([key, preset]) => (
+                            <div
+                                key={key}
+                                onClick={() => handleApplyAnimation(key)}
+                                onMouseEnter={() => setHoveredAnim(key)}
+                                onMouseLeave={() => setHoveredAnim(null)}
+                                className="group cursor-pointer flex flex-col gap-2 p-3 bg-white rounded-lg border border-gray-200 hover:border-purple-500 hover:shadow-md transition-all"
+                            >
+                                <div className="flex items-center gap-2 mb-1">
+                                    <div className="w-6 h-6 rounded bg-purple-100 text-purple-600 flex items-center justify-center">
+                                        <Sparkles size={14} />
                                     </div>
-                                );
-                            })}
-                        </div>
+                                    <span className="text-sm font-bold text-gray-800">{preset.name}</span>
+                                </div>
+                                <p className="text-[10px] text-gray-500 leading-tight">{preset.description}</p>
+                            </div>
+                        ))}
                     </div>
-                ))}
+                ) : (
+                    /* Element Animations Categories */
+                    Object.entries(elementAnimationCategories).map(([category, animKeys]) => (
+                        <div key={category} className="mb-6">
+                            <h3 className="text-xs font-bold text-gray-500 uppercase mb-3 px-1">{category}</h3>
+                            <div className="grid grid-cols-3 gap-3">
+                                {animKeys.map(key => {
+                                    const animDef = animations[key];
+                                    if (!animDef) return null;
+
+                                    return (
+                                        <div
+                                            key={key}
+                                            onClick={() => handleApplyAnimation(key)}
+                                            onMouseEnter={() => setHoveredAnim(key)}
+                                            onMouseLeave={() => setHoveredAnim(null)}
+                                            className="group cursor-pointer flex flex-col items-center gap-2"
+                                        >
+                                            <div className={`
+                                        w-full aspect-square bg-white rounded-lg border border-gray-200 flex items-center justify-center overflow-hidden transition-all
+                                        group-hover:border-purple-500 group-hover:shadow-md
+                                        ${hoveredAnim === key ? 'scale-105' : ''}
+                                    `}>
+                                                {/* Preview Block */}
+                                                <div
+                                                    className="w-8 h-8 bg-purple-100 rounded text-purple-600 flex items-center justify-center"
+                                                    style={{
+                                                        animation: hoveredAnim === key ? `${animDef.keyframes} 1s infinite` : 'none'
+                                                    }}
+                                                >
+                                                    <Sparkles size={16} />
+                                                </div>
+                                            </div>
+                                            <span className="text-[10px] text-center text-gray-600 font-medium group-hover:text-purple-600 transition-colors">
+                                                {animDef.name}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ))
+                )}
 
                 {/* Dynamic preview hint */}
                 <div className="mt-8 p-3 bg-blue-50 rounded-lg text-xs text-blue-700">

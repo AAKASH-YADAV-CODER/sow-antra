@@ -1,13 +1,13 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-const VideoSettings = ({ 
-  videoFormat, 
-  videoQuality, 
+const VideoSettings = ({
+  videoFormat,
+  videoQuality,
   recordingDuration,
-  onFormatChange, 
-  onQualityChange, 
-  onDurationChange 
+  onFormatChange,
+  onQualityChange,
+  onDurationChange
 }) => {
   const { t } = useTranslation();
 
@@ -16,7 +16,7 @@ const VideoSettings = ({
       <h3 className="font-semibold mb-3 text-gray-700 text-base md:text-lg sm:text-sm">
         {t('export.videoSettings') || 'Video Settings'}
       </h3>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 sm:gap-2">
         <div>
           <label className="block text-sm font-medium mb-1 text-gray-700 md:text-base sm:text-xs">
@@ -40,7 +40,7 @@ const VideoSettings = ({
             </p>
           )}
         </div>
-        
+
         <div>
           <label className="block text-sm font-medium mb-1 text-gray-700 md:text-base sm:text-xs">
             {t('recording.quality') || 'Quality'}
@@ -55,11 +55,11 @@ const VideoSettings = ({
           >
             <option value="low">{t('export.lowQuality') || 'Low (1 Mbps)'}</option>
             <option value="medium">{t('export.mediumQuality') || 'Medium (2.5 Mbps)'}</option>
-            <option value="high">{t('export.highQuality') || 'High (5 Mbps)'}</option>
+            <option value="high">{t('export.highQuality') || 'High (1080p, 10 Mbps)'}</option>
           </select>
         </div>
       </div>
-      
+
       <div className="mt-3">
         <label className="block text-sm font-medium mb-1 text-gray-700 md:text-base sm:text-xs">
           Animation Loop: <span className="text-blue-600">{recordingDuration}s</span>

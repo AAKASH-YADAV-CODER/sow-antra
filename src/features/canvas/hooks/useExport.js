@@ -12,9 +12,10 @@ import {
  * @param {Function} getCurrentPageElements - Function to get current page elements
  * @param {Object} canvasSize - Canvas dimensions {width, height}
  * @param {Object} imageEffects - Image effects configuration
+ * @param {string} backgroundColor - Canvas background color
  * @returns {Object} Export functions
  */
-const useExport = ({ getCurrentPageElements, canvasSize, imageEffects }) => {
+const useExport = ({ getCurrentPageElements, canvasSize, imageEffects, backgroundColor }) => {
 
   // Export as SVG
   const exportAsSVG = useCallback(() => {
@@ -29,14 +30,14 @@ const useExport = ({ getCurrentPageElements, canvasSize, imageEffects }) => {
       return;
     }
     const currentElements = getCurrentPageElements();
-    return exportAsImageUtil(currentElements, canvasSize, format, imageEffects);
-  }, [getCurrentPageElements, canvasSize, imageEffects, exportAsSVG]);
+    return exportAsImageUtil(currentElements, canvasSize, format, imageEffects, backgroundColor);
+  }, [getCurrentPageElements, canvasSize, imageEffects, exportAsSVG, backgroundColor]);
 
   // Export as PDF
   const exportAsPDF = useCallback(() => {
     const currentElements = getCurrentPageElements();
-    return exportAsPDFUtil(currentElements, canvasSize, imageEffects);
-  }, [getCurrentPageElements, canvasSize, imageEffects]);
+    return exportAsPDFUtil(currentElements, canvasSize, imageEffects, backgroundColor);
+  }, [getCurrentPageElements, canvasSize, imageEffects, backgroundColor]);
 
   // Get export-ready elements with proper filtering
   const getExportReadyElements = useCallback(() => {
@@ -62,12 +63,12 @@ const useExport = ({ getCurrentPageElements, canvasSize, imageEffects }) => {
     exportAsSVG,
     exportAsImage,
     exportAsPDF,
-    exportAsVideo: useCallback((duration, onProgress) => {
+    exportAsVideo: useCallback((duration, onProgress, format = 'video/webm', videoQuality = 'medium') => {
       const currentElements = getCurrentPageElements();
       return import('../../../utils/canvasExport').then(module => {
-        return module.exportAsVideo(currentElements, canvasSize, imageEffects, duration, onProgress);
+        return module.exportAsVideo(currentElements, canvasSize, imageEffects, duration, onProgress, format, backgroundColor, videoQuality);
       });
-    }, [getCurrentPageElements, canvasSize, imageEffects]),
+    }, [getCurrentPageElements, canvasSize, imageEffects, backgroundColor]),
     getExportReadyElements
   };
 };

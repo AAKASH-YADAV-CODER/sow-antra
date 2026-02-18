@@ -10,6 +10,8 @@ import {
     Layout, Star, Hexagon, Heart, Cloud, Shield
 } from 'lucide-react';
 
+import { advancedFrameCategories } from './advancedFrames';
+
 export const frameCategories = [
     {
         id: 'basic_frames',
@@ -49,7 +51,8 @@ export const frameCategories = [
             { id: 'frame_yt_thumb', type: 'frame', label: 'YouTube', icon: Youtube, props: { maskType: 'rect', width: 240, height: 135 } },
             { id: 'frame_tiktok', type: 'frame', label: 'TikTok', icon: Music2, props: { maskType: 'rounded', borderRadius: 12, width: 150, height: 266 } },
         ]
-    }
+    },
+    ...advancedFrameCategories
 ];
 
 export const getAllFrames = () => {

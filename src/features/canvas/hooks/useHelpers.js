@@ -14,7 +14,6 @@ const useHelpers = ({
   textEffects,
   imageEffects,
   shapeEffects,
-  specialEffects,
   fontFamilies,
   supportedLanguages,
   stickerOptions,
@@ -45,13 +44,17 @@ const useHelpers = ({
   setUploads,
   setCanvasHighlighted,
   zoom,
-  onCommentClick
+  onCommentClick,
+  frameEditing,
+  setFrameEditing,
+  penCursorPos,
+  setCurrentPage
 }) => {
 
   // Wrapper for getEffectCSS with all effect types
   const getEffectCSSWrapper = useCallback((element) => {
-    return getEffectCSS(element, textEffects, imageEffects, shapeEffects, specialEffects);
-  }, [textEffects, imageEffects, shapeEffects, specialEffects]);
+    return getEffectCSS(element, textEffects, imageEffects, shapeEffects);
+  }, [textEffects, imageEffects, shapeEffects]);
 
   // Wrapper for getCanvasEffects
   const getCanvasEffectsWrapper = useCallback((element) => {
@@ -59,20 +62,68 @@ const useHelpers = ({
   }, [imageEffects]);
 
   // Handle image upload from file input
-  const handleImageUpload = useCallback((event) => {
+  const handleImageUpload = useCallback(async (event) => {
     const file = event.target.files[0];
     if (file) {
+      // Create a unique ID for the asset
+      const assetId = `asset-${Date.now()}`;
+
       const reader = new FileReader();
-      reader.onload = (e) => {
-        const src = e.target.result;
-        addElement('image', { src });
-        // Add to uploads gallery
-        if (setUploads) {
-          setUploads(prev => [
-            { id: Date.now(), src, name: file.name, type: file.type },
-            ...prev
-          ]);
-        }
+      reader.onload = async (e) => {
+        const src = e.target.result; // Base64 string for immediate display
+
+        // Detect natural dimensions
+        const img = new Image();
+        img.onload = async () => {
+          const naturalWidth = img.naturalWidth;
+          const naturalHeight = img.naturalHeight;
+          const aspectRatio = naturalWidth / naturalHeight;
+
+          // Default size logic
+          let width = 200;
+          let height = 200;
+
+          if (aspectRatio > 1) {
+            width = 400;
+            height = 400 / aspectRatio;
+          } else {
+            height = 400;
+            width = 400 * aspectRatio;
+          }
+
+          // 1. Add to Canvas
+          addElement('image', {
+            src,
+            width,
+            height,
+            crop: { t: 0, b: 0, l: 0, r: 0 }
+          });
+
+          // 2. Save to IndexedDB (Persistent Storage)
+          try {
+            const { storage } = await import('../../../utils/storage');
+            const newAsset = {
+              id: assetId,
+              src, // Storing base64 for now. For huge files, we should store Blob, but let's stick to base64 for ease of use with <img> tags.
+              name: file.name,
+              type: file.type.startsWith('video/') ? 'video' : 'image',
+              width: naturalWidth,
+              height: naturalHeight,
+              createdAt: Date.now(),
+              folderId: null // Root by default
+            };
+
+            await storage.addAsset(newAsset);
+
+            // 3. Update UI State if provided
+            if (setUploads) {
+              setUploads(prev => [newAsset, ...prev]);
+            }
+          } catch (error) {
+            console.error("Failed to save upload:", error);
+          }
+        };
+        img.src = src;
       };
       reader.readAsDataURL(file);
     }
@@ -98,7 +149,18 @@ const useHelpers = ({
   }, [setCanvasHighlighted]);
 
   // Render element using CanvasElement component
-  const renderElement = useCallback((element) => {
+  const renderElement = useCallback((element, pageId) => {
+    // Intercept handlers to update active page
+    const wrappedHandleMouseDown = (e, id, action, direction) => {
+      if (setCurrentPage && pageId) setCurrentPage(pageId);
+      handleMouseDown(e, id, action, direction);
+    };
+
+    const wrappedHandleSelectElement = (e, id) => {
+      if (setCurrentPage && pageId) setCurrentPage(pageId);
+      handleSelectElement(e, id);
+    };
+
     return (
       <CanvasElement
         key={element.id}
@@ -112,8 +174,8 @@ const useHelpers = ({
         fontFamilies={fontFamilies}
         supportedLanguages={supportedLanguages}
         stickerOptions={stickerOptions}
-        handleMouseDown={handleMouseDown}
-        handleSelectElement={handleSelectElement}
+        handleMouseDown={wrappedHandleMouseDown}
+        handleSelectElement={wrappedHandleSelectElement}
         updateElement={updateElement}
         setTextEditing={setTextEditing}
         getCurrentPageElements={getCurrentPageElements}
@@ -125,10 +187,16 @@ const useHelpers = ({
         handleTextEdit={handleTextEdit}
         onCommentClick={onCommentClick}
         zoom={zoom}
+        frameEditing={frameEditing}
+        setFrameEditing={setFrameEditing}
+        penCursorPos={penCursorPos}
       />
     );
   }, [
-    selectedElements,
+    setCurrentPage,
+    handleMouseDown,
+    handleSelectElement,
+    selectedElements, // Added missing dependency
     textEditing,
     lockedElements,
     currentTool,
@@ -137,8 +205,6 @@ const useHelpers = ({
     fontFamilies,
     supportedLanguages,
     stickerOptions,
-    handleMouseDown,
-    handleSelectElement,
     updateElement,
     setTextEditing,
     getCurrentPageElements,
@@ -149,7 +215,10 @@ const useHelpers = ({
     renderSelectionHandles,
     handleTextEdit,
     onCommentClick,
-    zoom
+    zoom,
+    frameEditing,
+    setFrameEditing,
+    penCursorPos
   ]);
 
   // Render drawing path in progress

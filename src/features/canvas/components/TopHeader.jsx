@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import {
-  ArrowLeft, ZoomIn, ZoomOut, Maximize, Layers, Sparkles, Play, Pause,
-  Square, Film, Languages, User, LogOut, Settings, HelpCircle, Download,
+  ZoomIn, ZoomOut, Maximize, Play, Pause,
+  Languages, User, LogOut, Settings, HelpCircle, Download,
   Save, FolderOpen
 } from 'lucide-react';
 import ShareButton from '../../../components/common/ShareButton';
-import VideoSettings from './VideoSettings';
 
 /**
  * TopHeader Component
@@ -22,11 +21,9 @@ const TopHeader = ({
   zoomLevel,
   centerCanvas,
 
-  // Templates & Effects
+  // Templates
   showTemplates,
   setShowTemplates,
-  showEffectsPanel,
-  setShowEffectsPanel,
 
   // Animations & Recording
   playAnimations,
@@ -69,18 +66,14 @@ const TopHeader = ({
   setRecordingDuration
 }) => {
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
 
   return (
     <div className="main-header">
       {/* Left Section: Logo and Zoom Controls */}
       <div className="flex items-center gap-1 md:gap-2 min-w-0 flex-shrink-0">
-        <button
-          onClick={() => navigate('/home')}
-          className="flex items-center text-gray-600 hover:text-gray-900 transition-colors p-2 touch-manipulation flex-shrink-0"
-          title="Back to Home"
-        >
-          <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
-        </button>
+
 
         <h1 className="text-sm md:text-xl font-bold flex items-center flex-shrink-0 mr-2">
           <span className="handwritten-logo text-base md:text-2xl">Sowntra</span>
@@ -130,24 +123,8 @@ const TopHeader = ({
         </div>
       </div>
 
-      {/* Center Section: Templates, Effects, Animations, Recording */}
+      {/* Center Section: Animations, Recording */}
       <div className="hidden lg:flex items-center gap-1.5 flex-shrink min-w-0">
-        <button
-          onClick={() => setShowTemplates(!showTemplates)}
-          className={`px-2 py-1.5 rounded flex items-center touch-manipulation text-sm whitespace-nowrap ${showTemplates ? 'bg-white text-purple-600' : 'bg-white/20 hover:bg-white/30'}`}
-        >
-          <Layers size={14} className="mr-1" />
-          <span className="hidden xl:inline">{t('toolbar.templates')}</span>
-        </button>
-
-        <button
-          onClick={() => setShowEffectsPanel(!showEffectsPanel)}
-          className={`px-2 py-1.5 rounded flex items-center touch-manipulation text-sm whitespace-nowrap ${showEffectsPanel ? 'bg-white text-purple-600' : 'bg-white/20 hover:bg-white/30'}`}
-        >
-          <Sparkles size={14} className="mr-1" />
-          <span className="hidden xl:inline">{t('toolbar.effects')}</span>
-        </button>
-
         <button
           onClick={playAnimations}
           disabled={isPlaying}
@@ -275,58 +252,83 @@ const TopHeader = ({
                   <button onClick={() => { exportAsImage('svg'); setShowExportMenu(false); }} className="p-2 bg-gray-50 hover:bg-gray-100 rounded text-xs text-gray-700 font-medium border border-gray-200 transition-colors">SVG</button>
                 </div>
 
+                {/* Video Exports */}
+                <h4 className="text-xs font-bold text-gray-700 mb-2 px-1">Video & Animation</h4>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <button
+                    onClick={async () => {
+                      setShowExportMenu(false);
+                      setIsExporting(true);
+                      setExportProgress(0);
+                      try {
+                        // User requested 10s duration and 1080p resolution
+                        const durationFn = Math.max(recordingDuration * 1000 || 10000, 10000); // Min 10s
+                        await exportAsVideo(durationFn, (p) => setExportProgress(p), 'video/mp4', '1080p');
+                      } catch (e) {
+                        console.error("Export failed", e);
+                        alert("Export failed");
+                      } finally {
+                        setIsExporting(false);
+                        setExportProgress(0);
+                      }
+                    }}
+                    className="p-2 bg-purple-50 hover:bg-purple-100 rounded text-xs text-purple-700 font-medium border border-purple-200 transition-colors"
+                  >
+                    MP4 Video (1080p)
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setShowExportMenu(false);
+                      setIsExporting(true);
+                      setExportProgress(0);
+                      try {
+                        // User requested 10s duration
+                        const durationFn = Math.max(recordingDuration * 1000 || 10000, 10000); // Min 10s
+                        await exportAsVideo(durationFn, (p) => setExportProgress(p), 'image/gif', 'medium');
+                      } catch (e) {
+                        console.error("Export failed", e);
+                      } finally {
+                        setIsExporting(false);
+                        setExportProgress(0);
+                      }
+                    }}
+                    className="p-2 bg-purple-50 hover:bg-purple-100 rounded text-xs text-purple-700 font-medium border border-purple-200 transition-colors"
+                  >
+                    GIF Animation
+                  </button>
+                </div>
+
+                {/* Export Progress Modal */}
+                {isExporting && (
+                  <div className="fixed inset-0 bg-black/70 z-[100] flex items-center justify-center backdrop-blur-sm">
+                    <div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4 flex flex-col items-center">
+                      <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mb-4 text-purple-600 animate-pulse">
+                        <Download size={24} />
+                      </div>
+                      <h3 className="text-lg font-bold text-gray-900 mb-1">Exporting Video...</h3>
+                      <p className="text-sm text-gray-500 mb-6 text-center">Please wait while we render your design. This may take a moment.</p>
+
+                      {/* Progress Bar */}
+                      <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2 overflow-hidden">
+                        <div
+                          className="bg-purple-600 h-2.5 rounded-full transition-all duration-300 ease-out"
+                          style={{ width: `${exportProgress}%` }}
+                        ></div>
+                      </div>
+                      <div className="w-full flex justify-between text-xs text-gray-500 font-medium">
+                        <span>{exportProgress}%</span>
+                        <span>1080p HD</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <button
                   onClick={() => { exportAsPDF(); setShowExportMenu(false); }}
                   className="w-full p-2 mb-3 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded text-sm font-medium border border-blue-200 transition-colors flex items-center justify-center gap-2"
                 >
                   <Download size={14} /> Download PDF
                 </button>
-
-                <div className="h-px bg-gray-200 my-2" />
-
-                <h3 className="text-sm font-bold text-gray-700 mb-2 px-1">Video / GIF</h3>
-                <VideoSettings
-                  videoFormat={videoFormat}
-                  videoQuality={videoQuality}
-                  recordingDuration={recordingDuration}
-                  onFormatChange={setVideoFormat}
-                  onQualityChange={setVideoQuality}
-                  onDurationChange={setRecordingDuration}
-                />
-
-                {!recording ? (
-                  <div className="flex flex-col gap-2 mt-2">
-                    <button
-                      onClick={() => {
-                        exportAsVideo(recordingDuration * 1000, (prog) => console.log(prog), 'video/mp4');
-                        setShowExportMenu(false);
-                      }}
-                      className="w-full p-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded text-sm font-medium hover:from-purple-700 hover:to-pink-700 transition-colors flex items-center justify-center gap-2"
-                    >
-                      <Film size={14} /> Download Video (MP4)
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        // GIF export requires complex encoding, for now we will use video 
-                        // or we'd need to inject gif.js. Use MP4 for best quality.
-                        alert("GIF export is coming soon! Downloading as Video for now.");
-                        exportAsVideo(recordingDuration * 1000, undefined, 'video/mp4');
-                        setShowExportMenu(false);
-                      }}
-                      className="w-full p-2 bg-gray-100 text-gray-700 rounded text-sm font-medium hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
-                    >
-                      <Film size={14} /> Download GIF
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => { stopRecording(); setShowExportMenu(false); }}
-                    className="w-full mt-2 p-2 bg-red-500 text-white rounded text-sm font-medium hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Square size={14} className="fill-current" /> Stop Recording
-                  </button>
-                )}
               </div>
             </>
           )}

@@ -8,7 +8,7 @@ const InviteAcceptPage = () => {
   const { token } = useParams();
   const navigate = useNavigate();
   const { currentUser, isAuthenticated } = useAuth();
-  
+
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState('validating'); // validating, valid, invalid, accepted, expired
   const [invitation, setInvitation] = useState(null);
@@ -27,9 +27,9 @@ const InviteAcceptPage = () => {
         console.log('Validating invitation token:', token);
         // First, validate the invitation token
         const validateResponse = await invitationAPI.validateInvitation(token);
-        
+
         console.log('Validation response:', validateResponse.data);
-        
+
         if (validateResponse.data.success) {
           setInvitation(validateResponse.data.invitation);
           setStatus('valid');
@@ -52,12 +52,12 @@ const InviteAcceptPage = () => {
           status: error.response?.status,
           message: error.message
         });
-        
+
         setStatus('invalid');
-        const errorMessage = error.response?.data?.message || 
-                           error.response?.data?.error ||
-                           error.message || 
-                           'Failed to validate invitation';
+        const errorMessage = error.response?.data?.message ||
+          error.response?.data?.error ||
+          error.message ||
+          'Failed to validate invitation';
         setError(errorMessage);
       } finally {
         setLoading(false);
@@ -80,12 +80,12 @@ const InviteAcceptPage = () => {
       console.log('Current user:', currentUser);
       console.log('Invitation details:', invitation);
       const response = await invitationAPI.acceptInvitation(token);
-      
+
       console.log('Accept invitation response:', response.data);
-      
+
       if (response.data.success) {
         setStatus('accepted');
-        
+
         // Redirect to whiteboard after a short delay
         setTimeout(() => {
           if (response.data.board) {
@@ -105,13 +105,13 @@ const InviteAcceptPage = () => {
         status: error.response?.status,
         message: error.message
       });
-      const errorMessage = error.response?.data?.message || 
-                          error.response?.data?.error ||
-                          error.message || 
-                          'Failed to accept invitation';
+      const errorMessage = error.response?.data?.message ||
+        error.response?.data?.error ||
+        error.message ||
+        'Failed to accept invitation';
       setError(errorMessage);
       setStatus('error');
-      
+
       // If it's a 403 error about email mismatch, show a more helpful message
       if (error.response?.status === 403) {
         console.error('403 Forbidden - Email mismatch or permission issue');

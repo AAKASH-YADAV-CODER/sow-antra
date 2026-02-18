@@ -61,7 +61,7 @@ const CommentPopup = ({
             {/* Comments List */}
             <div
                 ref={scrollRef}
-                className="flex-1 overflow-y-auto p-4 space-y-4 max-h-60 custom-scrollbar"
+                className="flex-1 overflow-y-auto p-4 space-y-4 max-h-60 light-scrollbar"
             >
                 {comments.length === 0 ? (
                     <div className="text-center py-4">

@@ -13,6 +13,7 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
+  AlignJustify,
   AlignStartVertical,
   AlignCenterVertical,
   AlignEndVertical,
@@ -25,6 +26,23 @@ import {
   Clipboard,
   Paintbrush
 } from "lucide-react";
+
+// Moved MenuItem outside the component to prevent re-creation on render
+const MenuItem = ({ icon: Icon, label, onClick, hasSubMenu, active }) => (
+  <button
+    type="button"
+    onClick={(e) => {
+      if (onClick) onClick(e);
+    }}
+    className={`w-full flex items-center justify-between px-3 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors rounded-md my-0.5 ${active ? 'bg-purple-50 text-purple-600 font-medium' : ''}`}
+  >
+    <div className="flex items-center gap-2">
+      <Icon size={16} className={active ? 'text-purple-500' : 'text-gray-500'} />
+      <span>{label}</span>
+    </div>
+    {hasSubMenu && <ChevronRight size={14} className={active ? 'text-purple-400' : 'text-gray-400'} />}
+  </button>
+);
 
 /**
  * FloatingToolbar Component
@@ -52,7 +70,8 @@ const FloatingToolbar = ({
   pasteElements,
   pasteStyle,
   hasClipboard,
-  hasStyleClipboard
+  hasStyleClipboard,
+  onShowLayers // New prop
 }) => {
   const [position, setPosition] = useState({ left: 0, top: 0, opacity: 0 });
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
@@ -72,12 +91,17 @@ const FloatingToolbar = ({
     return currentElements.filter((el) => selectedElements.has(el.id));
   }, [currentElements, selectedElements]);
 
+  const selectionKey = selectedElementsData.map(el => `${el.id}:${el.x}:${el.y}:${el.width}:${el.height}`).join('|');
+
   // Calculate bounding box and position
   useEffect(() => {
     // If no selection, hide everything (including portal menu)
     if (selectedElementsData.length === 0 || !canvasRef.current || !canvasSize) {
-      setPosition((prev) => ({ ...prev, opacity: 0 }));
-      setIsMoreMenuOpen(false); // Force close menu on deselection
+      setPosition((prev) => {
+        if (prev.opacity === 0) return prev;
+        return { ...prev, opacity: 0 };
+      });
+      if (isMoreMenuOpen) setIsMoreMenuOpen(false);
       return;
     }
 
@@ -110,17 +134,35 @@ const FloatingToolbar = ({
         finalTop = canvasRect.top + (maxY * scaleY) + 15;
       }
 
-      setPosition({
-        left: screenX,
-        top: Math.max(padding, finalTop),
-        opacity: 1
+      setPosition(prev => {
+        const newLeft = screenX;
+        const newTop = Math.max(padding, finalTop);
+        // Increase threshold to 1px to avoid microscopic loops during layout transitions
+        const hasChanged = Math.abs(prev.left - newLeft) > 1 ||
+          Math.abs(prev.top - newTop) > 1 ||
+          prev.opacity !== 1;
+
+        if (!hasChanged) return prev;
+        return {
+          left: newLeft,
+          top: newTop,
+          opacity: 1
+        };
       });
     };
 
     updatePosition();
-    const timer = setTimeout(updatePosition, 0);
-    return () => clearTimeout(timer);
-  }, [selectedElementsData, zoomLevel, canvasOffset, canvasRef, canvasSize]);
+    // Removed immediate setTimeout to avoid rapid re-renders
+    return () => { };
+  }, [
+    selectionKey,
+    zoomLevel,
+    canvasOffset,
+    canvasRef,
+    canvasSize,
+    isMoreMenuOpen,
+    selectedElementsData
+  ]);
 
   // Handle Menu Position (Portal)
   useEffect(() => {
@@ -150,9 +192,15 @@ const FloatingToolbar = ({
 
 
   // Execute action safely
-  const handleAction = useCallback((action) => {
+  const handleAction = useCallback((action, e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
     if (typeof action === 'function') {
       try {
+        console.log("Executing toolbar action...");
         action();
       } catch (err) {
         console.error("Action error:", err);
@@ -162,7 +210,7 @@ const FloatingToolbar = ({
     setTimeout(() => {
       setIsMoreMenuOpen(false);
       setActiveSubMenu(null);
-    }, 100);
+    }, 150);
   }, []);
 
   const handleSubMenuToggle = useCallback((subMenu, e) => {
@@ -179,22 +227,7 @@ const FloatingToolbar = ({
   const hasGroup = selectedElementsData.some(el => el.type === 'group');
   const isMultiSelect = selectedElements.size > 1;
 
-  const MenuItem = ({ icon: Icon, label, onClick, hasSubMenu, active }) => (
-    <button
-      onClick={(e) => {
-        if (onClick) onClick(e);
-      }}
-      className={`w-full flex items-center justify-between px-3 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors rounded-md my-0.5 ${active ? 'bg-purple-50 text-purple-600 font-medium' : ''}`}
-    >
-      <div className="flex items-center gap-2">
-        <Icon size={16} className={active ? 'text-purple-500' : 'text-gray-500'} />
-        <span>{label}</span>
-      </div>
-      {hasSubMenu && <ChevronRight size={14} className={active ? 'text-purple-400' : 'text-gray-400'} />}
-    </button>
-  );
-
-  return (
+  return createPortal(
     <>
       {/* MAIN TOOLBAR */}
       <div
@@ -209,11 +242,9 @@ const FloatingToolbar = ({
         onMouseDown={(e) => { e.stopPropagation(); }}
         onClick={(e) => { e.stopPropagation(); }}
       >
-        {/* Buttons... */}
-        {/* Buttons... */}
-
         {/* Comment */}
         <button
+          type="button"
           onClick={(e) => handleAction(() => onCommentClick && onCommentClick(), e)}
           className="p-2 hover:bg-gray-100 rounded-lg text-gray-700 transition-colors"
           title="Comment"
@@ -223,6 +254,7 @@ const FloatingToolbar = ({
 
         {/* Lock/Unlock */}
         <button
+          type="button"
           onClick={(e) => handleAction(() => Array.from(selectedElements).forEach(id => toggleElementLock(id)), e)}
           className={`p-2 hover:bg-gray-100 rounded-lg transition-colors ${isLocked ? 'text-gray-900 bg-gray-100' : 'text-gray-700'}`}
           title={isLocked ? "Unlock" : "Lock"}
@@ -233,6 +265,7 @@ const FloatingToolbar = ({
         {/* Duplicate */}
         {!isLocked && (
           <button
+            type="button"
             onClick={(e) => handleAction(() => Array.from(selectedElements).forEach(id => duplicateElement(id)), e)}
             className="p-2 hover:bg-gray-100 rounded-lg text-gray-700 transition-colors"
             title="Duplicate"
@@ -244,6 +277,7 @@ const FloatingToolbar = ({
         {/* Delete */}
         {!isLocked && (
           <button
+            type="button"
             onClick={(e) => handleAction(() => Array.from(selectedElements).forEach(id => deleteElement(id)), e)}
             className="p-2 hover:bg-gray-100 rounded-lg text-gray-700 transition-colors"
             title="Delete"
@@ -258,6 +292,7 @@ const FloatingToolbar = ({
             <div className="h-4 w-px bg-gray-300 mx-0.5" />
             {isMultiSelect && (
               <button
+                type="button"
                 onClick={(e) => handleAction(groupElements, e)}
                 className="p-2 hover:bg-gray-100 rounded-lg text-gray-700 transition-colors"
                 title="Group"
@@ -267,6 +302,7 @@ const FloatingToolbar = ({
             )}
             {hasGroup && (
               <button
+                type="button"
                 onClick={(e) => handleAction(() => {
                   const groupToUngroup = selectedElementsData.find(el => el.type === 'group');
                   if (groupToUngroup) ungroupElements(groupToUngroup.id);
@@ -282,6 +318,7 @@ const FloatingToolbar = ({
 
         {/* More Button */}
         <button
+          type="button"
           ref={moreMenuBtnRef}
           onClick={(e) => {
             e.stopPropagation();
@@ -296,8 +333,8 @@ const FloatingToolbar = ({
         </button>
       </div>
 
-      {/* PORTAL FOR MORE MENU */}
-      {isMoreMenuOpen && createPortal(
+      {/* MORE MENU CONTENT */}
+      {isMoreMenuOpen && (
         <div className="fixed inset-0 z-[9999]" style={{ pointerEvents: 'auto' }}>
           {/* Backdrop */}
           <div
@@ -308,7 +345,7 @@ const FloatingToolbar = ({
               setIsMoreMenuOpen(false);
               setActiveSubMenu(null);
             }}
-            onMouseDown={(e) => e.stopPropagation()} // Keep this? Yes, prevent canvas interaction behind.
+            onMouseDown={(e) => e.stopPropagation()}
             onContextMenu={(e) => e.preventDefault()}
           />
 
@@ -321,17 +358,16 @@ const FloatingToolbar = ({
               right: menuPosition.align === 'right' ? (window.innerWidth - menuPosition.left) : undefined,
               transform: 'translateY(-50%)'
             }}
-            // CRITICAL: Stop propagation here to prevent "Backdrop" click or Canvas click
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
             onContextMenu={(e) => e.stopPropagation()}
           >
-            <MenuItem icon={Copy} label="Copy" onClick={() => handleAction(copyElements)} />
-            {!isMultiSelect && <MenuItem icon={Paintbrush} label="Copy Style" onClick={() => handleAction(copyStyle)} />}
-            {hasClipboard && <MenuItem icon={Clipboard} label="Paste" onClick={() => handleAction(pasteElements)} />}
-            <MenuItem icon={Copy} label="Duplicate" onClick={() => handleAction(() => Array.from(selectedElements).forEach(id => duplicateElement(id)))} />
-            <MenuItem icon={Trash2} label="Delete" onClick={() => handleAction(() => Array.from(selectedElements).forEach(id => deleteElement(id)))} />
-            <MenuItem icon={isLocked ? Unlock : Lock} label={isLocked ? "Unlock" : "Lock"} onClick={() => handleAction(() => Array.from(selectedElements).forEach(id => toggleElementLock(id)))} />
+            <MenuItem icon={Copy} label="Copy" onClick={(e) => handleAction(copyElements, e)} />
+            {!isMultiSelect && <MenuItem icon={Paintbrush} label="Copy Style" onClick={(e) => handleAction(copyStyle, e)} />}
+            {hasClipboard && <MenuItem icon={Clipboard} label="Paste" onClick={(e) => handleAction(pasteElements, e)} />}
+            <MenuItem icon={Copy} label="Duplicate" onClick={(e) => handleAction(() => Array.from(selectedElements).forEach(id => duplicateElement(id)), e)} />
+            <MenuItem icon={Trash2} label="Delete" onClick={(e) => handleAction(() => Array.from(selectedElements).forEach(id => deleteElement(id)), e)} />
+            <MenuItem icon={isLocked ? Unlock : Lock} label={isLocked ? "Unlock" : "Lock"} onClick={(e) => handleAction(() => Array.from(selectedElements).forEach(id => toggleElementLock(id)), e)} />
 
             <div className="h-px bg-gray-100 my-1 mx-2" />
 
@@ -349,14 +385,15 @@ const FloatingToolbar = ({
                   className={`absolute top-0 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-1 px-1 animate-in fade-in zoom-in-95 duration-200 ${menuPosition.align === 'left' ? 'left-full ml-1' : 'right-full mr-1'
                     }`}
                   style={{ zIndex: 100 }}
+                  onMouseDown={(e) => e.stopPropagation()}
                 >
-                  <MenuItem icon={AlignLeft} label="Left" onClick={() => handleAction(() => alignElements(Array.from(selectedElements), 'left'))} />
-                  <MenuItem icon={AlignCenter} label="Center" onClick={() => handleAction(() => alignElements(Array.from(selectedElements), 'center'))} />
-                  <MenuItem icon={AlignRight} label="Right" onClick={() => handleAction(() => alignElements(Array.from(selectedElements), 'right'))} />
+                  <MenuItem icon={AlignLeft} label="Left" onClick={(e) => handleAction(() => alignElements(Array.from(selectedElements), 'left'), e)} />
+                  <MenuItem icon={AlignCenter} label="Center" onClick={(e) => handleAction(() => alignElements(Array.from(selectedElements), 'center'), e)} />
+                  <MenuItem icon={AlignRight} label="Right" onClick={(e) => handleAction(() => alignElements(Array.from(selectedElements), 'right'), e)} />
                   <div className="h-px bg-gray-100 my-1 mx-2" />
-                  <MenuItem icon={AlignStartVertical} label="Top" onClick={() => handleAction(() => alignElements(Array.from(selectedElements), 'top'))} />
-                  <MenuItem icon={AlignCenterVertical} label="Middle" onClick={() => handleAction(() => alignElements(Array.from(selectedElements), 'middle'))} />
-                  <MenuItem icon={AlignEndVertical} label="Bottom" onClick={() => handleAction(() => alignElements(Array.from(selectedElements), 'bottom'))} />
+                  <MenuItem icon={AlignStartVertical} label="Top" onClick={(e) => handleAction(() => alignElements(Array.from(selectedElements), 'top'), e)} />
+                  <MenuItem icon={AlignCenterVertical} label="Middle" onClick={(e) => handleAction(() => alignElements(Array.from(selectedElements), 'middle'), e)} />
+                  <MenuItem icon={AlignEndVertical} label="Bottom" onClick={(e) => handleAction(() => alignElements(Array.from(selectedElements), 'bottom'), e)} />
                 </div>
               )}
             </div>
@@ -375,26 +412,27 @@ const FloatingToolbar = ({
                   className={`absolute top-0 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-1 px-1 animate-in fade-in zoom-in-95 duration-200 ${menuPosition.align === 'left' ? 'left-full ml-1' : 'right-full mr-1'
                     }`}
                   style={{ zIndex: 100 }}
+                  onMouseDown={(e) => e.stopPropagation()}
                 >
-                  <MenuItem icon={ArrowUp} label="Bring Forward" onClick={() => handleAction(() => Array.from(selectedElements).forEach(id => changeZIndex(id, 'forward')))} />
-                  <MenuItem icon={ChevronsUp} label="Bring to Front" onClick={() => handleAction(() => Array.from(selectedElements).forEach(id => changeZIndex(id, 'front')))} />
-                  <MenuItem icon={ArrowDown} label="Send Backward" onClick={() => handleAction(() => Array.from(selectedElements).forEach(id => changeZIndex(id, 'backward')))} />
-                  <MenuItem icon={ChevronsDown} label="Send to Back" onClick={() => handleAction(() => Array.from(selectedElements).forEach(id => changeZIndex(id, 'back')))} />
+                  <MenuItem icon={ArrowUp} label="Bring Forward" onClick={(e) => handleAction(() => changeZIndex(Array.from(selectedElements), 'forward'), e)} />
+                  <MenuItem icon={ChevronsUp} label="Bring to Front" onClick={(e) => handleAction(() => changeZIndex(Array.from(selectedElements), 'front'), e)} />
+                  <MenuItem icon={ArrowDown} label="Send Backward" onClick={(e) => handleAction(() => changeZIndex(Array.from(selectedElements), 'backward'), e)} />
+                  <MenuItem icon={ChevronsDown} label="Send to Back" onClick={(e) => handleAction(() => changeZIndex(Array.from(selectedElements), 'back'), e)} />
                   <div className="h-px bg-gray-100 my-1 mx-2" />
-                  <MenuItem icon={Layers} label="Show Layers" onClick={() => handleAction(() => { })} />
+                  <MenuItem icon={Layers} label="Show Layers" onClick={(e) => handleAction(() => onShowLayers && onShowLayers(), e)} />
                 </div>
               )}
             </div>
 
             <div className="h-px bg-gray-100 my-2 mx-2" />
 
-            <MenuItem icon={Link} label="Link" onClick={() => handleAction(() => { })} />
-            <MenuItem icon={MessageCircle} label="Comment" onClick={() => handleAction(onCommentClick)} />
+            <MenuItem icon={Link} label="Link" onClick={(e) => handleAction(() => { }, e)} />
+            <MenuItem icon={MessageCircle} label="Comment" onClick={(e) => handleAction(onCommentClick, e)} />
           </div>
-        </div>,
-        document.body
+        </div>
       )}
-    </>
+    </>,
+    document.body
   );
 };
 

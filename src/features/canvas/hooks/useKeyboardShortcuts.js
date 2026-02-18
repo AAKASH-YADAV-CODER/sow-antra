@@ -30,10 +30,12 @@ const useKeyboardShortcuts = ({
   ungroupElements,
   toggleElementLock,
   setTextEditing,
-  showEffectsPanel,
-  setShowEffectsPanel,
+  activeSidePanel,
+  setActiveSidePanel,
   copyElements,
-  pasteElements
+  pasteElements,
+  splitPage,
+  currentTime
 }) => {
 
   useEffect(() => {
@@ -43,6 +45,12 @@ const useKeyboardShortcuts = ({
 
       // Don't handle shortcuts when typing in input fields
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+      // 'S' key: Split page at current time
+      if (e.key.toLowerCase() === 's' && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        e.preventDefault();
+        if (splitPage) splitPage(currentTime);
+      }
 
       // Delete/Backspace: Delete selected elements
       if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -118,7 +126,7 @@ const useKeyboardShortcuts = ({
         setSelectedElement(null);
         setSelectedElements(new Set());
         setTextEditing(null);
-        setShowEffectsPanel(false);
+        setActiveSidePanel('none');
       }
 
       // Ctrl/Cmd+G: Group/ungroup elements
@@ -147,7 +155,7 @@ const useKeyboardShortcuts = ({
       if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
         e.preventDefault();
         if (selectedElement) {
-          setShowEffectsPanel(!showEffectsPanel);
+          setActiveSidePanel(prev => prev === 'effects' ? 'none' : 'effects');
         }
       }
     };
@@ -172,10 +180,12 @@ const useKeyboardShortcuts = ({
     ungroupElements,
     toggleElementLock,
     setTextEditing,
-    showEffectsPanel,
-    setShowEffectsPanel,
+    activeSidePanel,
+    setActiveSidePanel,
     copyElements,
-    pasteElements
+    pasteElements,
+    splitPage,
+    currentTime
   ]);
 };
 

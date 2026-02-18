@@ -163,7 +163,8 @@ const useProjectManager = ({
           setSelectedElements(new Set());
 
           // Force center and fit
-          setTimeout(centerCanvas, 50);
+          const newSize = projectData.canvasSize || { width: 800, height: 600 };
+          setTimeout(() => centerCanvas(newSize), 50);
 
           alert('Project loaded successfully!');
         } catch (error) {

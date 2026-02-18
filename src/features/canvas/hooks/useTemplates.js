@@ -28,8 +28,8 @@ const useTemplates = ({
       // Set the new canvas size
       setCanvasSize({ width: template.width, height: template.height });
 
-      // Force center and fit
-      setTimeout(centerCanvas, 50);
+      // Force center and fit with the new size immediately to bypass state update delays
+      setTimeout(() => centerCanvas({ width: template.width, height: template.height }), 50);
       setShowTemplates(false);
     }
   }, [setCanvasSize, centerCanvas, setShowTemplates, setShowCustomTemplateModal]);
@@ -37,12 +37,13 @@ const useTemplates = ({
   // Create a custom template with user-defined dimensions
   const createCustomTemplate = useCallback(() => {
     if (customTemplateSize.width > 0 && customTemplateSize.height > 0) {
-      setCanvasSize({
+      const newSize = {
         width: customTemplateSize.width,
         height: customTemplateSize.height
-      });
+      };
+      setCanvasSize(newSize);
 
-      setTimeout(centerCanvas, 50);
+      setTimeout(() => centerCanvas(newSize), 50);
 
       setShowCustomTemplateModal(false);
       setShowTemplates(false);

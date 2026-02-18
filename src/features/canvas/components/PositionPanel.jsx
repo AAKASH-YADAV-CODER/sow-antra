@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import {
-    X, Layers, ChevronUp, ChevronDown, ChevronsUp, ChevronsDown,
-    AlignStartVertical, AlignCenterVertical, AlignEndVertical,
+    AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd,
     AlignLeft, AlignCenter, AlignRight,
+    X, Layers, ChevronUp, ChevronDown, ChevronsUp, ChevronsDown,
     Type, Image as ImageIcon, Square, Circle, Triangle, Star, Hexagon,
     MoreHorizontal, Lock, GripVertical
 } from 'lucide-react';
@@ -17,11 +17,13 @@ const PositionPanel = ({
     alignElements,
     changeZIndex,
     setSelectedElement,
+    setSelectedElements,
     toggleElementLock,
     lockedElements,
-    reorderElement
+    reorderElement,
+    defaultTab = 'arrange' // Default prop
 }) => {
-    const [activeTab, setActiveTab] = useState('arrange'); // 'arrange' | 'layers'
+    const [activeTab, setActiveTab] = useState(defaultTab); // Initialize with prop
     const [layerFilter, setLayerFilter] = useState('all'); // 'all' | 'overlapping'
     const [draggedItemId, setDraggedItemId] = useState(null);
 
@@ -97,7 +99,7 @@ const PositionPanel = ({
 
 
     return (
-        <div className="fixed left-0 top-[56px] bottom-0 w-80 bg-white shadow-xl z-40 flex flex-col border-r border-gray-200 animate-in slide-in-from-left duration-200">
+        <div className="absolute left-[72px] top-[64px] bottom-0 w-80 bg-white shadow-xl z-[100] flex flex-col border-r border-gray-200 animate-in slide-in-from-left duration-300">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
                 <h2 className="font-bold text-gray-800">Position</h2>
@@ -132,7 +134,7 @@ const PositionPanel = ({
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar bg-gray-50">
+            <div className="flex-1 overflow-y-auto light-scrollbar bg-gray-50">
 
                 {/* ARRANGE TAB */}
                 {activeTab === 'arrange' && (
@@ -183,7 +185,7 @@ const PositionPanel = ({
                                     disabled={!selectedElement}
                                     className="flex items-center gap-3 px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 text-sm text-gray-700 transition-colors disabled:opacity-50 bg-white"
                                 >
-                                    <AlignStartVertical size={16} className="rotate-180" /> Top
+                                    <AlignVerticalJustifyStart size={16} className="rotate-180" /> Top
                                 </button>
                                 {/* Left */}
                                 <button
@@ -199,7 +201,7 @@ const PositionPanel = ({
                                     disabled={!selectedElement}
                                     className="flex items-center gap-3 px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 text-sm text-gray-700 transition-colors disabled:opacity-50 bg-white"
                                 >
-                                    <AlignCenterVertical size={16} /> Middle
+                                    <AlignVerticalJustifyCenter size={16} /> Middle
                                 </button>
                                 {/* Center */}
                                 <button
@@ -215,7 +217,7 @@ const PositionPanel = ({
                                     disabled={!selectedElement}
                                     className="flex items-center gap-3 px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 text-sm text-gray-700 transition-colors disabled:opacity-50 bg-white"
                                 >
-                                    <AlignEndVertical size={16} /> Bottom
+                                    <AlignVerticalJustifyEnd size={16} /> Bottom
                                 </button>
                                 {/* Right */}
                                 <button
@@ -337,7 +339,11 @@ const PositionPanel = ({
                                 return (
                                     <div
                                         key={el.id}
-                                        onClick={() => setSelectedElement(el.id)}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedElement(el.id);
+                                            setSelectedElements(new Set([el.id]));
+                                        }}
                                         draggable={true}
                                         onDragStart={(e) => handleDragStart(e, el.id)}
                                         onDragOver={handleDragOver}
