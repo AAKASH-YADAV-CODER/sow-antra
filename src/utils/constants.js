@@ -2,7 +2,7 @@ import React from 'react';
 import {
   Square, Type, Image, Smartphone, MessageCircle,
   Monitor, Film, FileText, Printer, Heart, Music, Zap, CreditCard,
-  Tv, Megaphone, Users, BookOpen
+  Tv, Megaphone, Users, BookOpen, Maximize
 } from 'lucide-react';
 
 // Font families with Indian language support
@@ -388,6 +388,20 @@ export const socialMediaTemplates = {
     name: 'A3 Poster',
     icon: <Printer size={16} />,
     aspectRatio: 3508 / 4961
+  },
+  poster: {
+    width: 1587,
+    height: 2245,
+    name: 'Poster (A2)',
+    icon: <Image size={16} />,
+    aspectRatio: 1587 / 2245
+  },
+  logo: {
+    width: 1000,
+    height: 1000,
+    name: 'Logo',
+    icon: <Maximize size={16} />,
+    aspectRatio: 1
   },
   a5Flyer: {
     width: 1748,

@@ -83,7 +83,7 @@ const Sowntra = () => {
   // recording, mediaRecorder, recordingStartTime, recordingTimeElapsed now managed by useRecording hook
   // drawingPath, isDrawing now managed by useCanvasInteraction hook
   const [showSaveDialog, setShowSaveDialog] = useState(false);
-  const [projectName, setProjectName] = useState('');
+  const [projectName, setProjectName] = useState('Untitled project');
   const [textEditing, setTextEditing] = useState(null);
   const [pages, setPages] = useState([{ id: 'page-1', name: 'Page 1', elements: [] }]);
   const [currentPage, setCurrentPage] = useState('page-1');
@@ -142,6 +142,7 @@ const Sowntra = () => {
 
   const [isProcessingBG, setIsProcessingBG] = useState(false);
   const [bgProcessingStatus, setBgProcessingStatus] = useState('');
+  const [saveStatus, setSaveStatus] = useState('idle'); // 'idle', 'saving', 'saved', 'error'
 
   // Video Editor State
   const [isVideoMode, setIsVideoMode] = useState(false);
@@ -395,10 +396,6 @@ const Sowntra = () => {
           setTimeout(() => {
             centerCanvas();
           }, 200);
-          if (projectData.showGrid !== undefined) setShowGrid(projectData.showGrid);
-          if (projectData.snapToGrid !== undefined) setSnapToGrid(projectData.snapToGrid);
-          if (projectData.currentLanguage) setCurrentLanguage(projectData.currentLanguage);
-          if (projectData.textDirection) setTextDirection(projectData.textDirection);
         }
       } catch (error) {
         console.error('Error loading project:', error);
@@ -989,12 +986,14 @@ const Sowntra = () => {
   const {
     exportAsImage,
     exportAsPDF,
-    exportAsVideo
+    exportAsVideo,
+    getCanvasDataURL
   } = useExport({
     getCurrentPageElements,
     canvasSize,
     imageEffects,
-    backgroundColor: pages.find(p => p.id === currentPage)?.backgroundGradient || canvasBackgroundColor
+    backgroundColor: pages.find(p => p.id === currentPage)?.backgroundGradient || canvasBackgroundColor,
+    projectName
   });
 
   // Custom Hooks - Helper Functions
@@ -1060,6 +1059,7 @@ const Sowntra = () => {
   // Custom Hooks - Project Management (Save/Load)
   const {
     handleSaveClick,
+    saveProject,
     confirmSave,
     loadProject,
     handleProjectFileLoad
@@ -1088,8 +1088,67 @@ const Sowntra = () => {
     setSelectedElement,
     setSelectedElements,
     loadProjectInputRef,
-    centerCanvas
+    centerCanvas,
+    projectId: currentProjectId // Pass currentProjectId to hook
   });
+
+  // Silent save wrapper for background tasks
+  const handleSilentSave = useCallback(async () => {
+    setSaveStatus('saving');
+    try {
+      // Capture design snapshot before saving
+      let thumbnail = null;
+      try {
+        thumbnail = await getCanvasDataURL('png');
+      } catch (snapshotError) {
+        console.warn('Failed to capture silent-save snapshot:', snapshotError);
+      }
+
+      const response = await saveProject({ title: projectName, thumbnail }, true);
+      setSaveStatus('saved');
+
+      // Robust ID capture
+      const newId = response?.data?.id ||
+        response?.data?.project?.id ||
+        response?.data?.data?.id ||
+        response?.data?._id;
+
+      if (!currentProjectId && newId) {
+        navigate(`?project=${newId}`, { replace: true });
+      }
+    } catch (error) {
+      console.error('Silent save failed:', error);
+      setSaveStatus('error');
+    }
+  }, [saveProject, currentProjectId, navigate, getCanvasDataURL, projectName]);
+
+  // Debounced Auto-save to backend
+  useEffect(() => {
+    // Only auto-save if there are elements or a non-default name
+    if (pages.some(p => p.elements.length > 0) || (projectName && projectName !== 'Untitled project')) {
+      const timeoutId = setTimeout(async () => {
+        handleSilentSave();
+      }, 1500); // 1.5s idle debounce for heavier saving (including thumbnail)
+      return () => clearTimeout(timeoutId);
+    }
+  }, [pages, projectName, handleSilentSave]);
+
+  // Handle page leave - vital for ensuring last changes aren't lost
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      // Trigger a silent save
+      handleSilentSave();
+
+      // Standard message for some browsers
+      if (saveStatus === 'saving') {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [handleSilentSave, saveStatus]);
 
   // NOTE: The following functions are now provided by useProjectManager hook:
   // - handleSaveClick, saveProject, confirmSave, loadProject, handleProjectFileLoad
@@ -1151,100 +1210,6 @@ const Sowntra = () => {
   // NOTE: Keyboard shortcuts handler now provided by useKeyboardShortcuts hook
   // This replaces the large useEffect with handleKeyDown function
 
-  // Keyboard shortcuts - OLD (now in hook)
-  /*
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (textEditing) return;
-      
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-      
-        if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        undo();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
-        e.preventDefault();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) {
-        e.preventDefault();
-        redo();
-      }
-      
-      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
-        e.preventDefault();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
-        e.preventDefault();
-      }
-      
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-        if (selectedElements.size > 0) {
-          e.preventDefault();
-          const delta = e.shiftKey ? 10 : 1;
-          const moveX = e.key === 'ArrowLeft' ? -delta : e.key === 'ArrowRight' ? delta : 0;
-          const moveY = e.key === 'ArrowUp' ? -delta : e.key === 'ArrowDown' ? delta : 0;
-          
-          const currentElements = getCurrentPageElements();
-          const newElements = currentElements.map(el => {
-            if (selectedElements.has(el.id) && !lockedElements.has(el.id)) {
-              return {
-                ...el,
-                x: el.x + moveX,
-                y: el.y + moveY
-              };
-            }
-            return el;
-          });
-          
-          setCurrentPageElements(newElements);
-          saveToHistory(newElements);
-        }
-      }
-   
-   
-      if (e.key === 'Escape') {
-        setSelectedElement(null);
-        setSelectedElements(new Set());
-        setTextEditing(null);
-        setShowEffectsPanel(false);
-      }
-   
-      if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
-        e.preventDefault();
-        if (selectedElements.size > 1) {
-          groupElements();
-        } else if (selectedElement) {
-          const currentElements = getCurrentPageElements();
-          const element = currentElements.find(el => el.id === selectedElement);
-          if (element?.type === 'group') {
-            ungroupElements(selectedElement);
-          }
-        }
-      }
-   
-      if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
-        e.preventDefault();
-        if (selectedElement) {
-          toggleElementLock(selectedElement);
-        }
-      }
-   
-   
-      if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
-        e.preventDefault();
-        if (selectedElement) {
-          setShowEffectsPanel(!showEffectsPanel);
-        }
-      }
-    };
-   
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [selectedElements, getCurrentPageElements, selectedElement, undo, redo, saveToHistory, groupElements, textEditing, lockedElements, setCurrentPageElements, ungroupElements, toggleElementLock, showEffectsPanel]);
-  */
 
   // Add event listeners
   useEffect(() => {
@@ -1269,11 +1234,22 @@ const Sowntra = () => {
       const staticTemplate = socialMediaTemplates[templateKey];
       const editableTemplate = editableTemplates[templateKey];
 
-      if (editableTemplate) {
+      // Check community templates in localStorage
+      const communityTemplates = JSON.parse(localStorage.getItem('community_templates') || '[]');
+      const communityTemplate = communityTemplates.find(t => t.id === templateKey);
+
+      if (communityTemplate) {
+        const size = communityTemplate.canvasSize || { width: 800, height: 600 };
+        setCanvasSize(size);
+        setPages(communityTemplate.pages || [{ id: 'page-1', elements: [] }]);
+        // Force immediate auto-fit using the explicit size to avoid stale state issues
+        setTimeout(() => centerCanvas(size), 400);
+      } else if (editableTemplate) {
         setCanvasSize({ width: editableTemplate.width, height: editableTemplate.height });
-        // The centerCanvas will be triggered by canvasSize change via useEffect
         setTimeout(() => {
           applyEditableTemplate(templateKey);
+          // Re-center after applying elements
+          setTimeout(() => centerCanvas(), 200);
         }, 300);
       } else if (staticTemplate) {
         setCanvasSize({ width: staticTemplate.width, height: staticTemplate.height });
@@ -1285,7 +1261,7 @@ const Sowntra = () => {
         setCanvasSize({ width: w, height: h });
       }
     }
-  }, [searchParams, applyEditableTemplate]);
+  }, [searchParams, applyEditableTemplate, centerCanvas]);
 
   // Handle clicking outside the canvas paper (the gray area)
   const handleContainerMouseDown = useCallback((e) => {
@@ -1336,7 +1312,15 @@ const Sowntra = () => {
           recordingDuration={recordingDuration}
           setRecordingDuration={setRecordingDuration}
           onSaveProject={handleSaveClick}
+          onSilentSave={handleSilentSave}
           loadProject={loadProject}
+          projectName={projectName}
+          setProjectName={setProjectName}
+          pages={pages}
+          canvasSize={canvasSize}
+          isCreatorMode={searchParams.get('isCreatorMode') === 'true'}
+          saveStatus={saveStatus}
+          getCanvasDataURL={getCanvasDataURL}
         />
 
 

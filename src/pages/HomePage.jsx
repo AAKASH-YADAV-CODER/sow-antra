@@ -1,18 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { ArrowRight, CheckCircle, LogOut, FolderOpen, Clock, Trash2, Plus, Search, X, Layout, Monitor, Smartphone, Palette, FileText, ArrowLeft, ChevronLeft } from 'lucide-react';
+import { ArrowRight, FolderOpen, Trash2, Plus, Search, X, Layout, Monitor, Smartphone, Palette, FileText, ChevronLeft } from 'lucide-react';
 import { socialMediaTemplates } from '../utils/constants';
 import { projectAPI, boardAPI } from '../services/api';
 import { editableTemplates, templateCategories } from '../config/editableTemplates';
-import { LayoutTemplate, Home, FolderHorizontal, Trash, Settings, Award } from 'lucide-react';
+import { LayoutTemplate, Home, Settings, Award, Users } from 'lucide-react';
 
 const HomePage = () => {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
-  const [showProjects, setShowProjects] = useState(false);
   const [projects, setProjects] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [showCreatePopup, setShowCreatePopup] = useState(false);
   const [isCustomSizeView, setIsCustomSizeView] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -23,6 +23,16 @@ const HomePage = () => {
   });
   const [activeTab, setActiveTab] = useState('home'); // 'home', 'templates', 'projects'
   const [selectedTemplateCategory, setSelectedTemplateCategory] = useState('all');
+  const [communityTemplates, setCommunityTemplates] = useState([]);
+
+  useEffect(() => {
+    // Load community templates from localStorage
+    const stored = JSON.parse(localStorage.getItem('community_templates') || '[]');
+    setCommunityTemplates(stored);
+  }, []);
+
+  const [editingProjectId, setEditingProjectId] = useState(null);
+  const [tempTitle, setTempTitle] = useState('');
 
   const handleLogout = async () => {
     try {
@@ -33,6 +43,163 @@ const HomePage = () => {
     }
   };
 
+  const handleRenameProject = async (projectId, newTitle) => {
+    if (!newTitle.trim()) {
+      setEditingProjectId(null);
+      return;
+    }
+
+    try {
+      const item = projects.find(p => p.id === projectId);
+      const isBoard = item?.type === 'board';
+
+      if (isBoard) {
+        await boardAPI.updateBoard(projectId, { title: newTitle.trim() });
+      } else {
+        // Project update might expect a nested projectData object depending on the API
+        // For projectAPI.updateProject it usually is { projectData: { ... } }
+        // Let's check api.js again
+        await projectAPI.updateProject(projectId, { title: newTitle.trim() });
+      }
+
+      setProjects(projects.map(p => p.id === projectId ? { ...p, title: newTitle.trim() } : p));
+      setEditingProjectId(null);
+    } catch (error) {
+      console.error('Error renaming project:', error);
+      alert('Failed to rename project');
+      setEditingProjectId(null);
+    }
+  };
+
+  // Shared fetching logic
+  const refreshDesigns = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const [projRes, boardRes] = await Promise.allSettled([
+        projectAPI.loadProjects(),
+        boardAPI.listBoards()
+      ]);
+
+      let allItems = [];
+      const extractDataList = (obj, depth = 0) => {
+        if (!obj || depth > 5) return [];
+        if (Array.isArray(obj)) return obj;
+        if (typeof obj === 'object') {
+          // Check if object itself is a project
+          if (obj.title || obj.name || obj.projectData || obj.boardData || (obj.id && obj.pages)) {
+            return [obj];
+          }
+          // Known containers
+          const known = ['projects', 'boards', 'data', 'results', 'list', 'items', 'project'];
+          for (const key of known) {
+            if (obj[key]) {
+              const found = extractDataList(obj[key], depth + 1);
+              if (found.length > 0) return found;
+            }
+          }
+          // Any array
+          const vals = Object.values(obj);
+          const firstArr = vals.find(v => Array.isArray(v));
+          if (firstArr) return firstArr;
+          // Dictionary of objects
+          const allObj = vals.length > 0 && vals.every(v => v && typeof v === 'object');
+          if (allObj && vals.some(v => v.title || v.name || v.projectData || v.boardData || v.pages)) return vals;
+          // Deep search
+          for (const v of vals) {
+            if (v && typeof v === 'object' && !Array.isArray(v)) {
+              const found = extractDataList(v, depth + 1);
+              if (found.length > 0) return found;
+            }
+          }
+        }
+        return [];
+      };
+
+      let projItems = [];
+      let boardItems = [];
+
+      if (projRes.status === 'fulfilled') {
+        const rawProjData = projRes.value?.data;
+        console.log('[HomePage] Raw Project Data:', rawProjData);
+        projItems = extractDataList(rawProjData).map(p => ({ ...p, _sourceType: 'project' }));
+      }
+      if (boardRes.status === 'fulfilled') {
+        const rawBoardData = boardRes.value?.data;
+        console.log('[HomePage] Raw Board Data:', rawBoardData);
+        boardItems = extractDataList(rawBoardData).map(p => ({ ...p, _sourceType: 'board' }));
+      }
+
+      allItems = [...projItems, ...boardItems];
+
+      const flattened = allItems.map(p => {
+        if (!p) return null;
+        const data = p.projectData || p.boardData || (typeof p === 'object' ? p : {});
+        const id = p.id || p._id || data.id || data._id || p.boardId || (typeof p === 'string' ? p : null);
+        const title = p.title || p.name || data.title || data.name || (p.pages ? `Project ${id || ''}` : 'Untitled design');
+
+        let lastMod = p.lastModified || p.timestamp || p.updatedAt || data.updatedAt || Date.now();
+        // Ensure valid date for sorting
+        if (isNaN(new Date(lastMod).getTime())) lastMod = Date.now();
+
+        return {
+          ...p,
+          ...data,
+          id,
+          title: String(title || 'Untitled design'),
+          type: p._sourceType || ((p.boardId || p.boardData) ? 'board' : 'project'),
+          lastModified: lastMod
+        };
+      }).filter(p => p && p.id && String(p.id) !== 'undefined');
+
+      const unique = Array.from(new Map(flattened.map(item => [String(item.id), item])).values());
+      unique.sort((a, b) => {
+        const dateB = new Date(b.lastModified).getTime();
+        const dateA = new Date(a.lastModified).getTime();
+        return (isNaN(dateB) ? 0 : dateB) - (isNaN(dateA) ? 0 : dateA);
+      });
+      setProjects(unique);
+      setError(null);
+
+      // Warn if partial failure
+      if (projRes.status === 'rejected' || boardRes.status === 'rejected') {
+        const failed = [];
+        if (projRes.status === 'rejected') failed.push('Projects API');
+        if (boardRes.status === 'rejected') failed.push('Boards API');
+        console.warn(`Partial sync success. Failed: ${failed.join(', ')}`);
+        // Just show a small warning if one worked
+        if (unique.length > 0) {
+          setError(`Partial sync: ${failed.join(', ')} unavailable.`);
+        } else {
+          setError(`Unable to sync designs: ${failed.join(', ')} returned errors.`);
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing designs:', error);
+      setError(error.message || 'Failed to fetch designs. Please check your connection.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Load projects on mount and visibility change (tab switch)
+  useEffect(() => {
+    if (!currentUser) return;
+
+    // Initial load
+    refreshDesigns();
+
+    // Refresh when user switches back to this tab from the editor
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('Tab visible: Refreshing designs to sync with editor...');
+        refreshDesigns();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [currentUser, refreshDesigns]);
+
   const handleGetStarted = () => {
     navigate('/main');
   };
@@ -42,29 +209,31 @@ const HomePage = () => {
   };
 
   const handleMyProjects = async () => {
-    setShowProjects(true);
-    setLoading(true);
-    try {
-      const response = await projectAPI.loadProjects();
-      setProjects(response.data.projects || []);
-    } catch (error) {
-      console.error('Error loading projects:', error);
-      setProjects([]);
-    } finally {
-      setLoading(false);
-    }
+    setActiveTab('projects');
+    refreshDesigns();
   };
 
   const handleDeleteProject = async (projectId, e) => {
     e.stopPropagation();
-    if (!window.confirm('Are you sure you want to delete this project?')) return;
+    if (!window.confirm('Are you sure you want to delete this design?')) return;
+
+    // Find the item to determine its type (hardening with String comparison)
+    const item = projects.find(p => String(p.id) === String(projectId));
+    const isBoard = item?.type === 'board';
+
+    console.log(`[Delete] ID: ${projectId}, Found Item: ${item?.title}, Type: ${item?.type}, IsBoard: ${isBoard}`);
 
     try {
-      await projectAPI.deleteProject(projectId);
-      setProjects(projects.filter(p => p.id !== projectId));
+      if (isBoard) {
+        await boardAPI.deleteBoard(projectId);
+      } else {
+        await projectAPI.deleteProject(projectId);
+      }
+      setProjects(projects.filter(p => String(p.id) !== String(projectId)));
     } catch (error) {
-      console.error('Error deleting project:', error);
-      alert('Failed to delete project');
+      console.error(`Error deleting ${isBoard ? 'board' : 'project'}:`, error);
+      const errorMsg = error.response?.data?.message || error.message || 'Server error';
+      alert(`Failed to delete design: ${errorMsg}`);
     }
   };
 
@@ -118,14 +287,6 @@ const HomePage = () => {
     }
   };
 
-  const getJoinedDate = () => {
-    return new Date().toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
-
   const getUserInitial = () => {
     if (currentUser?.displayName) {
       return currentUser.displayName.charAt(0).toUpperCase();
@@ -162,7 +323,6 @@ const HomePage = () => {
               Create
             </button>
             <nav className="hidden md:flex items-center gap-6">
-              <button className="text-sm font-semibold text-gray-600 hover:text-[#8b3dff] transition-colors">Templates</button>
               <button onClick={handleMyProjects} className="text-sm font-semibold text-gray-600 hover:text-[#8b3dff] transition-colors">Projects</button>
               <button className="text-sm font-semibold text-gray-600 hover:text-[#8b3dff] transition-colors">RTC</button>
             </nav>
@@ -189,12 +349,14 @@ const HomePage = () => {
               { id: 'templates', name: 'Templates', icon: <LayoutTemplate size={22} /> },
               { id: 'projects', name: 'Projects', icon: <FolderOpen size={22} /> },
               { id: 'brand', name: 'Brand', icon: <Award size={22} /> },
+              { id: 'creators', name: 'Creators', icon: <Users size={22} /> },
             ].map(item => (
               <button
                 key={item.id}
                 onClick={() => {
                   if (item.id === 'projects') handleMyProjects();
                   if (item.id === 'brand') navigate('/brand-kit');
+                  if (item.id === 'creators') navigate('/creators');
                   setActiveTab(item.id);
                 }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all
@@ -277,7 +439,13 @@ const HomePage = () => {
                 <section className="mb-16">
                   <div className="flex items-center justify-between mb-8">
                     <h2 className="text-2xl font-extrabold tracking-tight">Recent designs</h2>
-                    <button onClick={() => setActiveTab('projects')} className="text-[#8b3dff] font-bold hover:underline flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        handleMyProjects();
+                        setActiveTab('projects');
+                      }}
+                      className="text-[#8b3dff] font-bold hover:underline flex items-center gap-1"
+                    >
                       See all <ArrowRight size={16} />
                     </button>
                   </div>
@@ -295,31 +463,76 @@ const HomePage = () => {
                     </div>
 
                     {/* User Projects */}
-                    {projects.length > 0 ? projects.slice(0, 10).map(project => (
-                      <div
-                        key={project.id}
-                        onClick={() => handleOpenProject(project.id)}
-                        className="flex-shrink-0 w-[240px] group cursor-pointer"
-                      >
-                        <div className="w-full h-[300px] bg-gray-100 rounded-2xl mb-3 overflow-hidden border border-gray-100 shadow-sm transition-all group-hover:shadow-xl group-hover:-translate-y-1 relative">
-                          <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center">
-                            <span className="text-4xl opacity-20">🎨</span>
-                          </div>
-                          <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={(e) => handleDeleteProject(project.id, e)}
-                              className="p-2 bg-white/90 backdrop-blur rounded-lg text-red-500 hover:bg-white shadow-sm"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
+                    {loading ? (
+                      // Skeleton Loader
+                      [1, 2, 3, 4].map(i => (
+                        <div key={i} className="flex-shrink-0 w-[240px] animate-pulse">
+                          <div className="w-full h-[300px] bg-gray-100 rounded-2xl mb-3 border border-gray-100" />
+                          <div className="h-5 bg-gray-100 rounded w-3/4 mb-2" />
+                          <div className="h-4 bg-gray-50 rounded w-1/2" />
                         </div>
-                        <h3 className="font-bold text-gray-800 line-clamp-1">{project.title}</h3>
-                        <p className="text-sm text-gray-400 font-medium">
-                          {new Date(project.lastModified).toLocaleDateString()}
-                        </p>
-                      </div>
-                    )) : !loading && (
+                      ))
+                    ) : projects.length > 0 ? (
+                      projects.map(project => (
+                        <div
+                          key={project.id}
+                          onClick={() => handleOpenProject(project.id)}
+                          className="flex-shrink-0 w-[240px] group cursor-pointer"
+                        >
+                          <div className="w-full h-[300px] bg-gray-100 rounded-2xl mb-3 overflow-hidden border border-gray-100 shadow-sm transition-all group-hover:shadow-xl group-hover:-translate-y-1 relative flex items-center justify-center">
+                            {project.thumbnail ? (
+                              <img
+                                src={project.thumbnail}
+                                alt={project.title}
+                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                              />
+                            ) : (
+                              <div className="absolute inset-0 bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center">
+                                <span className="text-4xl opacity-20">🎨</span>
+                              </div>
+                            )}
+                            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={(e) => handleDeleteProject(project.id, e)}
+                                className="p-2 bg-white/90 backdrop-blur rounded-lg text-red-500 hover:bg-white shadow-sm"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </div>
+                          {editingProjectId === project.id ? (
+                            <input
+                              autoFocus
+                              type="text"
+                              value={tempTitle}
+                              onChange={(e) => setTempTitle(e.target.value)}
+                              onBlur={() => handleRenameProject(project.id, tempTitle)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleRenameProject(project.id, tempTitle);
+                                if (e.key === 'Escape') setEditingProjectId(null);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-full bg-purple-50 border-none focus:ring-2 focus:ring-purple-200 rounded px-1 -ml-1 text-sm font-bold text-gray-900 outline-none"
+                            />
+                          ) : (
+                            <h3
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingProjectId(project.id);
+                                setTempTitle(project.title);
+                              }}
+                              className="font-bold text-gray-800 line-clamp-1 hover:text-[#8b3dff] transition-colors"
+                              title="Click to rename"
+                            >
+                              {project.title}
+                            </h3>
+                          )}
+                          <p className="text-sm text-gray-400 font-medium">
+                            {new Date(project.lastModified || project.timestamp || project.updatedAt || Date.now()).toLocaleDateString()}
+                          </p>
+                        </div>
+                      ))
+                    ) : (
                       <div className="flex-1 flex flex-col items-center justify-center py-20 text-gray-400">
                         <FolderOpen className="mb-4" size={48} />
                         <p className="font-medium text-center">No designs yet. Start one today!</p>
@@ -338,7 +551,7 @@ const HomePage = () => {
                   </div>
 
                   <div className="flex gap-6 overflow-x-auto pb-6 -mx-2 px-2 scrollbar-hide">
-                    {Object.values(editableTemplates).map((template) => (
+                    {[...communityTemplates, ...Object.values(editableTemplates).slice(0, 10)].map((template) => (
                       <div
                         key={template.id}
                         onClick={() => handleCreateWithTemplate(template.id)}
@@ -353,7 +566,7 @@ const HomePage = () => {
                             />
                           ) : (
                             <div className="text-5xl group-hover:scale-110 transition-transform">
-                              {template.thumbnail}
+                              {template.thumbnail || '🎨'}
                             </div>
                           )}
                           <div className="absolute bottom-2 left-2 bg-white/80 backdrop-blur px-2 py-0.5 rounded text-[10px] font-bold text-gray-500 uppercase tracking-widest whitespace-nowrap">
@@ -396,7 +609,7 @@ const HomePage = () => {
 
                 {/* Templates Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                  {Object.values(editableTemplates)
+                  {[...communityTemplates, ...Object.values(editableTemplates)]
                     .filter(t => selectedTemplateCategory === 'all' || t.category === selectedTemplateCategory)
                     .map(template => (
                       <div
@@ -413,7 +626,7 @@ const HomePage = () => {
                             />
                           ) : (
                             <div className="text-6xl group-hover:scale-110 transition-transform duration-300">
-                              {template.thumbnail}
+                              {template.thumbnail || '🎨'}
                             </div>
                           )}
 
@@ -447,6 +660,8 @@ const HomePage = () => {
                         type="text"
                         placeholder="Search your designs..."
                         className="pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 outline-none w-64"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
                       />
                     </div>
                   </div>
@@ -455,6 +670,12 @@ const HomePage = () => {
                 {loading ? (
                   <div className="flex items-center justify-center py-20">
                     <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-purple-600"></div>
+                  </div>
+                ) : projects.length > 0 && projects.filter(p => !searchQuery || (p.title || '').toLowerCase().includes(searchQuery.toLowerCase())).length === 0 ? (
+                  <div className="text-center py-20 bg-gray-50 rounded-[32px] border-2 border-dashed border-gray-200">
+                    <Search className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500 font-bold text-lg">No results for "{searchQuery}"</p>
+                    <button onClick={() => setSearchQuery('')} className="text-[#8b3dff] font-bold mt-2">Clear search</button>
                   </div>
                 ) : projects.length === 0 ? (
                   <div className="text-center py-20 bg-gray-50 rounded-[32px] border-2 border-dashed border-gray-200">
@@ -470,31 +691,39 @@ const HomePage = () => {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                    {projects.map(project => (
-                      <div
-                        key={project.id}
-                        onClick={() => handleOpenProject(project.id)}
-                        className="group cursor-pointer"
-                      >
-                        <div className="aspect-[4/3] bg-white rounded-3xl mb-4 overflow-hidden border border-gray-200 shadow-sm transition-all group-hover:shadow-xl group-hover:-translate-y-1 relative">
-                          <div className="absolute inset-0 bg-gradient-to-br from-gray-50 to-white flex items-center justify-center">
-                            <span className="text-5xl opacity-10">🎨</span>
+                    {projects
+                      .filter(p => {
+                        const search = (searchQuery || '').toLowerCase();
+                        if (!search) return true;
+                        const title = (p.title || '').toLowerCase();
+                        const id = String(p.id || '').toLowerCase();
+                        return title.includes(search) || id.includes(search);
+                      })
+                      .map(project => (
+                        <div
+                          key={project.id}
+                          onClick={() => handleOpenProject(project.id)}
+                          className="group cursor-pointer"
+                        >
+                          <div className="aspect-[4/3] bg-white rounded-3xl mb-4 overflow-hidden border border-gray-200 shadow-sm transition-all group-hover:shadow-xl group-hover:-translate-y-1 relative">
+                            <div className="absolute inset-0 bg-gradient-to-br from-gray-50 to-white flex items-center justify-center">
+                              <span className="text-5xl opacity-10">🎨</span>
+                            </div>
+                            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={(e) => handleDeleteProject(project.id, e)}
+                                className="p-2.5 bg-white rounded-full text-red-500 hover:bg-red-50 shadow-md transition-colors"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </div>
                           </div>
-                          <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={(e) => handleDeleteProject(project.id, e)}
-                              className="p-2.5 bg-white rounded-full text-red-500 hover:bg-red-50 shadow-md transition-colors"
-                            >
-                              <Trash2 size={18} />
-                            </button>
-                          </div>
+                          <h3 className="font-bold text-gray-800 text-lg line-clamp-1 px-1">{project.title}</h3>
+                          <p className="text-sm text-gray-400 font-bold px-1">
+                            Modified {new Date(project.lastModified || project.timestamp || project.updatedAt || Date.now()).toLocaleDateString()}
+                          </p>
                         </div>
-                        <h3 className="font-bold text-gray-800 text-lg line-clamp-1 px-1">{project.title}</h3>
-                        <p className="text-sm text-gray-400 font-bold px-1">
-                          Modified {new Date(project.lastModified).toLocaleDateString()}
-                        </p>
-                      </div>
-                    ))}
+                      ))}
                   </div>
                 )}
               </div>
@@ -622,68 +851,9 @@ const HomePage = () => {
         </div>
       )}
 
-
-      {/* Projects Modal */}
-      {showProjects && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-4xl mx-4 max-h-[80vh] overflow-hidden">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold text-gray-900">My Projects</h3>
-              <button
-                onClick={() => setShowProjects(false)}
-                className="text-gray-500 hover:text-gray-700 text-2xl"
-              >
-                ×
-              </button>
-            </div>
-
-            {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-              </div>
-            ) : projects.length === 0 ? (
-              <div className="text-center py-12">
-                <FolderOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500 mb-4">No projects found</p>
-                <p className="text-gray-400 text-sm">Create your first design to see it here</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[60vh] overflow-y-auto">
-                {projects.map((project) => (
-                  <div
-                    key={project.id}
-                    onClick={() => handleOpenProject(project.id)}
-                    className="bg-gray-50 border border-gray-200 rounded-lg p-4 hover:shadow-lg transition-shadow cursor-pointer group"
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-semibold text-gray-900 line-clamp-1">{project.title}</h4>
-                      <button
-                        onClick={(e) => handleDeleteProject(project.id, e)}
-                        className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-opacity"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                    {project.description && (
-                      <p className="text-sm text-gray-500 line-clamp-2 mb-2">{project.description}</p>
-                    )}
-                    <div className="flex items-center justify-between text-xs text-gray-400">
-                      <span className="flex items-center">
-                        <Clock className="w-3 h-3 mr-1" />
-                        {new Date(project.lastModified).toLocaleDateString()}
-                      </span>
-                      <span>{project.isPublic ? 'Public' : 'Private'}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Modal removed to use Tab-only interface */}
     </div>
   );
 };
 
 export default HomePage;
-

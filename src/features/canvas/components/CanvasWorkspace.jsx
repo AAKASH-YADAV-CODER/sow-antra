@@ -128,14 +128,16 @@ const CanvasWorkspace = ({
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-[#ebedef] relative">
       <div
-        className="canvas-workspace-scroller flex-1 overflow-y-auto overflow-x-hidden px-4 pt-24"
+        className={`canvas-workspace-scroller flex-1 overflow-y-auto overflow-x-hidden px-4 pt-24 ${showPagesStrip ? 'pb-40' : 'pb-10'}`}
         ref={canvasContainerRef}
         onMouseDown={handleContainerMouseDown}
       >
         {/* Wrapper to enforce correct scroll height based on zoom */}
         <div
           style={{
-            height: `${((pages.length * canvasSize.height + Math.max(0, pages.length - 1) * 16 + 40) * zoomLevel)}px`,
+            height: showPagesStrip
+              ? `${(canvasSize.height + 40) * zoomLevel}px`
+              : `${((pages.length * canvasSize.height + Math.max(0, pages.length - 1) * 16 + 40) * zoomLevel)}px`,
             width: '100%',
             position: 'relative',
             minHeight: '100%'
@@ -148,10 +150,11 @@ const CanvasWorkspace = ({
               transformOrigin: 'top center',
               paddingTop: '20px',
               paddingBottom: '20px',
-              gap: `${60 / zoomLevel}px` // Dynamic gap to prevent header overlap when zoomed out
+              gap: showPagesStrip ? '0' : `${60 / zoomLevel}px` // Dynamic gap to prevent header overlap when zoomed out
             }}
           >
-            {pages.map((page, index) => {
+            {(showPagesStrip ? pages.filter(p => p.id === currentPage) : pages).map((page) => {
+              const index = pages.findIndex(p => p.id === page.id); // Get true index from original array
               const isCurrentPage = page.id === currentPage;
 
               return (
@@ -412,26 +415,28 @@ const CanvasWorkspace = ({
             })}
 
             {/* Add Page Button Placeholder */}
-            <div
-              className="flex flex-col items-center mt-8"
-              style={{
-                transform: `scale(${1 / zoomLevel})`,
-                transformOrigin: 'top center',
-                marginBottom: `${40 / zoomLevel}px` // Add some bottom margin that scales inversely to keep spacing consistent
-              }}
-            >
-              <button
-                onClick={addNewPage}
-                className="group flex items-center justify-center gap-2 bg-[#f8f9fa] border border-[#dadce0] rounded-lg py-2 px-8 hover:bg-white hover:border-purple-300 transition-all font-semibold text-[#3c4043] hover:text-purple-600 shadow-sm hover:shadow"
+            {!showPagesStrip && (
+              <div
+                className="flex flex-col items-center mt-8"
                 style={{
-                  width: '200px', // Fixed width, no longer dependent on canvas width
-                  height: '44px'
+                  transform: `scale(${1 / zoomLevel})`,
+                  transformOrigin: 'top center',
+                  marginBottom: `${40 / zoomLevel}px` // Add some bottom margin that scales inversely to keep spacing consistent
                 }}
               >
-                <Plus size={18} />
-                <span>Add page</span>
-              </button>
-            </div>
+                <button
+                  onClick={addNewPage}
+                  className="group flex items-center justify-center gap-2 bg-[#f8f9fa] border border-[#dadce0] rounded-lg py-2 px-8 hover:bg-white hover:border-purple-300 transition-all font-semibold text-[#3c4043] hover:text-purple-600 shadow-sm hover:shadow"
+                  style={{
+                    width: '200px', // Fixed width, no longer dependent on canvas width
+                    height: '44px'
+                  }}
+                >
+                  <Plus size={18} />
+                  <span>Add page</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

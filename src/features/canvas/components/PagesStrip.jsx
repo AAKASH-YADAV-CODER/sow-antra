@@ -24,12 +24,12 @@ const PagesStrip = ({
     };
 
     return (
-        <div className="absolute left-0 right-0 bottom-10 h-32 bg-white border-t border-gray-200 z-[1002] flex items-center px-4 gap-4 animate-in slide-in-from-bottom duration-300">
+        <div className="absolute left-0 right-0 bottom-10 h-24 bg-white border-t border-gray-200 z-[1002] flex items-center px-4 gap-4 animate-in slide-in-from-bottom duration-300">
             <button
                 onClick={() => scroll('left')}
                 className="p-1 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
             >
-                <ChevronLeft size={24} />
+                <ChevronLeft size={20} />
             </button>
 
             <div
@@ -55,8 +55,8 @@ const PagesStrip = ({
                             >
                                 <PagePreview
                                     page={page}
-                                    width={140}
-                                    height={100}
+                                    width={100}
+                                    height={70}
                                     canvasSize={canvasSize}
                                     renderElement={renderElement}
                                 />
@@ -72,13 +72,13 @@ const PagesStrip = ({
                 <div className="flex items-center gap-1 flex-shrink-0 mr-4">
                     <button
                         onClick={addNewPage}
-                        className="w-[100px] h-[100px] border-2 border-dashed border-gray-200 rounded-md flex items-center justify-center text-gray-400 hover:border-purple-300 hover:text-purple-500 hover:bg-purple-50 transition-all"
+                        className="w-[80px] h-[70px] border-2 border-dashed border-gray-200 rounded-md flex items-center justify-center text-gray-400 hover:border-purple-300 hover:text-purple-500 hover:bg-purple-50 transition-all"
                         title="Add page"
                     >
-                        <Plus size={24} />
+                        <Plus size={20} />
                     </button>
-                    <button className="h-[100px] px-1 hover:bg-gray-100 rounded-md transition-colors text-gray-400">
-                        <ChevronDown size={16} />
+                    <button className="h-[70px] px-1 hover:bg-gray-100 rounded-md transition-colors text-gray-400">
+                        <ChevronDown size={14} />
                     </button>
                 </div>
             </div>
@@ -87,7 +87,7 @@ const PagesStrip = ({
                 onClick={() => scroll('right')}
                 className="p-1 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
             >
-                <ChevronRight size={24} />
+                <ChevronRight size={20} />
             </button>
         </div>
     );

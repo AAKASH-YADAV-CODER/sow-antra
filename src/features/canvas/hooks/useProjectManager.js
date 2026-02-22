@@ -33,22 +33,38 @@ const useProjectManager = ({
   setSelectedElement,
   setSelectedElements,
   loadProjectInputRef,
-  centerCanvas
+  centerCanvas,
+  projectId // New parameter
 }) => {
 
-  // Show save dialog with default project name
+  // Show save dialog with current project name
   const handleSaveClick = useCallback(() => {
-    setProjectName(`My Design ${new Date().toLocaleDateString()}`);
+    // Only set a default if it's currently "Untitled project" or empty
+    if (!projectName || projectName === 'Untitled project') {
+      setProjectName(`My Design ${new Date().toLocaleDateString()}`);
+    }
     setShowSaveDialog(true);
-  }, [setProjectName, setShowSaveDialog]);
+  }, [projectName, setProjectName, setShowSaveDialog]);
 
   // Save project to backend (PostgreSQL) with local backup
-  const saveProject = useCallback(async (customTitle = null) => {
+  const saveProject = useCallback(async (customTitle = null, isSilent = false) => {
     try {
+      const now = new Date().toISOString();
+      let finalTitle = projectName || 'Untitled project';
+      let thumbnail = null;
+
+      if (typeof customTitle === 'string') {
+        finalTitle = customTitle;
+      } else if (typeof customTitle === 'object' && customTitle !== null) {
+        finalTitle = customTitle.title || finalTitle;
+        thumbnail = customTitle.thumbnail || null;
+      }
+
       const projectData = {
         version: '1.0',
-        timestamp: new Date().toISOString(),
-        title: customTitle || `My Design ${new Date().toLocaleDateString()}`,
+        timestamp: now,
+        lastModified: now,
+        title: String(finalTitle).trim(),
         description: 'Created with Sowntra',
         pages: pages,
         currentPage: currentPage,
@@ -58,64 +74,37 @@ const useProjectManager = ({
         showGrid: showGrid,
         snapToGrid: snapToGrid,
         currentLanguage: currentLanguage,
-        textDirection: textDirection
+        textDirection: textDirection,
+        thumbnail: thumbnail
       };
 
+      // Only include ID if it is truthy (not null/undefined/empty)
+      if (projectId) {
+        projectData.id = projectId;
+      }
+
       // Save to cloud
-      // eslint-disable-next-line no-unused-vars
-      const response = await projectAPI.saveProject(projectData);
+      let response;
+      if (projectId) {
+        response = await projectAPI.updateProject(projectId, projectData);
+      } else {
+        response = await projectAPI.saveProject(projectData);
+      }
 
-      // Also save locally as backup
-      const dataStr = JSON.stringify(projectData, null, 2);
-      const dataBlob = new Blob([dataStr], { type: 'application/json' });
-      const url = URL.createObjectURL(dataBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `sowntra-project-${new Date().getTime()}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      if (!isSilent) {
+        alert(projectId ? 'Project updated successfully!' : 'Project saved successfully!');
+      }
 
-      alert('Project saved successfully to cloud and locally!');
+      return response; // Return response so caller can get new ID if needed
     } catch (error) {
-      console.error('Error saving project:', error);
-      alert('Error saving project to cloud. Saving locally only...');
-
-      // Fallback to local save only
-      try {
-        const projectData = {
-          version: '1.0',
-          timestamp: new Date().toISOString(),
-          pages: pages,
-          currentPage: currentPage,
-          canvasSize: canvasSize,
-          zoomLevel: zoomLevel,
-          canvasOffset: canvasOffset,
-          showGrid: showGrid,
-          snapToGrid: snapToGrid,
-          currentLanguage: currentLanguage,
-          textDirection: textDirection
-        };
-
-        const dataStr = JSON.stringify(projectData, null, 2);
-        const dataBlob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(dataBlob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `sowntra-project-${new Date().getTime()}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-
-        alert('Project saved locally!');
-      } catch (localError) {
-        console.error('Error saving locally:', localError);
-        alert('Error saving project. Please try again.');
+      if (!isSilent) {
+        console.error('Error saving project:', error);
+        alert('Error saving project to cloud. Please try again.');
+      } else {
+        console.warn('Silent save failed:', error);
       }
     }
-  }, [pages, currentPage, canvasSize, zoomLevel, canvasOffset, showGrid, snapToGrid, currentLanguage, textDirection]);
+  }, [pages, currentPage, canvasSize, zoomLevel, canvasOffset, showGrid, snapToGrid, currentLanguage, textDirection, projectName, projectId]);
 
   // Confirm save with project name validation
   const confirmSave = useCallback(async () => {
@@ -125,8 +114,16 @@ const useProjectManager = ({
     }
 
     setShowSaveDialog(false);
-    await saveProject(projectName.trim());
-  }, [projectName, saveProject, setShowSaveDialog]);
+    const response = await saveProject(projectName.trim());
+
+    // Update URL if new project created and ID returned
+    if (!projectId && response?.data?.id) {
+      const newId = response.data.id;
+      const url = new URL(window.location);
+      url.searchParams.set('project', newId);
+      window.history.replaceState({}, '', url);
+    }
+  }, [projectName, saveProject, setShowSaveDialog, projectId]);
 
   // Trigger file input for loading project
   const loadProject = useCallback(() => {
@@ -157,6 +154,9 @@ const useProjectManager = ({
           setSnapToGrid(projectData.snapToGrid || false);
           setCurrentLanguage(projectData.currentLanguage || 'en');
           setTextDirection(projectData.textDirection || 'ltr');
+          if (projectData.title) {
+            setProjectName(projectData.title);
+          }
 
           // Clear selections
           setSelectedElement(null);
@@ -177,7 +177,7 @@ const useProjectManager = ({
 
     // Reset the input value so the same file can be loaded again
     event.target.value = '';
-  }, [setPages, setCurrentPage, setCanvasSize, setZoomLevel, setCanvasOffset, setShowGrid, setSnapToGrid, setCurrentLanguage, setTextDirection, setSelectedElement, setSelectedElements, centerCanvas]);
+  }, [setPages, setCurrentPage, setCanvasSize, setZoomLevel, setCanvasOffset, setShowGrid, setSnapToGrid, setCurrentLanguage, setTextDirection, setSelectedElement, setSelectedElements, centerCanvas, setProjectName]);
 
   return {
     handleSaveClick,

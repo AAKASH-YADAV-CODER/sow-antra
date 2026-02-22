@@ -4,6 +4,9 @@ import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./features/auth/components/ProtectedRoute";
 import LoadingSpinner from "./components/common/LoadingSpinner";
 import ErrorBoundary from "./components/common/ErrorBoundary";
+import CreatorsDiscoveryPage from "./pages/CreatorsDiscoveryPage.jsx";
+import CreatorsDashboard from "./pages/CreatorsDashboard.jsx";
+import CreatorProfilePage from "./pages/CreatorProfilePage.jsx";
 
 console.log('--- Sowntra MP v1.1 - Refined Pen Tool Loaded ---');
 
@@ -65,6 +68,30 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <BrandKitDetailPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/creators"
+                element={
+                  <ProtectedRoute>
+                    <CreatorsDiscoveryPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/creators/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <CreatorsDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/creators/profile/:id"
+                element={
+                  <ProtectedRoute>
+                    <CreatorProfilePage />
                   </ProtectedRoute>
                 }
               />

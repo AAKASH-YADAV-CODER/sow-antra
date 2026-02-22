@@ -1621,7 +1621,7 @@ export const drawElementToCanvas = (ctx, element, time, elementIndex, imageEffec
 /**
  * Export canvas as SVG
  */
-export const exportAsSVG = (elements, canvasSize) => {
+export const exportAsSVG = (elements, canvasSize, filename = 'sowntra-design') => {
   let svgContent = `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="${canvasSize.width}" height="${canvasSize.height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
   <rect width="100%" height="100%" fill="white"/>
@@ -2024,7 +2024,7 @@ export const exportAsSVG = (elements, canvasSize) => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `sowntra-design.svg`;
+  a.download = `${filename}.svg`;
   a.click();
   URL.revokeObjectURL(url);
 };
@@ -2032,7 +2032,7 @@ export const exportAsSVG = (elements, canvasSize) => {
 /**
  * Export canvas as image (PNG, JPEG, WebP)
  */
-export const exportAsImage = async (elements, canvasSize, format, imageEffects = {}, backgroundColor = '#ffffff') => {
+export const exportAsImage = async (elements, canvasSize, format, imageEffects = {}, backgroundColor = '#ffffff', filename = 'sowntra-design') => {
   const canvas = document.createElement('canvas');
   canvas.width = canvasSize.width;
   canvas.height = canvasSize.height;
@@ -2087,7 +2087,7 @@ export const exportAsImage = async (elements, canvasSize, format, imageEffects =
     const dataUrl = canvas.toDataURL(`image/${format}`, 0.95);
     const a = document.createElement('a');
     a.href = dataUrl;
-    a.download = `sowntra-design.${format}`;
+    a.download = `${filename}.${format}`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -2098,9 +2098,63 @@ export const exportAsImage = async (elements, canvasSize, format, imageEffects =
 };
 
 /**
+ * Capture canvas as Data URL (without downloading)
+ * Used for previews and thumbnails
+ */
+export const getCanvasDataURL = async (elements, canvasSize, format = 'png', imageEffects = {}, backgroundColor = '#ffffff', maxWidth = 480) => {
+  const scale = Math.min(1, maxWidth / canvasSize.width);
+  const width = canvasSize.width * scale;
+  const height = canvasSize.height * scale;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+
+  if (!ctx) return null;
+
+  // Scale context for all following draw calls
+  ctx.scale(scale, scale);
+
+  await Promise.all([
+    preloadAllImages(elements),
+    document.fonts.ready
+  ]);
+
+  // Set background
+  if (typeof backgroundColor === 'object' && backgroundColor !== null) {
+    const bgGradient = getCanvasGradient(ctx, {
+      fillType: 'gradient',
+      gradient: backgroundColor,
+      width: canvasSize.width,
+      height: canvasSize.height,
+      x: 0,
+      y: 0
+    });
+    ctx.fillStyle = bgGradient;
+  } else {
+    ctx.fillStyle = backgroundColor || '#ffffff';
+  }
+  ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
+
+  const sortedElements = getSortedElementsForExport(elements);
+
+  sortedElements.forEach((element, index) => {
+    if (!element) return;
+    try {
+      drawElementToCanvas(ctx, element, undefined, index, imageEffects);
+    } catch (e) {
+      console.error(e);
+    }
+  });
+
+  return canvas.toDataURL(`image/${format}`, 0.8); // 80% quality for preview
+};
+
+/**
  * Export canvas as PDF
  */
-export const exportAsPDF = async (elements, canvasSize, imageEffects = {}, backgroundColor = '#ffffff') => {
+export const exportAsPDF = async (elements, canvasSize, imageEffects = {}, backgroundColor = '#ffffff', filename = 'sowntra-design') => {
   const canvas = document.createElement('canvas');
   canvas.width = canvasSize.width;
   canvas.height = canvasSize.height;
@@ -2160,7 +2214,7 @@ export const exportAsPDF = async (elements, canvasSize, imageEffects = {}, backg
     });
 
     pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-    pdf.save('sowntra-design.pdf');
+    pdf.save(`${filename}.pdf`);
   } catch (error) {
     console.error('Error exporting PDF:', error);
     alert('Error exporting PDF. Please try again.');
@@ -2170,7 +2224,7 @@ export const exportAsPDF = async (elements, canvasSize, imageEffects = {}, backg
 /**
  * Export canvas as Video (WebM)
  */
-export const exportAsVideo = async (elements, canvasSize, imageEffects = {}, duration = 5000, onProgress, mimeType = 'video/webm', backgroundColor = '#ffffff', videoQuality = 'medium') => {
+export const exportAsVideo = async (elements, canvasSize, imageEffects = {}, duration = 5000, onProgress, mimeType = 'video/webm', backgroundColor = '#ffffff', videoQuality = 'medium', filename = 'sowntra-design') => {
   // Determine target resolution
   let videoWidth = canvasSize.width;
   let videoHeight = canvasSize.height;
@@ -2289,7 +2343,7 @@ export const exportAsVideo = async (elements, canvasSize, imageEffects = {}, dur
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `sowntra-design.mp4`;
+      a.download = `${filename}.mp4`;
       a.click();
       URL.revokeObjectURL(url);
       return;
