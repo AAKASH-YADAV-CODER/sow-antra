@@ -1,5 +1,5 @@
 import React from 'react';
-import { textEffects, imageEffects, shapeEffects, specialEffects } from '../types/types.ts';
+import { textEffects, imageEffects, shapeEffects } from '../types/types.ts';
 
 const EffectsPanel = ({
   showEffectsPanel,
@@ -32,11 +32,10 @@ const EffectsPanel = ({
               <button
                 key={key}
                 onClick={() => updateElement(selectedElement, { textEffect: key })}
-                className={`p-2 rounded text-xs ${
-                  selectedElementData.textEffect === key
+                className={`p-2 rounded text-xs ${selectedElementData.textEffect === key
                     ? 'bg-blue-100 text-blue-600 border border-blue-300'
                     : 'bg-gray-100 border border-gray-300 hover:bg-gray-200'
-                }`}
+                  }`}
               >
                 {effect.name}
               </button>
@@ -54,11 +53,10 @@ const EffectsPanel = ({
               <button
                 key={key}
                 onClick={() => updateElement(selectedElement, { imageEffect: key })}
-                className={`p-2 rounded text-xs ${
-                  selectedElementData.imageEffect === key
+                className={`p-2 rounded text-xs ${selectedElementData.imageEffect === key
                     ? 'bg-blue-100 text-blue-600 border border-blue-300'
                     : 'bg-gray-100 border border-gray-300 hover:bg-gray-200'
-                }`}
+                  }`}
               >
                 {effect.name}
               </button>
@@ -76,11 +74,10 @@ const EffectsPanel = ({
               <button
                 key={key}
                 onClick={() => updateElement(selectedElement, { shapeEffect: key })}
-                className={`p-2 rounded text-xs ${
-                  selectedElementData.shapeEffect === key
+                className={`p-2 rounded text-xs ${selectedElementData.shapeEffect === key
                     ? 'bg-blue-100 text-blue-600 border border-blue-300'
                     : 'bg-gray-100 border border-gray-300 hover:bg-gray-200'
-                }`}
+                  }`}
               >
                 {effect.name}
               </button>
@@ -89,25 +86,6 @@ const EffectsPanel = ({
         </div>
       )}
 
-      {/* Special Effects for All Elements */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium mb-2">Special Effects</label>
-        <div className="grid grid-cols-2 gap-2">
-          {Object.entries(specialEffects).map(([key, effect]) => (
-            <button
-              key={key}
-              onClick={() => updateElement(selectedElement, { specialEffect: key })}
-              className={`p-2 rounded text-xs ${
-                selectedElementData.specialEffect === key
-                  ? 'bg-blue-100 text-blue-600 border border-blue-300'
-                  : 'bg-gray-100 border border-gray-300 hover:bg-gray-200'
-              }`}
-            >
-              {effect.name}
-            </button>
-          ))}
-        </div>
-      </div>
     </div>
   );
 };

@@ -8,7 +8,6 @@ import { ZoomIn, ZoomOut, Maximize, Settings } from 'lucide-react';
 const MobileFABButtons = ({
   zoom,
   centerCanvas,
-
   setShowMobileProperties,
   selectedElement
 }) => {
@@ -41,7 +40,6 @@ const MobileFABButtons = ({
         <Maximize size={20} />
       </button>
       
-
       {selectedElement && (
         <button
           onClick={() => setShowMobileProperties(true)}

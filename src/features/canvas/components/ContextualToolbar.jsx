@@ -1,22 +1,22 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
+import React, { useState } from 'react';
 import {
-    Type, Image as ImageIcon, Square, LayoutTemplate, Palette,
-    Trash2, Lock, Unlock, Copy, MoreHorizontal, AlignLeft,
+    Square, LayoutTemplate, Palette,
+    Trash2, Lock, Unlock, AlignLeft,
     List, Bold, Italic, Underline, Strikethrough, Move,
-    MousePointer2, Minus, Plus, ChevronDown, AlignCenter, AlignRight,
+    Minus, Plus, ChevronDown, AlignCenter, AlignRight,
     MonitorPlay,
     Layers,
     Crop,
     FlipHorizontal,
-    Eraser,
     Wand2,
     Sparkles,
-    ArrowUp, ArrowDown, ChevronsUp, ChevronsDown,
-    Grid3X3
+    Loader2,
+    RotateCcw,
+    ArrowUp,
+    Grid3X3, ArrowUpDown, AlignStartVertical, AlignCenterVertical, AlignEndVertical,
+    PaintRoller, Clipboard, Scan
 } from 'lucide-react';
-import PositionPanel from './PositionPanel';
-import AnimationPanel from './AnimationPanel'; // Import animation panel
+import useFontLoader from '../hooks/useFontLoader';
 
 const Separator = () => <div className="h-6 w-px bg-gray-300 mx-2" />;
 
@@ -37,26 +37,10 @@ const ToolbarButton = ({ icon: Icon, label, active, onClick, disabled, className
     </button>
 );
 
-const ColorPickerButton = ({ color, onChange, type = 'solid' }) => (
-    <div className="relative group flex items-center justify-center">
-        <div
-            className="w-8 h-8 rounded border border-gray-300 cursor-pointer overflow-hidden shadow-sm"
-            style={{ background: color || '#000000', backgroundImage: color === 'transparent' ? 'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)' : undefined, backgroundSize: '10px 10px' }}
-        >
-            <input
-                type="color"
-                value={color && color.startsWith('#') ? color : '#000000'}
-                onChange={(e) => onChange(e.target.value)}
-                className="opacity-0 w-full h-full cursor-pointer absolute inset-0"
-            />
-        </div>
-    </div>
-);
-
 const ContextualToolbar = ({
     selectedElement,
     selectedElementData,
-    updateElement,
+    updateElement: originalUpdateElement,
     updateElements,
     toggleElementLock,
     lockedElements,
@@ -72,102 +56,233 @@ const ContextualToolbar = ({
     changeZIndex,
     filterOptions,
     updateFilter,
-    setSelectedElement,
     alignElements,
-    reorderElement
+    reorderElement,
+    activeSidePanel,
+    setActiveSidePanel,
+    setSelectedElement,
+    copyStyle,
+    pasteStyle,
+    hasStyleClipboard,
+    handleRemoveBackground,
+    isProcessingBG,
+    handleRevertBackground,
+    bgProcessingStatus
 }) => {
-    const { t } = useTranslation();
     const [activePopover, setActivePopover] = useState(null); // 'position', 'transparency', 'filters'
+    const { loadFont } = useFontLoader(); // Helper to load on demand
 
-    // Get current page elements
-    const currentPageElements = pages?.find(p => p.id === currentPage)?.elements || [];
-
-    // Close popover when selection changes
-    // useEffect(() => {
-    //     setActivePopover(null);
-    // }, [selectedElement]); // We might want to keep it open if user selects from layers tab
+    const updateElement = (id, updates) => {
+        console.log("ContextualToolbar: updateElement called", id, updates);
+        originalUpdateElement(id, updates);
+    };
 
     const togglePopover = (name) => {
         setActivePopover(prev => prev === name ? null : name);
     };
 
-    // Common Popovers (Position & Transparency)
+    // Common Popovers (Transparency)
     const renderPopovers = () => (
         <>
-            {/* Position Panel (Replaces old popover) */}
-            <PositionPanel
-                isOpen={activePopover === 'position'}
-                onClose={() => setActivePopover(null)}
-                selectedElement={selectedElement}
-                selectedElements={new Set([selectedElement])} // TODO: Pass actual set if available
-                elements={currentPageElements}
-                updateElement={updateElement}
-                alignElements={alignElements}
-                changeZIndex={changeZIndex}
-                setSelectedElement={setSelectedElement}
-                toggleElementLock={toggleElementLock}
-                lockedElements={lockedElements}
-                reorderElement={reorderElement}
-            />
-
-            {/* Animation Panel */}
-            <AnimationPanel
-                isOpen={activePopover === 'animate'}
-                onClose={() => setActivePopover(null)}
-                selectedElement={selectedElement}
-                selectedElements={new Set([selectedElement])}
-                elements={currentPageElements}
-                updateElement={updateElement}
-                updateElements={updateElements}
-                mode={selectedElementData ? 'element' : 'page'} // Mode logic: if data exists, it's an element
-            />
-
             {activePopover === 'transparency' && selectedElementData && (
                 <>
                     <div className="fixed inset-0 z-40" onClick={() => setActivePopover(null)} />
-                    <div className="absolute top-14 right-10 z-50 bg-white rounded-lg shadow-xl border border-gray-200 p-4 w-64 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="absolute top-[60px] right-2 z-50 bg-white rounded-lg shadow-xl border border-gray-200 p-4 w-64 animate-in fade-in zoom-in-95 duration-200">
                         <h3 className="text-sm font-bold text-gray-700 mb-3">Transparency</h3>
                         <div className="flex items-center gap-3">
-                            <Layers size={16} className="text-gray-500" />
                             <input
                                 type="range"
                                 min="0"
                                 max="100"
-                                value={typeof selectedElementData.opacity === 'number' ? selectedElementData.opacity * 100 : 100}
-                                onChange={(e) => updateElement(selectedElement, { opacity: parseInt(e.target.value) / 100 })}
-                                className="flex-1"
+                                value={Math.round((selectedElementData.opacity ?? 1) * 100)}
+                                onChange={(e) => {
+                                    const val = parseInt(e.target.value) / 100;
+                                    updateElement(selectedElement, {
+                                        opacity: val,
+                                        // Also sync with filters for backward compatibility/rendering consistency
+                                        filters: {
+                                            ...(selectedElementData.filters || {}),
+                                            opacity: {
+                                                ...(selectedElementData.filters?.opacity || { name: 'Opacity', unit: '%' }),
+                                                value: parseInt(e.target.value)
+                                            }
+                                        }
+                                    });
+                                }}
+                                className="flex-1 accent-purple-600 h-1.5 rounded-lg appearance-none cursor-pointer bg-gray-200"
                             />
-                            <span className="text-xs text-gray-500 w-8">
-                                {Math.round((typeof selectedElementData.opacity === 'number' ? selectedElementData.opacity : 1) * 100)}%
+                            <span className="text-xs font-bold text-gray-600 w-10 text-right">
+                                {Math.round((selectedElementData.opacity ?? 1) * 100)}%
                             </span>
                         </div>
                     </div>
                 </>
             )}
 
-            {/* Position popover logic removed from here */}
+            {activePopover === 'spacing' && (selectedElementData?.type === 'text' || selectedElementData?.type === 'type_extrude') && (
+                <>
+                    <div className="fixed inset-0 z-40" onClick={() => setActivePopover(null)} />
+                    <div className="absolute top-[60px] left-1/2 -translate-x-1/2 z-50 bg-white rounded-lg shadow-xl border border-gray-200 p-5 w-72 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="space-y-5">
+                            {/* Letter Spacing */}
+                            <div>
+                                <div className="flex justify-between items-center mb-1">
+                                    <label className="text-sm font-medium text-gray-700">Letter spacing</label>
+                                    <span className="text-xs font-bold text-gray-600">{selectedElementData.letterSpacing || 0}</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="-100"
+                                    max="800"
+                                    value={selectedElementData.letterSpacing || 0}
+                                    onChange={(e) => updateElement(selectedElement, { letterSpacing: parseFloat(e.target.value) })}
+                                    className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                                />
+                            </div>
+
+                            {/* Line Spacing */}
+                            <div>
+                                <div className="flex justify-between items-center mb-1">
+                                    <label className="text-sm font-medium text-gray-700">Line spacing</label>
+                                    <span className="text-xs font-bold text-gray-600">{selectedElementData.lineHeight || 1.4}</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="0.5"
+                                    max="2.5"
+                                    step="0.1"
+                                    value={selectedElementData.lineHeight || 1.4}
+                                    onChange={(e) => updateElement(selectedElement, { lineHeight: parseFloat(e.target.value) })}
+                                    className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                                />
+                            </div>
+
+                            {/* Anchor */}
+                            <div className="pt-2 border-t border-gray-100">
+                                <label className="text-sm font-medium text-gray-700 block mb-2">Anchor text box</label>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => updateElement(selectedElement, { textAnchor: 'top' })}
+                                        className={`flex-1 p-2 rounded-md border transition-all flex justify-center ${(selectedElementData.textAnchor || 'top') === 'top'
+                                            ? 'border-purple-600 bg-purple-50 text-purple-700'
+                                            : 'border-gray-200 hover:border-gray-300 text-gray-500'
+                                            }`}
+                                    >
+                                        <AlignStartVertical size={20} />
+                                    </button>
+                                    <button
+                                        onClick={() => updateElement(selectedElement, { textAnchor: 'middle' })}
+                                        className={`flex-1 p-2 rounded-md border transition-all flex justify-center ${selectedElementData.textAnchor === 'middle'
+                                            ? 'border-purple-600 bg-purple-50 text-purple-700'
+                                            : 'border-gray-200 hover:border-gray-300 text-gray-500'
+                                            }`}
+                                    >
+                                        <AlignCenterVertical size={20} />
+                                    </button>
+                                    <button
+                                        onClick={() => updateElement(selectedElement, { textAnchor: 'bottom' })}
+                                        className={`flex-1 p-2 rounded-md border transition-all flex justify-center ${selectedElementData.textAnchor === 'bottom'
+                                            ? 'border-purple-600 bg-purple-50 text-purple-700'
+                                            : 'border-gray-200 hover:border-gray-300 text-gray-500'
+                                            }`}
+                                    >
+                                        <AlignEndVertical size={20} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* More Settings Link */}
+                            <button
+                                onClick={() => {
+                                    setActiveSidePanel('advanced');
+                                    setActivePopover(null);
+                                }}
+                                className="w-full py-2 mt-2 text-sm font-bold text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-md border border-gray-200 transition-colors"
+                            >
+                                More settings
+                            </button>
+                        </div>
+                    </div>
+                </>
+            )}
 
             {activePopover === 'filters' && selectedElementData?.type === 'image' && (
                 <>
                     <div className="fixed inset-0 z-40" onClick={() => setActivePopover(null)} />
-                    <div className="absolute top-14 left-4 z-50 bg-white rounded-lg shadow-xl border border-gray-200 p-4 w-72 animate-in fade-in zoom-in-95 duration-200 max-h-[60vh] overflow-y-auto">
-                        <h3 className="text-sm font-bold text-gray-700 mb-3">Filters</h3>
-                        {Object.entries(selectedElementData.filters || filterOptions || {}).map(([key, filter]) => (
-                            <div key={key} className="mb-3">
-                                <div className="flex justify-between mb-1">
-                                    <label className="text-xs font-medium text-gray-600">{filter.name}</label>
-                                    <span className="text-xs text-gray-400">{filter.value}{filter.unit}</span>
-                                </div>
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max={filter.max}
-                                    value={filter.value}
-                                    onChange={(e) => updateFilter && updateFilter(selectedElement, key, parseInt(e.target.value))}
-                                    className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
-                                />
-                            </div>
-                        ))}
+                    <div className="absolute top-[60px] left-4 z-50 bg-white rounded-lg shadow-xl border border-gray-200 p-4 w-72 animate-in fade-in zoom-in-95 duration-200">
+                        <div className="flex justify-between items-center mb-3">
+                            <h3 className="text-sm font-bold text-gray-700">Filters</h3>
+                            <button
+                                onClick={() => {
+                                    setActiveSidePanel('editImage');
+                                    setActivePopover(null);
+                                }}
+                                className="text-xs font-bold text-purple-600 hover:underline"
+                            >
+                                More
+                            </button>
+                        </div>
+                        <div className="max-h-[40vh] overflow-y-auto pr-2 space-y-4">
+                            {Object.entries(selectedElementData.filters || filterOptions || {}).map(([key, filter]) => {
+                                if (key === 'opacity') return null; // Handled separately
+                                return (
+                                    <div key={key}>
+                                        <div className="flex justify-between mb-1">
+                                            <label className="text-xs font-medium text-gray-600">{filter.name}</label>
+                                            <span className="text-xs font-bold text-gray-500">{filter.value}{filter.unit}</span>
+                                        </div>
+                                        <input
+                                            type="range"
+                                            min="0"
+                                            max={filter.max}
+                                            value={filter.value}
+                                            onChange={(e) => updateFilter && updateFilter(selectedElement, key, parseInt(e.target.value))}
+                                            className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                                        />
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {activePopover === 'editShape' && (
+                <>
+                    <div className="fixed inset-0 z-40" onClick={() => setActivePopover(null)} />
+                    <div className="absolute top-[60px] left-1/2 -translate-x-1/2 z-50 bg-white rounded-lg shadow-xl border border-gray-200 p-4 w-80 animate-in fade-in zoom-in-95 duration-200">
+                        <h3 className="text-sm font-bold text-gray-700 mb-3">Change Shape</h3>
+                        <div className="grid grid-cols-4 gap-2 max-h-[40vh] overflow-y-auto p-1">
+                            {[
+                                { id: 'rectangle', icon: Square },
+                                { id: 'circle', icon: Palette, label: 'Circle' }, // Using Palette as fallback or keep simple
+                                { id: 'triangle', icon: ArrowUp },
+                                { id: 'star', icon: Sparkles },
+                                { id: 'hexagon', icon: Grid3X3 },
+                                { id: 'diamond', icon: LayoutTemplate },
+                                { id: 'heart', icon: Layers, label: 'Heart' },
+                                { id: 'parallelogram', icon: Move },
+                                { id: 'trapezoid', icon: MonitorPlay },
+                                { id: 'location', icon: Trash2 }, // Just placeholders for grid
+                                { id: 'shield', icon: Lock },
+                                { id: 'cross', icon: Plus }
+                            ].map(shape => (
+                                <button
+                                    key={shape.id}
+                                    onClick={() => {
+                                        updateElement(selectedElement, { type: shape.id });
+                                        setActivePopover(null);
+                                    }}
+                                    className={`aspect-square flex flex-col items-center justify-center p-2 rounded-lg border transition-all hover:bg-gray-50 hover:border-purple-300 ${selectedElementData.type === shape.id ? 'border-purple-600 bg-purple-50' : 'border-gray-100'}`}
+                                >
+                                    <div className="w-8 h-8 flex items-center justify-center text-gray-600">
+                                        {/* Simplified icons for now, but usually they'd be shape SVG icons */}
+                                        <Square size={20} fill={selectedElementData.type === shape.id ? '#9333ea' : 'transparent'} strokeWidth={1.5} />
+                                    </div>
+                                    <span className="text-[10px] text-gray-500 mt-1 capitalize">{shape.id}</span>
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </>
             )}
@@ -181,23 +296,17 @@ const ContextualToolbar = ({
 
     if (!selectedElementData) {
         // ---- Page Properties Toolbar ----
-        // Shows when selectedElement is present (Page ID) but no element data found
         return (
-            <div className="w-full bg-white border-b border-gray-200 h-14 min-h-[56px] flex items-center px-4 gap-2 overflow-x-auto shadow-sm sticky top-0 z-50">
-                <div className="flex items-center gap-2 mr-4 border-r border-gray-200 pr-4">
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center bg-white/95 backdrop-blur-sm border border-gray-200 h-12 px-3 gap-2 rounded-full shadow-lg transition-all duration-300">
+                <div className="flex items-center gap-2 mr-2 border-r border-gray-100 pr-3">
                     <span className="text-xs text-gray-500 font-medium hidden sm:inline">Background</span>
                     {/* Page Background Color Picker */}
                     <div
-                        className="w-8 h-8 rounded border border-gray-300 cursor-pointer overflow-hidden shadow-sm relative group"
+                        className={`w-8 h-8 rounded border border-gray-300 cursor-pointer overflow-hidden shadow-sm relative group ${activeSidePanel === 'color' ? 'ring-2 ring-purple-600' : ''}`}
                         style={{ background: canvasBackgroundColor || '#ffffff' }}
                         title="Background Color"
+                        onClick={() => setActiveSidePanel(prev => prev === 'color' ? 'none' : 'color')}
                     >
-                        <input
-                            type="color"
-                            value={canvasBackgroundColor || '#ffffff'}
-                            onChange={(e) => setCanvasBackgroundColor(e.target.value)}
-                            className="opacity-0 w-full h-full cursor-pointer absolute inset-0"
-                        />
                         <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
                     </div>
 
@@ -207,14 +316,14 @@ const ContextualToolbar = ({
                     <ToolbarButton
                         label="Animate"
                         icon={MonitorPlay}
-                        active={activePopover === 'animate'}
-                        onClick={() => togglePopover('animate')}
+                        active={activeSidePanel === 'animation'}
+                        onClick={() => setActiveSidePanel(prev => prev === 'animation' ? 'none' : 'animation')}
                     />
 
                     <ToolbarButton
                         label="Position"
-                        onClick={() => togglePopover('position')}
-                        active={activePopover === 'position'}
+                        onClick={() => setActiveSidePanel(prev => prev === 'position' ? 'none' : 'position')}
+                        active={activeSidePanel === 'position'}
                     />
                 </div>
 
@@ -225,249 +334,411 @@ const ContextualToolbar = ({
 
     const isLocked = lockedElements.has(selectedElement);
 
+    // Style Copy / Paste Logic
+    const handleCopyStyle = (e) => {
+        e.stopPropagation();
+        copyStyle(selectedElementData);
+    };
 
+    const handlePasteStyle = (e) => {
+        e.stopPropagation();
+        pasteStyle(selectedElement);
+    };
 
-    // Common Right-Side Actions (Position, Transparency, Lock)
+    // Common Right-Side Actions (Position, Transparency, Lock, Paint Roller)
+    // NOTE: renderPopovers() is now called separately, outside the scrollable container
     const renderCommonActions = () => (
         <>
-            <div className="flex-grow" />
+            <div className="h-6 w-px bg-gray-200 mx-1" />
             <ToolbarButton
                 icon={MonitorPlay}
                 label="Animate"
-                active={activePopover === 'animate'}
-                onClick={() => togglePopover('animate')}
+                active={activeSidePanel === 'animation'}
+                onClick={() => setActiveSidePanel(prev => prev === 'animation' ? 'none' : 'animation')}
+                className="rounded-full"
             />
             <ToolbarButton
-                icon={Layers} // Using Layers icon for Position/Arrange
+                icon={Layers}
                 label="Position"
-                active={activePopover === 'position'}
-                onClick={() => togglePopover('position')}
+                active={activeSidePanel === 'position'}
+                onClick={() => setActiveSidePanel(prev => prev === 'position' ? 'none' : 'position')}
+                className="rounded-full"
             />
             <ToolbarButton
-                icon={Grid3X3} // Using Grid icon for Transparency visualization
+                icon={Grid3X3}
                 label="Transparency"
                 active={activePopover === 'transparency'}
                 onClick={() => togglePopover('transparency')}
+                className="rounded-full"
             />
+            <div className="h-6 w-px bg-gray-200 mx-1" />
+            <ToolbarButton
+                icon={PaintRoller}
+                label="Copy style"
+                active={hasStyleClipboard}
+                onClick={handleCopyStyle}
+                className="rounded-full"
+            />
+            {hasStyleClipboard && (
+                <ToolbarButton
+                    icon={Clipboard}
+                    label="Paste style"
+                    onClick={handlePasteStyle}
+                    className="rounded-full text-purple-600"
+                />
+            )}
             <div className="h-6 w-px bg-gray-200 mx-1" />
             <ToolbarButton
                 icon={isLocked ? Unlock : Lock}
                 active={isLocked}
                 onClick={() => toggleElementLock(selectedElement)}
-                className={isLocked ? "text-red-500 hover:bg-red-50" : ""}
+                className={`rounded-full ${isLocked ? "text-red-500 hover:bg-red-50" : ""}`}
             />
-            {renderPopovers()}
         </>
     );
 
     // ---- Text Toolbar ----
-    if (selectedElementData.type === 'text') {
+    if (selectedElementData.type === 'text' || selectedElementData.type === 'type_extrude') {
         return (
-            <div className="w-full bg-white border-b border-gray-200 h-14 min-h-[56px] flex items-center px-4 gap-2 overflow-x-auto shadow-sm sticky top-0 z-50">
-                {/* Font Family */}
-                <div className="relative">
-                    <select
-                        value={selectedElementData.fontFamily}
-                        onChange={(e) => updateElement(selectedElement, { fontFamily: e.target.value })}
-                        className="appearance-none bg-transparent hover:bg-gray-50 border border-gray-200 rounded px-3 py-1.5 pr-8 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 w-32 truncate"
-                    >
-                        {fontFamilies.map(f => <option key={f} value={f}>{f}</option>)}
-                    </select>
-                    <ChevronDown size={14} className="absolute right-2 top-1.5 text-gray-500 pointer-events-none" />
+            <>
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center bg-white/95 backdrop-blur-sm border border-gray-200 h-12 px-3 gap-1 rounded-full shadow-lg transition-all duration-300 max-w-[95vw] overflow-x-auto no-scrollbar">
+                    {/* Font Family */}
+                    <div className="relative flex items-center bg-gray-50 hover:bg-gray-100 rounded-full px-3 py-1 border border-gray-200 transition-colors group">
+                        <select
+                            value={selectedElementData.fontFamily}
+                            onChange={(e) => {
+                                loadFont(e.target.value);
+                                updateElement(selectedElement, { fontFamily: e.target.value });
+                            }}
+                            className="appearance-none bg-transparent text-xs font-bold focus:outline-none min-w-[80px] pr-4 cursor-pointer"
+                        >
+                            {fontFamilies.map(f => <option key={f} value={f}>{f}</option>)}
+                        </select>
+                        <ChevronDown size={14} className="absolute right-2 text-gray-500 pointer-events-none group-hover:text-gray-700" />
+                    </div>
+
+                    {/* Font Size */}
+                    <div className="flex items-center bg-gray-50 rounded-full border border-gray-200 px-1 py-0.5 h-8">
+                        <button
+                            onClick={() => updateElement(selectedElement, { fontSize: Math.max(1, (selectedElementData.fontSize || 16) - 1) })}
+                            className="w-6 h-6 rounded-full hover:bg-gray-200 flex items-center justify-center text-gray-600 transition-colors"
+                        >
+                            <Minus size={14} strokeWidth={3} />
+                        </button>
+                        <input
+                            type="number"
+                            value={Math.round(selectedElementData.fontSize || 16)}
+                            onChange={(e) => updateElement(selectedElement, { fontSize: parseInt(e.target.value) })}
+                            className="w-8 text-center text-xs font-bold bg-transparent focus:outline-none appearance-none"
+                        />
+                        <button
+                            onClick={() => updateElement(selectedElement, { fontSize: (selectedElementData.fontSize || 16) + 1 })}
+                            className="w-6 h-6 rounded-full hover:bg-gray-200 flex items-center justify-center text-gray-600 transition-colors"
+                        >
+                            <Plus size={14} strokeWidth={3} />
+                        </button>
+                    </div>
+
+                    <div className="h-6 w-px bg-gray-200 mx-1" />
+
+                    <div className="flex items-center gap-0.5">
+                        <div className="relative group">
+                            <ToolbarButton
+                                icon={Palette}
+                                onClick={() => setActiveSidePanel(prev => prev === 'color' ? 'none' : 'color')}
+                                active={activeSidePanel === 'color'}
+                                className="rounded-full !p-2"
+                            />
+                            <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-4 h-1 rounded-full" style={{ backgroundColor: selectedElementData.color || '#000' }} />
+                        </div>
+
+                        <ToolbarButton
+                            icon={Bold}
+                            active={selectedElementData.fontWeight === 'bold'}
+                            onClick={() => updateElement(selectedElement, { fontWeight: selectedElementData.fontWeight === 'bold' ? 'normal' : 'bold' })}
+                            className="rounded-full"
+                        />
+                        <ToolbarButton
+                            icon={Italic}
+                            active={selectedElementData.fontStyle === 'italic'}
+                            onClick={() => updateElement(selectedElement, { fontStyle: selectedElementData.fontStyle === 'italic' ? 'normal' : 'italic' })}
+                            className="rounded-full"
+                        />
+                        <ToolbarButton
+                            icon={Underline}
+                            active={(selectedElementData.textDecoration || '').includes('underline')}
+                            onClick={() => {
+                                const current = selectedElementData.textDecoration || 'none';
+                                const decorations = current === 'none' ? [] : current.split(' ');
+                                const newVal = decorations.includes('underline')
+                                    ? decorations.filter(d => d !== 'underline').join(' ') || 'none'
+                                    : [...decorations, 'underline'].join(' ');
+                                updateElement(selectedElement, { textDecoration: newVal });
+                            }}
+                            className="rounded-full"
+                        />
+                        <ToolbarButton
+                            icon={Strikethrough}
+                            active={(selectedElementData.textDecoration || '').includes('line-through')}
+                            onClick={() => {
+                                const current = selectedElementData.textDecoration || 'none';
+                                const decorations = current === 'none' ? [] : current.split(' ');
+                                const newVal = decorations.includes('line-through')
+                                    ? decorations.filter(d => d !== 'line-through').join(' ') || 'none'
+                                    : [...decorations, 'line-through'].join(' ');
+                                updateElement(selectedElement, { textDecoration: newVal });
+                            }}
+                            className="rounded-full"
+                        />
+                        <ToolbarButton
+                            label="aA"
+                            className="font-bold text-xs px-2 hover:bg-gray-100 rounded-full h-8"
+                            onClick={() => updateElement(selectedElement, { textTransform: selectedElementData.textTransform === 'uppercase' ? 'none' : 'uppercase' })}
+                        />
+                    </div>
+
+                    <div className="h-6 w-px bg-gray-200 mx-1" />
+
+                    <div className="flex items-center gap-0.5">
+                        <ToolbarButton
+                            icon={selectedElementData.textAlign === 'center' ? AlignCenter : (selectedElementData.textAlign === 'right' ? AlignRight : AlignLeft)}
+                            onClick={() => {
+                                const nextAlign = selectedElementData.textAlign === 'left' ? 'center' : selectedElementData.textAlign === 'center' ? 'right' : 'left';
+                                updateElement(selectedElement, { textAlign: nextAlign });
+                            }}
+                            className="rounded-full"
+                        />
+                        <ToolbarButton
+                            icon={List}
+                            className="rounded-full"
+                        />
+                        <ToolbarButton
+                            icon={ArrowUpDown}
+                            active={activePopover === 'spacing'}
+                            onClick={() => togglePopover('spacing')}
+                            className="rounded-full"
+                        />
+                    </div>
+
+                    <div className="h-6 w-px bg-gray-200 mx-1" />
+
+                    <ToolbarButton
+                        icon={Sparkles}
+                        label="Effects"
+                        active={activeSidePanel === 'effects'}
+                        onClick={() => {
+                            setActiveSidePanel(prev => prev === 'effects' ? 'none' : 'effects');
+                            setActivePopover(null);
+                        }}
+                        className="rounded-full px-3 text-xs"
+                    />
+
+                    {renderCommonActions()}
                 </div>
-
-                {/* Font Size */}
-                <div className="flex items-center border border-gray-200 rounded overflow-hidden h-8">
-                    <button
-                        onClick={() => updateElement(selectedElement, { fontSize: Math.max(1, (selectedElementData.fontSize || 16) - 1) })}
-                        className="px-2 h-full hover:bg-gray-100 flex items-center"
-                    >
-                        <Minus size={14} />
-                    </button>
-                    <input
-                        type="number"
-                        value={Math.round(selectedElementData.fontSize || 16)}
-                        onChange={(e) => updateElement(selectedElement, { fontSize: parseInt(e.target.value) })}
-                        className="w-10 text-center text-sm focus:outline-none h-full appearance-none"
-                    />
-                    <button
-                        onClick={() => updateElement(selectedElement, { fontSize: (selectedElementData.fontSize || 16) + 1 })}
-                        className="px-2 h-full hover:bg-gray-100 flex items-center"
-                    >
-                        <Plus size={14} />
-                    </button>
-                </div>
-
-                <div className="h-8 w-px bg-gray-200 mx-1" />
-
-                <ColorPickerButton
-                    color={selectedElementData.color}
-                    onChange={(val) => updateElement(selectedElement, { color: val })}
-                />
-
-                <div className="h-8 w-px bg-gray-200 mx-1" />
-
-                <div className="flex items-center gap-1">
-                    <ToolbarButton
-                        icon={Bold}
-                        active={selectedElementData.fontWeight === 'bold'}
-                        onClick={() => updateElement(selectedElement, { fontWeight: selectedElementData.fontWeight === 'bold' ? 'normal' : 'bold' })}
-                    />
-                    <ToolbarButton
-                        icon={Italic}
-                        active={selectedElementData.fontStyle === 'italic'}
-                        onClick={() => updateElement(selectedElement, { fontStyle: selectedElementData.fontStyle === 'italic' ? 'normal' : 'italic' })}
-                    />
-                    <ToolbarButton
-                        icon={Underline}
-                        active={selectedElementData.textDecoration === 'underline'}
-                        onClick={() => updateElement(selectedElement, { textDecoration: selectedElementData.textDecoration === 'underline' ? 'none' : 'underline' })}
-                    />
-                    <ToolbarButton
-                        icon={Strikethrough}
-                        active={selectedElementData.textDecoration === 'line-through'}
-                        onClick={() => updateElement(selectedElement, { textDecoration: selectedElementData.textDecoration === 'line-through' ? 'none' : 'line-through' })}
-                    />
-                    <ToolbarButton
-                        label="aA"
-                        className="font-bold font-serif px-2"
-                        onClick={() => updateElement(selectedElement, { textTransform: selectedElementData.textTransform === 'uppercase' ? 'none' : 'uppercase' })}
-                    />
-                </div>
-
-                <div className="h-8 w-px bg-gray-200 mx-1" />
-
-                <ToolbarButton
-                    icon={AlignLeft}
-                    onClick={() => {
-                        const nextAlign = selectedElementData.textAlign === 'left' ? 'center' : selectedElementData.textAlign === 'center' ? 'right' : 'left';
-                        updateElement(selectedElement, { textAlign: nextAlign });
-                    }}
-                />
-
-                <div className="h-8 w-px bg-gray-200 mx-1" />
-
-                <ToolbarButton
-                    icon={Sparkles}
-                    label="Effects"
-                    active={showEffectsPanel}
-                    onClick={() => setShowEffectsPanel(!showEffectsPanel)}
-                />
-
-                {renderCommonActions()}
-            </div>
+                {renderPopovers()}
+            </>
         );
     }
 
     // ---- Image Toolbar ----
     if (selectedElementData.type === 'image') {
         return (
-            <div className="w-full bg-white border-b border-gray-200 h-14 min-h-[56px] flex items-center px-4 gap-2 overflow-x-auto shadow-sm sticky top-0 z-50">
-                <ToolbarButton
-                    icon={Wand2}
-                    label="Edit photo"
-                    active={activePopover === 'filters'}
-                    onClick={() => togglePopover('filters')}
-                />
-                <div className="h-8 w-px bg-gray-200 mx-1" />
-                <ToolbarButton icon={Crop} label="Crop" />
-                <ToolbarButton icon={FlipHorizontal} label="Flip" />
+            <>
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center bg-white/95 backdrop-blur-sm border border-gray-200 h-12 px-3 gap-1 rounded-full shadow-lg transition-all duration-300">
+                    <ToolbarButton
+                        icon={Wand2}
+                        label="Edit image"
+                        active={activeSidePanel === 'editImage'}
+                        onClick={() => setActiveSidePanel(prev => prev === 'editImage' ? 'none' : 'editImage')}
+                        className="rounded-full px-3 text-xs"
+                    />
+                    <ToolbarButton
+                        icon={isProcessingBG ? Loader2 : Sparkles}
+                        label={isProcessingBG ? (bgProcessingStatus ? bgProcessingStatus.split(':')[0] : "Refining...") : "BG Remover"}
+                        disabled={isProcessingBG}
+                        onClick={handleRemoveBackground}
+                        className={`rounded-full px-3 text-xs transition-all duration-500 ${isProcessingBG ? 'text-purple-600 bg-purple-50 animate-pulse' : 'text-purple-600 hover:bg-purple-50'}`}
+                    />
 
-                {renderCommonActions()}
-            </div>
+                    {selectedElementData.originalSrc && !isProcessingBG && (
+                        <ToolbarButton
+                            icon={RotateCcw}
+                            label="Revert"
+                            onClick={handleRevertBackground}
+                            className="rounded-full px-3 text-xs text-gray-500 hover:text-purple-600 hover:bg-purple-50"
+                        />
+                    )}
+                    <div className="h-6 w-px bg-gray-200 mx-1" />
+
+                    {/* Crop Button */}
+                    <ToolbarButton
+                        icon={Crop}
+                        label="Crop"
+                        active={activeSidePanel === 'crop'}
+                        onClick={() => {
+                            if (activeSidePanel === 'crop') {
+                                setActiveSidePanel('none');
+                                updateElement(selectedElement, { isCropping: false });
+                            } else {
+                                setActiveSidePanel('crop');
+                                updateElement(selectedElement, { isCropping: true });
+                            }
+                        }}
+                        className="rounded-full"
+                    />
+
+                    {/* Flip Popover */}
+                    <div className="relative">
+                        <ToolbarButton
+                            icon={FlipHorizontal}
+                            label="Flip"
+                            active={activePopover === 'flip'}
+                            onClick={() => togglePopover('flip')}
+                            className="rounded-full"
+                        />
+                        {activePopover === 'flip' && (
+                            <>
+                                <div className="fixed inset-0 z-40" onClick={() => setActivePopover(null)} />
+                                <div className="absolute top-[50px] left-0 z-50 bg-white rounded-lg shadow-xl border border-gray-200 p-2 w-40 flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-200">
+                                    <button
+                                        onClick={() => {
+                                            updateElement(selectedElement, { flipX: !selectedElementData.flipX });
+                                            setActivePopover(null);
+                                        }}
+                                        className={`flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors ${selectedElementData.flipX ? 'bg-purple-50 text-purple-700' : ''}`}
+                                    >
+                                        <FlipHorizontal size={16} />
+                                        <span>Flip Horizontal</span>
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            updateElement(selectedElement, { flipY: !selectedElementData.flipY });
+                                            setActivePopover(null);
+                                        }}
+                                        className={`flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md transition-colors ${selectedElementData.flipY ? 'bg-purple-50 text-purple-700' : ''}`}
+                                    >
+                                        <div className="rotate-90"><FlipHorizontal size={16} /></div>
+                                        <span>Flip Vertical</span>
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    <div className="h-6 w-px bg-gray-200 mx-1" />
+
+                    {/* Corner Radius */}
+                    <div className="flex items-center bg-gray-50 rounded-full border border-gray-200 px-1 py-0.5 h-8" title="Corner Radius">
+                        <div className="w-6 h-6 flex items-center justify-center text-gray-500">
+                            <Scan size={14} />
+                        </div>
+                        <input
+                            type="number"
+                            value={selectedElementData.borderRadius || 0}
+                            onChange={(e) => updateElement(selectedElement, { borderRadius: parseInt(e.target.value) })}
+                            className="w-8 text-center text-[10px] font-bold outline-none bg-transparent"
+                            placeholder="0"
+                            min="0"
+                        />
+                    </div>
+
+                    {renderCommonActions()}
+                </div>
+                {renderPopovers()}
+            </>
         );
     }
 
     // ---- Shape Toolbar (Canva Style) ----
     return (
-        <div className="w-full bg-white border-b border-gray-200 h-14 min-h-[56px] flex items-center px-4 gap-2 overflow-x-auto shadow-sm sticky top-0 z-50">
+        <>
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center bg-white/95 backdrop-blur-sm border border-gray-200 h-12 px-3 gap-1 rounded-full shadow-lg transition-all duration-300 max-w-[95vw]">
 
-            {/* Edit Shape Button (First Item) */}
-            <button className="flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 transition-colors">
-                <Square size={18} />
-                <span className="hidden sm:inline">Edit Shape</span>
-            </button>
+                {/* Edit Shape Button (First Item) */}
+                <button
+                    onClick={() => togglePopover('editShape')}
+                    className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold transition-colors border ${activePopover === 'editShape' ? 'bg-purple-50 border-purple-300 text-purple-700' : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'}`}
+                >
+                    <Square size={16} />
+                    <span className="hidden sm:inline">Edit Shape</span>
+                </button>
 
-            <div className="h-6 w-px bg-gray-200 mx-1" />
+                <div className="h-6 w-px bg-gray-200 mx-1" />
 
-            {/* Fill Color */}
-            <ColorPickerButton
-                color={selectedElementData.fill}
-                onChange={(val) => updateElement(selectedElement, { fill: val })}
-            />
+                {/* Fill Color */}
+                <div className="relative group">
+                    <ToolbarButton
+                        icon={Palette}
+                        onClick={() => setActiveSidePanel(prev => prev === 'color' ? 'none' : 'color')}
+                        active={activeSidePanel === 'color'}
+                        className="rounded-full !p-2"
+                    />
+                    <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-4 h-1 rounded-full border border-white/50" style={{ backgroundColor: selectedElementData.fill || '#cbd5e1' }} />
+                </div>
 
-            {/* Stroke/Border */}
-            <div className="flex items-center gap-1 border border-gray-200 rounded-md p-0.5 hover:bg-gray-50 transition-colors h-9">
-                <div className="relative w-8 h-full flex items-center justify-center border-r border-gray-200 cursor-pointer">
-                    <div className="w-5 h-5 rounded-sm border-2 border-gray-400" style={{ borderColor: selectedElementData.stroke || '#000000' }}></div>
+                {/* Stroke/Border */}
+                <div className="flex items-center gap-1 bg-gray-50 border border-gray-200 rounded-full px-1 py-0.5 h-8">
+                    <div className="relative w-6 h-6 rounded-full border border-gray-300 overflow-hidden">
+                        <div className="absolute inset-0 border-2" style={{ borderColor: selectedElementData.stroke || '#000000' }}></div>
+                        <input
+                            type="color"
+                            value={selectedElementData.stroke || '#000000'}
+                            onChange={(e) => updateElement(selectedElement, { stroke: e.target.value })}
+                            className="opacity-0 w-full h-full cursor-pointer absolute inset-0"
+                        />
+                    </div>
                     <input
-                        type="color"
-                        value={selectedElementData.stroke || '#000000'}
-                        onChange={(e) => updateElement(selectedElement, { stroke: e.target.value })}
-                        className="opacity-0 w-full h-full cursor-pointer absolute inset-0"
+                        type="number"
+                        value={selectedElementData.strokeWidth || 0}
+                        onChange={(e) => updateElement(selectedElement, { strokeWidth: parseInt(e.target.value) })}
+                        className="w-6 text-center text-[10px] font-bold outline-none bg-transparent"
+                        placeholder="0"
+                        min="0"
                     />
                 </div>
-                <input
-                    type="number"
-                    value={selectedElementData.strokeWidth || 0}
-                    onChange={(e) => updateElement(selectedElement, { strokeWidth: parseInt(e.target.value) })}
-                    className="w-8 text-center text-sm outline-none bg-transparent"
-                    placeholder="0"
-                    min="0"
-                />
+
+                <div className="h-6 w-px bg-gray-200 mx-1" />
+
+                {/* Corner Radius (Only for Rectangles normally, but let's show for all for now or check type) */}
+                <div className="flex items-center bg-gray-50 rounded-full border border-gray-200 px-1 py-0.5 h-8" title="Corner Radius">
+                    <div className="w-6 h-6 flex items-center justify-center text-gray-500">
+                        <Scan size={14} />
+                    </div>
+                    <input
+                        type="number"
+                        value={selectedElementData.borderRadius || 0}
+                        onChange={(e) => updateElement(selectedElement, { borderRadius: parseInt(e.target.value) })}
+                        className="w-8 text-center text-[10px] font-bold outline-none bg-transparent"
+                        placeholder="0"
+                        min="0"
+                    />
+                </div>
+
+                {renderCommonActions()}
             </div>
-
-            {/* Font Controls (Visual Match for "Canva Sans" etc - Disabled for Shapes currently) */}
-            <div className="hidden md:flex items-center gap-2 opacity-50 pointer-events-none grayscale">
-                <div className="relative border border-gray-200 rounded-md h-9 flex items-center bg-gray-50">
-                    <span className="px-3 text-sm font-medium text-gray-600">Canva Sans</span>
-                    <ChevronDown size={14} className="mr-2 text-gray-400" />
-                </div>
-                <div className="flex items-center border border-gray-200 rounded-md overflow-hidden h-9 bg-gray-50">
-                    <button className="px-2 h-full flex items-center justify-center text-gray-500"><Minus size={12} /></button>
-                    <span className="w-8 text-center text-sm text-gray-600">19</span>
-                    <button className="px-2 h-full flex items-center justify-center text-gray-500"><Plus size={12} /></button>
-                </div>
-                <div className="w-8 h-8 rounded border border-gray-200 flex items-center justify-center bg-gray-50 text-gray-600">
-                    <span className="font-bold text-lg mb-1">A</span>
-                    <div className="h-1 w-5 bg-black absolute bottom-1.5" style={{ background: selectedElementData.color || '#000000' }}></div>
-                </div>
-                <button className="p-1.5"><Bold size={18} /></button>
-                <button className="p-1.5"><Italic size={18} /></button>
-                <button className="p-1.5"><Underline size={18} /></button>
-            </div>
-
-
-            {/* Animate */}
-            <div className="flex-grow" />
-            <ToolbarButton
-                icon={MonitorPlay}
-                label="Animate"
-                active={activePopover === 'animate'}
-                onClick={() => togglePopover('animate')}
-            />
-
-
-            {/* Position */}
-            <button
-                onClick={() => togglePopover('position')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${activePopover === 'position' ? 'bg-purple-50 text-purple-700' : 'text-gray-700 hover:bg-gray-100'}`}
-            >
-                <span className="hidden lg:inline">Position</span>
-            </button>
-
-            {/* Transparency */}
-            <button
-                onClick={() => togglePopover('transparency')}
-                className={`p-2 rounded-md text-gray-700 hover:bg-gray-100 transition-colors ${activePopover === 'transparency' ? 'bg-purple-50 text-purple-700' : ''}`}
-                title="Transparency"
-            >
-                <Grid3X3 size={20} />
-            </button>
-
             {renderPopovers()}
-        </div>
+        </>
     );
 };
 
-export default ContextualToolbar;
+const arePropsEqual = (prevProps, nextProps) => {
+    // Check key props that trigger re-render
+    if (prevProps.selectedElement !== nextProps.selectedElement) return false;
+    if (prevProps.activeSidePanel !== nextProps.activeSidePanel) return false;
+    if (prevProps.currentPage !== nextProps.currentPage) return false;
+    if (prevProps.lockedElements !== nextProps.lockedElements) return false;
+
+    // Check selection data deeply or by ref?
+    // If selectedElementData is a new object every time but content is same...
+    // But usually it's a ref from the elements array.
+    if (prevProps.selectedElementData !== nextProps.selectedElementData) return false;
+
+    // Check generic props
+    if (prevProps.canvasBackgroundColor !== nextProps.canvasBackgroundColor) return false;
+    if (prevProps.isProcessingBG !== nextProps.isProcessingBG) return false;
+    if (prevProps.bgProcessingStatus !== nextProps.bgProcessingStatus) return false;
+
+    return true;
+};
+
+export default React.memo(ContextualToolbar, arePropsEqual);

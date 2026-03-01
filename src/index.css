@@ -2,6 +2,41 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Gasoek+One&display=swap');
+
 body {
   @apply bg-gray-50 text-gray-900;
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Light Scrollbar for Panels */
+  .light-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .light-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .light-scrollbar::-webkit-scrollbar-thumb {
+    background-color: #c4b5fd;
+    /* Light violet */
+    border-radius: 3px;
+    border: none;
+  }
+
+  .light-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: #a78bfa;
+    /* Darker violet on hover */
+  }
 }

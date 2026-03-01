@@ -30,10 +30,12 @@ const useKeyboardShortcuts = ({
   ungroupElements,
   toggleElementLock,
   setTextEditing,
-  showEffectsPanel,
-  setShowEffectsPanel,
+  activeSidePanel,
+  setActiveSidePanel,
   copyElements,
-  pasteElements
+  pasteElements,
+  splitPage,
+  currentTime
 }) => {
 
   useEffect(() => {
@@ -43,6 +45,12 @@ const useKeyboardShortcuts = ({
 
       // Don't handle shortcuts when typing in input fields
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+      // 'S' key: Split page at current time
+      if (e.key.toLowerCase() === 's' && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        e.preventDefault();
+        if (splitPage) splitPage(currentTime);
+      }
 
       // Delete/Backspace: Delete selected elements
       if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -57,21 +65,25 @@ const useKeyboardShortcuts = ({
           saveToHistory(newElements);
         }
       }
+
       // Ctrl/Cmd+Z: Undo
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
         undo();
       }
+
       // Ctrl/Cmd+Y: Redo
       if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
         e.preventDefault();
         redo();
       }
+
       // Ctrl/Cmd+Shift+Z: Redo (alternative)
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) {
         e.preventDefault();
         redo();
       }
+
       // Ctrl/Cmd+C: Copy
       if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
         e.preventDefault();
@@ -91,6 +103,7 @@ const useKeyboardShortcuts = ({
           const delta = e.shiftKey ? 10 : 1;
           const moveX = e.key === 'ArrowLeft' ? -delta : e.key === 'ArrowRight' ? delta : 0;
           const moveY = e.key === 'ArrowUp' ? -delta : e.key === 'ArrowDown' ? delta : 0;
+
           const currentElements = getCurrentPageElements();
           const newElements = currentElements.map(el => {
             if (selectedElements.has(el.id) && !lockedElements.has(el.id)) {
@@ -102,17 +115,20 @@ const useKeyboardShortcuts = ({
             }
             return el;
           });
+
           setCurrentPageElements(newElements);
           saveToHistory(newElements);
         }
       }
+
       // Escape: Clear selection and close effects panel
       if (e.key === 'Escape') {
         setSelectedElement(null);
         setSelectedElements(new Set());
         setTextEditing(null);
-        setShowEffectsPanel(false);
+        setActiveSidePanel('none');
       }
+
       // Ctrl/Cmd+G: Group/ungroup elements
       if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
         e.preventDefault();
@@ -126,6 +142,7 @@ const useKeyboardShortcuts = ({
           }
         }
       }
+
       // Ctrl/Cmd+L: Lock/unlock element
       if ((e.ctrlKey || e.metaKey) && e.key === 'l') {
         e.preventDefault();
@@ -138,7 +155,7 @@ const useKeyboardShortcuts = ({
       if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
         e.preventDefault();
         if (selectedElement) {
-          setShowEffectsPanel(!showEffectsPanel);
+          setActiveSidePanel(prev => prev === 'effects' ? 'none' : 'effects');
         }
       }
     };
@@ -163,10 +180,12 @@ const useKeyboardShortcuts = ({
     ungroupElements,
     toggleElementLock,
     setTextEditing,
-    showEffectsPanel,
-    setShowEffectsPanel,
+    activeSidePanel,
+    setActiveSidePanel,
     copyElements,
-    pasteElements
+    pasteElements,
+    splitPage,
+    currentTime
   ]);
 };
 

@@ -8,7 +8,6 @@ import { useTranslation } from 'react-i18next';
 import GradientPicker from './GradientPicker';
 
 
-
 /**
  * Properties Panel Component
  * Displays and manages properties of the selected element
@@ -327,7 +326,6 @@ const PropertiesPanel = ({
                   type="number"
                   value={selectedElementData.strokeWidth}
                   onChange={(e) => updateElement(selectedElement, { strokeWidth: parseInt(e.target.value) })}
-
                   className="w-full p-2 border rounded text-sm"
                   min="0"
                 />
@@ -478,7 +476,6 @@ const PropertiesPanel = ({
           </button>
         </div>
       )}
-
 
       {/* Project Actions */}
       <div>
