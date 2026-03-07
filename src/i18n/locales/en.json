@@ -217,5 +217,15 @@
     "contrast": "Contrast",
     "saturate": "Saturate",
     "invert": "Invert"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "ok": "OK",
+    "loading": "Loading..."
+  },
+  "save": {
+    "projectName": "Save Project",
+    "enterProjectName": "Enter project name"
   }
 }

@@ -1,7 +1,15 @@
 import axios from 'axios';
 import { auth } from '../config/firebase';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://api.sowntra.com';
+const isLocalhost = Boolean(
+  window.location.hostname === 'localhost' ||
+  window.location.hostname === '[::1]' ||
+  window.location.hostname.match(/^127(?:\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$/)
+);
+
+const API_BASE_URL = isLocalhost ? '' : (process.env.REACT_APP_API_URL || 'https://api.sowntra.com');
+
+console.log(`[API] Initializing with baseURL: "${API_BASE_URL}" (Localhost: ${isLocalhost})`);
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -20,17 +28,19 @@ apiClient.interceptors.request.use(
           config.headers.Authorization = `Bearer ${token}`;
         }
       } else {
-        // If currentUser is null, wait a bit for auth to initialize
+        // If currentUser is null, wait longer for auth to initialize (up to 2 seconds)
         // This handles the case where the request is made before Firebase auth is ready
         await new Promise((resolve) => {
-          const timeout = setTimeout(() => resolve(), 100);
+          const timeout = setTimeout(() => resolve(), 2000); // 2 second timeout
           const unsubscribe = auth.onAuthStateChanged((user) => {
-            clearTimeout(timeout);
-            unsubscribe();
-            resolve();
+            if (user) {
+              clearTimeout(timeout);
+              unsubscribe();
+              resolve();
+            }
           });
         });
-        
+
         // Try again after waiting
         const retryUser = auth.currentUser;
         if (retryUser) {
@@ -88,19 +98,19 @@ export const boardAPI = {
 };
 
 export const projectAPI = {
-  saveProject: (projectData) => 
+  saveProject: (projectData) =>
     apiClient.post('/api/projects/save', { projectData }),
-  loadProjects: () => 
+  loadProjects: () =>
     apiClient.get('/api/projects'),
-  loadProject: (projectId) => 
+  loadProject: (projectId) =>
     apiClient.get(`/api/projects/${projectId}`),
-  loadBoardProject: (boardId) => 
+  loadBoardProject: (boardId) =>
     apiClient.get(`/api/projects/${boardId}/load`),
-  saveBoardProject: (boardId, projectData) => 
+  saveBoardProject: (boardId, projectData) =>
     apiClient.post(`/api/projects/${boardId}/save`, { projectData }),
-  updateProject: (projectId, projectData) => 
+  updateProject: (projectId, projectData) =>
     apiClient.put(`/api/projects/${projectId}`, { projectData }),
-  deleteProject: (projectId) => 
+  deleteProject: (projectId) =>
     apiClient.delete(`/api/projects/${projectId}`),
 };
 
@@ -132,13 +142,13 @@ const publicApiClient = axios.create({
 });
 
 export const invitationAPI = {
-  sendInvitation: (boardId, email, role = 'editor') => 
+  sendInvitation: (boardId, email, role = 'editor') =>
     apiClient.post('/api/invitations/send', { boardId, email, role }),
-  acceptInvitation: (token) => 
+  acceptInvitation: (token) =>
     apiClient.get(`/api/invitations/accept/${token}`),
-  validateInvitation: (token) => 
+  validateInvitation: (token) =>
     publicApiClient.get(`/api/invitations/validate/${token}`),
-  getBoardInvitations: (boardId) => 
+  getBoardInvitations: (boardId) =>
     apiClient.get(`/api/invitations/board/${boardId}`),
 };
 

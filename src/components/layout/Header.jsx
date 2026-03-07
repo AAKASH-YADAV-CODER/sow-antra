@@ -1,6 +1,6 @@
 import React from 'react';
-import { 
-  ArrowLeft, ZoomIn, ZoomOut, Maximize, Layers, Sparkles, 
+import {
+  ArrowLeft, ZoomIn, ZoomOut, Maximize, Layers, Sparkles,
   Play, Pause, Square, Film, Languages, User, LogOut, Settings, HelpCircle
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -174,13 +174,13 @@ const Header = ({
           )}
         </div>
 
-        <ShareButton 
+        <ShareButton
           url={window.location.href}
           title="Check out my design on Sowntra!"
           text="I created this amazing design on Sowntra. Check it out!"
           className="px-2 md:px-3 py-1.5 hidden md:flex"
         />
-        
+
         <div className="relative">
           <button
             onClick={() => setShowAccountMenu(!showAccountMenu)}
@@ -199,7 +199,7 @@ const Header = ({
                 <Settings size={16} />
                 Settings
               </div>
-              <div 
+              <div
                 className="dropdown-item text-red-600 hover:bg-red-50"
                 onClick={handleLogout}
               >

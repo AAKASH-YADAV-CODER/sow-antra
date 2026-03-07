@@ -14,7 +14,8 @@ const useClipboard = ({
     setSelectedElement,
     setSelectedElements,
     updateElement,
-    saveToHistory
+    saveToHistory,
+    canvasSize
 }) => {
     const [clipboard, setClipboard] = useState(null);
     const [styleClipboard, setStyleClipboard] = useState(null);
@@ -26,7 +27,12 @@ const useClipboard = ({
         const currentElements = getCurrentPageElements();
         const elementsToCopy = currentElements.filter(el => selectedElements.has(el.id));
 
-        setClipboard(JSON.parse(JSON.stringify(elementsToCopy)));
+        try {
+            setClipboard(JSON.parse(JSON.stringify(elementsToCopy)));
+        } catch (error) {
+            console.error('Error copying elements:', error);
+            setClipboard([]);
+        }
     }, [selectedElements, getCurrentPageElements]);
 
     // Copy style of the first selected element
@@ -100,7 +106,7 @@ const useClipboard = ({
             setSelectedElement(elementsToPaste[0].id);
         }
 
-        saveToHistory(newElements);
+        saveToHistory(newElements, canvasSize);
     }, [clipboard, getCurrentPageElements, setCurrentPageElements, setSelectedElements, setSelectedElement, saveToHistory]);
 
     // Paste style to selected elements

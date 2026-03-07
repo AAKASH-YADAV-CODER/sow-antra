@@ -1,12 +1,13 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Users } from 'lucide-react';
 
 /**
  * Component to display active collaborators and their cursors
  * Similar to Figma's collaboration features
  */
-const CollaborationPresence = ({ 
-  activeUsers = [], 
+const CollaborationPresence = ({
+  activeUsers = [],
   cursors = new Map(),
   currentUser,
   onCanvasMouseMove,
@@ -37,11 +38,11 @@ const CollaborationPresence = ({
     return user.color || '#6366f1';
   };
 
-  return (
+  return createPortal(
     <>
       {/* Active Users List */}
       {uniqueUsers.length > 0 && (
-        <div className="fixed top-20 right-4 z-50 bg-white rounded-lg shadow-lg p-3 max-w-xs">
+        <div className="fixed top-20 right-4 z-[9999] bg-white rounded-lg shadow-lg p-3 max-w-xs">
           <div className="flex items-center gap-2 mb-2">
             <Users className="w-4 h-4 text-gray-600" />
             <h3 className="text-sm font-semibold text-gray-900">
@@ -52,7 +53,7 @@ const CollaborationPresence = ({
             {uniqueUsers.map((user, index) => {
               const color = getUserColor(user);
               const initials = getUserInitials(user.userName || user.userEmail || 'Anonymous');
-              
+
               return (
                 <div
                   key={user.socketId || user.userId || index}
@@ -91,18 +92,18 @@ const CollaborationPresence = ({
       {/* Cursor Overlays */}
       {Array.from(cursors.entries()).map(([socketId, cursor]) => {
         // Filter out invalid cursors (stuck or undefined)
-        if (!cursor || cursor.x === undefined || cursor.y === undefined || 
-            isNaN(cursor.x) || isNaN(cursor.y)) return null;
-        
+        if (!cursor || cursor.x === undefined || cursor.y === undefined ||
+          isNaN(cursor.x) || isNaN(cursor.y)) return null;
+
         // Filter out current user's cursor
         if (currentUser && (
           (cursor.userId && cursor.userId === currentUser.uid) ||
           (cursor.userEmail && cursor.userEmail === currentUser.email)
         )) return null;
-        
+
         const color = cursor.color || '#6366f1';
         const userName = cursor.userName || 'Anonymous';
-        
+
         // Try to find canvas element - use ref if provided, otherwise query selector
         let canvasElement = null;
         if (canvasRef && canvasRef.current) {
@@ -110,17 +111,17 @@ const CollaborationPresence = ({
         } else {
           canvasElement = document.querySelector('.bg-white.shadow-lg');
         }
-        
+
         if (!canvasElement) {
           // Fallback: use fixed positioning relative to viewport
           // Cursor coordinates are in canvas space, convert to screen
           const adjustedX = window.innerWidth / 2 + (cursor.x * zoomLevel) + canvasOffset.x;
           const adjustedY = window.innerHeight / 2 + (cursor.y * zoomLevel) + canvasOffset.y;
-          
+
           return (
             <div
               key={socketId}
-              className="fixed pointer-events-none z-40"
+              className="fixed pointer-events-none z-[9999]"
               style={{
                 left: `${adjustedX}px`,
                 top: `${adjustedY}px`,
@@ -136,19 +137,17 @@ const CollaborationPresence = ({
             </div>
           );
         }
-        
+
         const canvasRect = canvasElement.getBoundingClientRect();
-        
+
         // Convert canvas coordinates to screen coordinates
-        // cursor.x and cursor.y are in canvas coordinate system (0 to canvasSize.width/height)
-        // We need to apply zoom and offset, then add canvas position
         const adjustedX = canvasRect.left + (cursor.x * zoomLevel) + canvasOffset.x;
         const adjustedY = canvasRect.top + (cursor.y * zoomLevel) + canvasOffset.y;
-        
+
         return (
           <div
             key={socketId}
-            className="fixed pointer-events-none z-40"
+            className="fixed pointer-events-none z-[9999]"
             style={{
               left: `${adjustedX}px`,
               top: `${adjustedY}px`,
@@ -170,7 +169,7 @@ const CollaborationPresence = ({
                 strokeWidth="1"
               />
             </svg>
-            
+
             {/* User Label */}
             <div
               className="absolute top-6 left-0 whitespace-nowrap px-2 py-1 rounded text-xs font-medium text-white shadow-lg"
@@ -181,7 +180,8 @@ const CollaborationPresence = ({
           </div>
         );
       })}
-    </>
+    </>,
+    document.body
   );
 };
 

@@ -18,7 +18,7 @@ const TopBar = ({
   saveProject,
   loadProject,
   exportAsImage,
-  
+
   // Animation & Recording
   playAnimations,
   resetAnimations,
@@ -27,27 +27,27 @@ const TopBar = ({
   recordingTimeElapsed,
   startRecording,
   stopRecording,
-  
+
   // View Controls
   zoomLevel,
   handleZoom,
   fitToScreen,
   showGrid,
   setShowGrid,
-  
+
   // Panels
   showTemplates,
   setShowTemplates,
   showEffectsPanel,
   setShowEffectsPanel,
-  
+
   // Language
   currentLanguage,
   supportedLanguages,
   showLanguageMenu,
   setShowLanguageMenu,
   handleLanguageChange,
-  
+
   // Account
   currentUser,
   showAccountMenu,
@@ -55,7 +55,7 @@ const TopBar = ({
   handleLogout,
   showLanguageHelp,
   setShowLanguageHelp,
-  
+
   // History state
   canUndo,
   canRedo,
@@ -69,7 +69,7 @@ const TopBar = ({
         <h1 className="text-lg md:text-xl font-bold mr-2 md:mr-4">
           Sowntra {t('app.title')}
         </h1>
-        
+
         <div className="flex items-center space-x-1 border-r border-white/30 pr-2">
           <button
             onClick={undo}
@@ -117,14 +117,13 @@ const TopBar = ({
       <div className="flex items-center space-x-1 md:space-x-2 order-3 md:order-2 w-full md:w-auto justify-center">
         <button
           onClick={() => setShowGrid(!showGrid)}
-          className={`p-1.5 md:p-2 rounded touch-manipulation transition-colors ${
-            showGrid ? 'bg-white text-purple-600' : 'bg-white/20 hover:bg-white/30'
-          }`}
+          className={`p-1.5 md:p-2 rounded touch-manipulation transition-colors ${showGrid ? 'bg-white text-purple-600' : 'bg-white/20 hover:bg-white/30'
+            }`}
           title="Toggle Grid"
         >
           <Grid size={16} className="md:w-[18px] md:h-[18px]" />
         </button>
-        
+
         <div className="flex items-center bg-white/10 rounded px-1 md:px-2 py-1 space-x-1">
           <button
             onClick={() => handleZoom(-0.1)}
@@ -155,18 +154,16 @@ const TopBar = ({
         <div className="hidden md:flex space-x-2">
           <button
             onClick={() => setShowTemplates(!showTemplates)}
-            className={`px-3 py-2 rounded flex items-center touch-manipulation transition-colors ${
-              showTemplates ? 'bg-white text-purple-600' : 'bg-white/20 hover:bg-white/30'
-            }`}
+            className={`px-3 py-2 rounded flex items-center touch-manipulation transition-colors ${showTemplates ? 'bg-white text-purple-600' : 'bg-white/20 hover:bg-white/30'
+              }`}
           >
             <Layers size={16} className="mr-1" />
             {t('toolbar.templates')}
           </button>
           <button
             onClick={() => setShowEffectsPanel(!showEffectsPanel)}
-            className={`px-3 py-2 rounded flex items-center touch-manipulation transition-colors ${
-              showEffectsPanel ? 'bg-white text-purple-600' : 'bg-white/20 hover:bg-white/30'
-            }`}
+            className={`px-3 py-2 rounded flex items-center touch-manipulation transition-colors ${showEffectsPanel ? 'bg-white text-purple-600' : 'bg-white/20 hover:bg-white/30'
+              }`}
           >
             <Sparkles size={16} className="mr-1" />
             {t('toolbar.effects')}
@@ -186,7 +183,7 @@ const TopBar = ({
             <Pause size={16} className="mr-1" />
             {t('toolbar.reset')}
           </button>
-          
+
           {/* Recording Button */}
           {recording ? (
             <div className="flex items-center space-x-2">
@@ -225,17 +222,17 @@ const TopBar = ({
               {supportedLanguages[currentLanguage]?.name}
             </span>
           </button>
-          
+
           {showLanguageMenu && (
             <>
-              <div 
+              <div
                 className="md:hidden fixed inset-0 bg-black/50 z-50"
                 onClick={() => setShowLanguageMenu(false)}
               />
               <div className="md:dropdown-menu md:relative md:w-[200px] md:shadow-lg md:border md:border-gray-200 fixed md:static left-0 right-0 top-0 bottom-0 md:top-auto md:left-auto md:right-auto md:bottom-auto bg-white md:rounded-lg z-50 flex flex-col md:max-h-96 max-h-screen overflow-hidden">
                 <div className="font-semibold px-4 py-3 border-b text-gray-700 flex items-center justify-between sticky top-0 bg-white z-10">
                   <div className="text-base md:text-sm font-bold">{t('language.title')}</div>
-                  <button 
+                  <button
                     onClick={() => setShowLanguageMenu(false)}
                     className="md:hidden p-2 rounded-lg hover:bg-gray-100 touch-manipulation text-2xl leading-none min-h-[44px] min-w-[44px]"
                   >
@@ -246,9 +243,8 @@ const TopBar = ({
                   {Object.entries(supportedLanguages).map(([code, lang]) => (
                     <div
                       key={code}
-                      className={`dropdown-item md:px-3 md:py-2 px-4 py-3 cursor-pointer touch-manipulation ${
-                        currentLanguage === code ? 'bg-blue-50 text-blue-800' : 'hover:bg-gray-50'
-                      }`}
+                      className={`dropdown-item md:px-3 md:py-2 px-4 py-3 cursor-pointer touch-manipulation ${currentLanguage === code ? 'bg-blue-50 text-blue-800' : 'hover:bg-gray-50'
+                        }`}
                       onClick={() => handleLanguageChange(code)}
                     >
                       <div className="font-medium">{lang.nativeName}</div>
@@ -272,10 +268,10 @@ const TopBar = ({
               {currentUser?.email?.split('@')[0] || 'User'}
             </span>
           </button>
-          
+
           {showAccountMenu && (
             <>
-              <div 
+              <div
                 className="fixed inset-0 z-40"
                 onClick={() => setShowAccountMenu(false)}
               />

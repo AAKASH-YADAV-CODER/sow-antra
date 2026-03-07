@@ -2,7 +2,8 @@ import { useCallback } from 'react';
 import {
   exportAsImage as exportAsImageUtil,
   exportAsPDF as exportAsPDFUtil,
-  exportAsSVG as exportAsSVGUtil
+  exportAsSVG as exportAsSVGUtil,
+  getCanvasDataURL as getCanvasDataURLUtil
 } from '../../../utils/canvasExport';
 
 /**
@@ -12,15 +13,21 @@ import {
  * @param {Function} getCurrentPageElements - Function to get current page elements
  * @param {Object} canvasSize - Canvas dimensions {width, height}
  * @param {Object} imageEffects - Image effects configuration
+ * @param {string} backgroundColor - Canvas background color
  * @returns {Object} Export functions
  */
-const useExport = ({ getCurrentPageElements, canvasSize, imageEffects }) => {
+const useExport = ({ getCurrentPageElements, canvasSize, imageEffects, backgroundColor, projectName }) => {
+
+  // Sanitize project name for filename
+  const getSanitizedFilename = () => {
+    return (projectName || 'sowntra-design').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+  };
 
   // Export as SVG
   const exportAsSVG = useCallback(() => {
     const currentElements = getCurrentPageElements();
-    return exportAsSVGUtil(currentElements, canvasSize);
-  }, [getCurrentPageElements, canvasSize]);
+    return exportAsSVGUtil(currentElements, canvasSize, getSanitizedFilename());
+  }, [getCurrentPageElements, canvasSize, projectName]);
 
   // Export as Image (PNG/JPG/SVG)
   const exportAsImage = useCallback((format) => {
@@ -29,24 +36,26 @@ const useExport = ({ getCurrentPageElements, canvasSize, imageEffects }) => {
       return;
     }
     const currentElements = getCurrentPageElements();
-    return exportAsImageUtil(currentElements, canvasSize, format, imageEffects);
-  }, [getCurrentPageElements, canvasSize, imageEffects, exportAsSVG]);
+    return exportAsImageUtil(currentElements, canvasSize, format, imageEffects, backgroundColor, getSanitizedFilename());
+  }, [getCurrentPageElements, canvasSize, imageEffects, exportAsSVG, backgroundColor, projectName]);
 
   // Export as PDF
   const exportAsPDF = useCallback(() => {
     const currentElements = getCurrentPageElements();
-    return exportAsPDFUtil(currentElements, canvasSize, imageEffects);
-  }, [getCurrentPageElements, canvasSize, imageEffects]);
+    return exportAsPDFUtil(currentElements, canvasSize, imageEffects, backgroundColor, getSanitizedFilename());
+  }, [getCurrentPageElements, canvasSize, imageEffects, backgroundColor, projectName]);
 
   // Get export-ready elements with proper filtering
   const getExportReadyElements = useCallback(() => {
     const currentElements = getCurrentPageElements();
+
     return [...currentElements]
       .sort((a, b) => {
         // First, sort by zIndex
         if (a.zIndex !== b.zIndex) {
           return a.zIndex - b.zIndex;
         }
+
         // If same zIndex, maintain original order
         return currentElements.indexOf(a) - currentElements.indexOf(b);
       })
@@ -60,13 +69,18 @@ const useExport = ({ getCurrentPageElements, canvasSize, imageEffects }) => {
     exportAsSVG,
     exportAsImage,
     exportAsPDF,
-    exportAsVideo: useCallback((duration, onProgress) => {
+    exportAsVideo: useCallback((duration, onProgress, format = 'video/webm', videoQuality = 'medium') => {
       const currentElements = getCurrentPageElements();
+      const filename = getSanitizedFilename();
       return import('../../../utils/canvasExport').then(module => {
-        return module.exportAsVideo(currentElements, canvasSize, imageEffects, duration, onProgress);
+        return module.exportAsVideo(currentElements, canvasSize, imageEffects, duration, onProgress, format, backgroundColor, videoQuality, filename);
       });
-    }, [getCurrentPageElements, canvasSize, imageEffects]),
-    getExportReadyElements
+    }, [getCurrentPageElements, canvasSize, imageEffects, backgroundColor, projectName]),
+    getExportReadyElements,
+    getCanvasDataURL: useCallback(async (format = 'png', maxWidth = 480) => {
+      const currentElements = getCurrentPageElements();
+      return getCanvasDataURLUtil(currentElements, canvasSize, format, imageEffects, backgroundColor, maxWidth);
+    }, [getCurrentPageElements, canvasSize, imageEffects, backgroundColor])
   };
 };
 

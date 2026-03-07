@@ -4,6 +4,11 @@ import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./features/auth/components/ProtectedRoute";
 import LoadingSpinner from "./components/common/LoadingSpinner";
 import ErrorBoundary from "./components/common/ErrorBoundary";
+import CreatorsDiscoveryPage from "./pages/CreatorsDiscoveryPage.jsx";
+import CreatorsDashboard from "./pages/CreatorsDashboard.jsx";
+import CreatorProfilePage from "./pages/CreatorProfilePage.jsx";
+
+console.log('--- Sowntra MP v1.1 - Refined Pen Tool Loaded ---');
 
 // Lazy load route components for better 
 const SignupPage = lazy(() => import("./features/auth/components/SignupPage"));
@@ -11,6 +16,8 @@ const HomePage = lazy(() => import("./pages/HomePage"));
 const MainPage = lazy(() => import("./pages/MainPage"));
 const WhiteboardPage = lazy(() => import("./pages/WhiteboardPage"));
 const InviteAcceptPage = lazy(() => import("./pages/InviteAcceptPage"));
+const BrandKitPage = lazy(() => import("./pages/BrandKitPage"));
+const BrandKitDetailPage = lazy(() => import("./pages/BrandKitDetailPage"));
 
 function App() {
   return (
@@ -20,33 +27,73 @@ function App() {
           <Suspense fallback={<LoadingSpinner message="Loading application..." />}>
             <Routes>
               <Route path="/" element={<SignupPage />} />
-              <Route 
-                path="/home" 
+              <Route
+                path="/home"
                 element={
                   <ProtectedRoute>
                     <HomePage />
                   </ProtectedRoute>
-                } 
+                }
               />
-              <Route 
-                path="/main" 
+              <Route
+                path="/main"
                 element={
                   <ProtectedRoute>
                     <MainPage />
                   </ProtectedRoute>
-                } 
+                }
               />
-              <Route 
-                path="/whiteboard/:boardId" 
+              <Route
+                path="/whiteboard/:boardId"
                 element={
                   <ProtectedRoute>
                     <WhiteboardPage />
                   </ProtectedRoute>
-                } 
+                }
               />
-              <Route 
-                path="/invite/:token" 
-                element={<InviteAcceptPage />} 
+              <Route
+                path="/invite/:token"
+                element={<InviteAcceptPage />}
+              />
+              <Route
+                path="/brand-kit"
+                element={
+                  <ProtectedRoute>
+                    <BrandKitPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/brand-kit/:id"
+                element={
+                  <ProtectedRoute>
+                    <BrandKitDetailPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/creators"
+                element={
+                  <ProtectedRoute>
+                    <CreatorsDiscoveryPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/creators/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <CreatorsDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/creators/profile/:id"
+                element={
+                  <ProtectedRoute>
+                    <CreatorProfilePage />
+                  </ProtectedRoute>
+                }
               />
             </Routes>
           </Suspense>
