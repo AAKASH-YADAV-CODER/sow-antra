@@ -259,14 +259,24 @@ const WhiteboardCanvas = ({
           addElement(currentLine);
         }
 
-        setCurrentLine(null);
-        // Deep reset for all drawing refs to prevent state contamination
+        // Important: We don't null currentLine immediately to prevent flickering
+        // Instead, we wait for the next frame or use a small timeout if needed,
+        // but adding it to elements first usually handles it if we manage the nulling carefully.
+        
+        // Reset drawing refs
         pointsRef.current = []; 
         lastPointRef.current = null;
         currentSpeedRef.current = 0;
+
+        // Increase delay significantly to ensure main elements layer has updated
+        setTimeout(() => {
+          setCurrentLine(null);
+        }, 150);
       } else if (['rect', 'circle', 'triangle', 'diamond'].includes(tool) && currentShape) {
         addElement(currentShape);
-        setCurrentShape(null);
+        setTimeout(() => {
+          setCurrentShape(null);
+        }, 150);
       }
     }
   };
@@ -280,15 +290,24 @@ const WhiteboardCanvas = ({
       Object.keys(layerRefs.current).forEach(id => {
         const layer = layerRefs.current[id];
         if (layer) {
-          // Only cache layers that are not currently being modified
-          // and have a reasonable number of elements
-          layer.cache({
-            pixelRatio: 1 // Keep memory low
-          });
+          // Clear cache before re-caching to avoid artifacts
+          layer.clearCache();
+          
+          // Get layer bounds to ensure we cache enough area including bleeds
+          const box = layer.getClientRect({ skipTransform: true });
+          if (box.width > 0 && box.height > 0) {
+            layer.cache({
+              x: box.x - 50,
+              y: box.y - 50,
+              width: box.width + 100,
+              height: box.height + 100,
+              pixelRatio: window.devicePixelRatio || 1
+            });
+          }
           layer.draw();
         }
       });
-    }, 100);
+    }, 200);
     
     return () => clearTimeout(timer);
   }, [elements, isDrawing, stageScale]);
@@ -328,7 +347,8 @@ const WhiteboardCanvas = ({
 
     const { key, ...cleanCommonProps } = commonProps;
 
-    const shadowProps = isSelected && tool === 'select' ? {
+    const isShape = ['rect', 'circle', 'triangle', 'diamond', 'sticky', 'text'].includes(el.type);
+    const shadowProps = isSelected && tool === 'select' && isShape ? {
       shadowColor: '#8b3dff',
       shadowBlur: 10,
       shadowOpacity: 0.6
@@ -595,6 +615,81 @@ const WhiteboardCanvas = ({
               }}
             />
           );
+        } else if (el.brushType === 'oil') {
+          return (
+            <Line
+              key={key}
+              {...cleanCommonProps}
+              {...shadowProps}
+              points={renderPoints}
+              sceneFunc={(context, shape) => {
+                const points = el.points;
+                if (points.length < 6) return;
+                context.lineCap = 'round';
+                context.lineJoin = 'round';
+                const baseOpacity = el.opacity || 1;
+                const radius = el.strokeWidth / 2;
+                
+                for (let i = 0; i < points.length - 3; i += 3) {
+                  const x1 = points[i], y1 = points[i+1], x2 = points[i+3], y2 = points[i+4];
+                  const pressure = points[i+2] || 0.5;
+                  const dist = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+                  const steps = Math.max(1, Math.floor(dist / 1.0));
+                  
+                  const angle = Math.atan2(y2 - y1, x2 - x1);
+                  
+                  for (let s = 0; s <= steps; s++) {
+                    const t = s / steps;
+                    const px = x1 + (x2 - x1) * t;
+                    const py = y1 + (y2 - y1) * t;
+                    
+                    const progress = i / points.length;
+                    const taper = Math.min(progress * 10, (1 - progress) * 10, 1);
+                    const currentRadius = radius * pressure * taper;
+                    
+                    // 1. Thick Base (The "body" of the paint)
+                    context.globalAlpha = baseOpacity;
+                    context.fillStyle = el.stroke;
+                    context.beginPath();
+                    context.arc(px, py, currentRadius, 0, Math.PI * 2);
+                    context.fill();
+
+                    // 2. Impasto Highlight (The 3D "ridge" of the paint)
+                    // Offset slightly to simulate top-down lighting
+                    const highlightOffset = currentRadius * 0.3;
+                    context.globalAlpha = baseOpacity * 0.3;
+                    context.fillStyle = '#ffffff';
+                    context.beginPath();
+                    context.arc(px - highlightOffset, py - highlightOffset, currentRadius * 0.4, 0, Math.PI * 2);
+                    context.fill();
+
+                    // 3. Shadow Edge (Depth)
+                    context.globalAlpha = baseOpacity * 0.2;
+                    context.fillStyle = '#000000';
+                    context.beginPath();
+                    context.arc(px + highlightOffset, py + highlightOffset, currentRadius * 0.9, 0, Math.PI * 2);
+                    context.stroke();
+
+                    // 4. Bristle Texture (The brush marks)
+                    if (s % 5 === 0) {
+                      context.save();
+                      context.translate(px, py);
+                      context.rotate(angle);
+                      context.globalAlpha = baseOpacity * 0.15;
+                      context.strokeStyle = '#ffffff';
+                      context.lineWidth = 1;
+                      context.beginPath();
+                      context.moveTo(-currentRadius, -currentRadius * 0.5);
+                      context.lineTo(currentRadius, -currentRadius * 0.5);
+                      context.stroke();
+                      context.restore();
+                    }
+                  }
+                }
+                context.globalAlpha = 1;
+              }}
+            />
+          );
         } else if (el.brushType === 'cloud') {
           return (
             <Line
@@ -602,6 +697,7 @@ const WhiteboardCanvas = ({
               {...cleanCommonProps}
               {...shadowProps}
               points={renderPoints}
+              strokeWidth={el.strokeWidth * 10}
               sceneFunc={(context, shape) => {
                 const points = el.points;
                 if (points.length < 6) return;
@@ -713,7 +809,9 @@ const WhiteboardCanvas = ({
                 if (points.length < 6) return;
                 context.lineCap = 'round';
                 context.lineJoin = 'round';
-                const bleedRadius = el.strokeWidth * 1.5;
+                const baseOpacity = el.opacity || 1;
+                const bleedRadius = el.strokeWidth * 1.8; // Increased for better wash
+
                 for (let i = 0; i < points.length - 3; i += 3) {
                   const x1 = points[i];
                   const y1 = points[i+1];
@@ -721,22 +819,39 @@ const WhiteboardCanvas = ({
                   const y2 = points[i+4];
                   const speed = points[i+2] || 1;
                   const dist = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-                  const steps = Math.max(1, Math.floor(dist / 2.5)); // Optimized step size
+                  
+                  // Much denser steps for smoothness (from 2.5 to 0.8)
+                  const steps = Math.max(1, Math.floor(dist / 0.8)); 
+                  
                   for (let s = 0; s <= steps; s++) {
                     const t = s / steps;
                     const px = x1 + (x2 - x1) * t;
                     const py = y1 + (y2 - y1) * t;
+                    
                     const progress = i / points.length;
-                    const radius = bleedRadius * (1.2 + Math.sin(progress * 10) * 0.2);
-                    const grad = context.createRadialGradient(px, py, radius * 0.4, px, py, radius);
+                    // Dynamic radius for a "watery" flow look
+                    const radius = bleedRadius * (1.1 + Math.sin(progress * 12) * 0.15) * Math.max(0.8, 1 - speed * 0.1);
+                    
+                    const grad = context.createRadialGradient(px, py, 0, px, py, radius);
                     grad.addColorStop(0, el.stroke);
-                    grad.addColorStop(0.7, el.stroke);
-                    grad.addColorStop(1, 'transparent');
+                    grad.addColorStop(0.2, el.stroke);
+                    grad.addColorStop(0.6, 'transparent'); // Softer falloff
+                    
                     context.fillStyle = grad;
-                    context.globalAlpha = (el.opacity || 1) * Math.max(0.02, 0.08 - speed * 0.02);
+                    // Lower opacity per step because we have more steps now
+                    context.globalAlpha = baseOpacity * Math.max(0.01, 0.04 - speed * 0.01);
+                    
                     context.beginPath();
                     context.arc(px, py, radius, 0, Math.PI * 2);
                     context.fill();
+
+                    // Occasional "pigment" spots for texture
+                    if (s % 10 === 0) {
+                      context.globalAlpha = baseOpacity * 0.02;
+                      context.beginPath();
+                      context.arc(px + (Math.random()-0.5)*radius, py + (Math.random()-0.5)*radius, radius*0.3, 0, Math.PI * 2);
+                      context.fill();
+                    }
                   }
                 }
                 context.globalAlpha = 1;
@@ -1415,9 +1530,13 @@ const WhiteboardCanvas = ({
             visible={layer.visible} 
             listening={!layer.locked && !isDrawing}
           >
+            {/* Filter and render memoized elements for this layer */}
             {elements
               .filter(el => el.layerId === layer.id || (!el.layerId && layer.id === 'layer-2'))
-              .map(renderElement)}
+              .map(el => {
+                // Return pre-rendered element from memo if available (optional optimization)
+                return renderElement(el);
+              })}
           </Layer>
         ))}
         

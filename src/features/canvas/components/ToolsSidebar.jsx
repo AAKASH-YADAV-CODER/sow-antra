@@ -21,7 +21,9 @@ import {
   MoreHorizontal,
   Calendar,
   Camera,
-  Palette
+  Palette,
+  Zap,
+  RotateCcw
 } from 'lucide-react';
 import { shapeCategories } from '../../../config/shapesLibrary';
 import { frameCategories } from '../../../config/frameLibrary';
@@ -46,6 +48,8 @@ import BadTVPanel from './BadTVPanel';
 import TypeFillPanel from './TypeFillPanel';
 import { TypeWarpPanel } from './TypeWarpPanel';
 import DuotonePanel from './DuotonePanel';
+import MagicResizePanel from './MagicResizePanel';
+import RGBGlitchPanel from './RGBGlitchPanel';
 
 /**
  * ToolsSidebar Component
@@ -666,7 +670,8 @@ const ToolsSidebar = ({
                   />
                 </div>
 
-                {/* Element Categories Pills */}
+                {/* Elements Category */}
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Elements</h3>
                 <div className="flex flex-wrap gap-2 mb-2">
                   {['All', 'Shapes', 'Frames', 'Devices', 'Organic', 'Fraction', 'Text', 'Grids', 'Lines', 'Arrows', 'Callouts', 'Social'].map(cat => (
                     <button
@@ -1112,6 +1117,42 @@ const ToolsSidebar = ({
                 </div>
 
                 <div className="grid grid-cols-1 gap-4">
+                  {/* Magic Resize App */}
+                  <div
+                    onClick={() => {
+                      setActivePanel('resize');
+                      setActiveSidePanel('resize');
+                    }}
+                    className="group flex items-center gap-4 p-4 bg-white border border-gray-100 rounded-2xl hover:border-indigo-500 hover:shadow-xl transition-all cursor-pointer overflow-hidden relative"
+                  >
+                    <div className="w-14 h-14 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                      <Maximize2 size={28} className="group-hover:rotate-12 transition-transform" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">Magic Resize Pro</h4>
+                      <p className="text-xs text-gray-500">Smartly scale your designs for any platform</p>
+                    </div>
+                    <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded tracking-widest">MAGIC</div>
+                  </div>
+
+                  {/* Magic Glitch App */}
+                  <div
+                    onClick={() => {
+                      setActivePanel('glitch');
+                      setActiveSidePanel('glitch');
+                    }}
+                    className="group flex items-center gap-4 p-4 bg-white border border-gray-100 rounded-2xl hover:border-red-500 hover:shadow-xl transition-all cursor-pointer overflow-hidden relative"
+                  >
+                    <div className="w-14 h-14 bg-black rounded-xl flex items-center justify-center text-cyan-400 group-hover:bg-red-600 group-hover:text-white transition-colors">
+                      <Zap size={28} className="group-hover:skew-x-12 transition-transform" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-gray-900 group-hover:text-red-600 transition-colors">Magic Glitch (3D)</h4>
+                      <p className="text-xs text-gray-500">Add cinematic RGB shift and glitch effects</p>
+                    </div>
+                    <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded tracking-widest">HOT</div>
+                  </div>
+
                   <div
                     onClick={() => {
                       setActivePanel('textStudio');
@@ -1505,6 +1546,30 @@ const ToolsSidebar = ({
                 selectedElementData={selectedElementData}
                 updateElement={updateElement}
                 addElement={addElement}
+              />
+            )}
+
+            {activePanel === 'glitch' && (
+              <RGBGlitchPanel
+                isOpen={true}
+                onClose={() => setActivePanel('elements')}
+                selectedElement={selectedElement}
+                selectedElementData={selectedElementData}
+                updateElement={updateElement}
+                addElement={addElement}
+              />
+            )}
+
+            {activePanel === 'resize' && (
+              <MagicResizePanel
+                isOpen={true}
+                onClose={() => setActivePanel('elements')}
+                canvasSize={canvasSize}
+                setCanvasSize={setCanvasSize}
+                pages={pages}
+                setPages={setPages}
+                currentPage={currentPage}
+                updateElements={updateElements}
               />
             )}
 
