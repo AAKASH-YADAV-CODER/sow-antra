@@ -22,26 +22,30 @@ const VectorOverlay = ({
     const [activePart, setActivePart] = useState(null);
     const [isAltPressed, setIsAltPressed] = useState(false);
     const [hoveredIdx, setHoveredIdx] = useState(null);
+    const [hoveredHandle, setHoveredHandle] = useState(null); // { idx, part: 'handleIn'|'handleOut' }
 
     const lastMousePos = useRef({ x: 0, y: 0 });
+    const anchorsRef = useRef(localAnchors);
     const elementRef = useRef(element);
 
     useEffect(() => {
         elementRef.current = element;
     }, [element]);
 
-    const finalizeUpdate = useCallback((anchors) => {
-        // Finalize the element's bounding box and normalize anchor points
-        const { minX, minY, maxX, maxY } = getPathBoundingBox(anchors);
+    // Keep ref in sync for the drag handler
+    useEffect(() => {
+        anchorsRef.current = localAnchors;
+    }, [localAnchors]);
 
-        // Absolute global top-left
+    const finalizeUpdate = useCallback((anchors) => {
+        if (!anchors || anchors.length === 0) return;
+        const { minX, minY, maxX, maxY } = getPathBoundingBox(anchors);
         const globalX = elementRef.current.x + minX;
         const globalY = elementRef.current.y + minY;
         const width = Math.max(1, maxX - minX);
         const height = Math.max(1, maxY - minY);
 
-        // Relativize anchors to new top-left
-        const normalizedAnchors = (anchors || []).map(a => ({
+        const normalizedAnchors = anchors.map(a => ({
             point: { x: a.point.x - minX, y: a.point.y - minY },
             handleIn: { x: a.handleIn.x - minX, y: a.handleIn.y - minY },
             handleOut: { x: a.handleOut.x - minX, y: a.handleOut.y - minY }
@@ -54,37 +58,26 @@ const VectorOverlay = ({
             height,
             bezierAnchors: normalizedAnchors
         }, true);
-    }, [onUpdate]); // elementRef is ref, stable
+    }, [onUpdate]);
 
-    // Sync local state when element updates externally (unless dragging)
+    // Sync local state when element updates externally
     useEffect(() => {
         if (activeAnchorIdx === null) {
             setLocalAnchors(element.bezierAnchors || []);
         }
     }, [element.bezierAnchors, activeAnchorIdx]);
 
-    // Calculate visual scale to keep handles consistent size
     const visualScale = 1 / zoom;
     const visualStrokeWidth = Math.max(visualScale * 2, element.strokeWidth || 2);
 
-    // Handle Keyboard Events (Delete, Alt)
     useEffect(() => {
         const handleKeyDown = (e) => {
             if (e.altKey) setIsAltPressed(true);
-
             if ((e.key === 'Delete' || e.key === 'Backspace') && selectedAnchorIdx !== null) {
-                // Delete Point
                 e.preventDefault();
                 e.stopPropagation();
-
-                const newAnchors = [...localAnchors];
-
-                // Remove the point
+                const newAnchors = [...anchorsRef.current];
                 newAnchors.splice(selectedAnchorIdx, 1);
-
-                // If we have fewer than 2 points, we might want to just clear it or handle it.
-                // For now, let's allow single point or empty, but standard SVG paths need 2.
-
                 setLocalAnchors(newAnchors);
                 setSelectedAnchorIdx(null);
                 finalizeUpdate(newAnchors);
@@ -99,94 +92,69 @@ const VectorOverlay = ({
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
         };
-    }, [selectedAnchorIdx, localAnchors, finalizeUpdate]);
+    }, [selectedAnchorIdx, finalizeUpdate]);
 
-    // Handle Dragging Logic
     const handlePointMouseDown = (e, idx, part) => {
-        e.stopPropagation(); // Prevent canvas selection or panning
-
-        // Auto-join logic: Click first point to close path
-        if (currentTool === 'pen' && idx === 0 && part === 'point' && element.bezierAnchors.length >= 2 && !element.isClosed) {
+        e.stopPropagation();
+        e.preventDefault();
+        if (currentTool === 'pen' && idx === 0 && part === 'point' && (element.bezierAnchors?.length || 0) >= 2 && !element.isClosed) {
             onUpdate(element.id, { isClosed: true });
             return;
         }
 
-        setActiveAnchorIdx(idx);
-        setActivePart(part);
-
-        // Select logic
-        if (part === 'point') {
-            setSelectedAnchorIdx(idx);
+        // Capture pointer so pointermove/pointerup fire even if cursor leaves the SVG
+        if (e.target && e.target.setPointerCapture) {
+            try { e.target.setPointerCapture(e.pointerId); } catch (_) {}
         }
 
+        setActiveAnchorIdx(idx);
+        setActivePart(part);
+        if (part === 'point') setSelectedAnchorIdx(idx);
         lastMousePos.current = { x: e.clientX, y: e.clientY };
     };
 
-    // Handle Click on Path (Add Point)
     const handlePathClick = (e) => {
         if (currentTool !== 'pen') return;
-
-        // Calculate click position relative to element (0,0 is element top-left)
-        // The SVG is positioned at top:0, left:0 of element?
-        // Wait, VectorOverlay is usually absolute positioned over the element.
-        // Yes, "style={{ position: 'absolute', top: 0, left: 0... }}"
-        // And rendering assumes local coordinates.
-
         const rect = e.currentTarget.getBoundingClientRect();
         const x = (e.clientX - rect.left) / zoom;
         const y = (e.clientY - rect.top) / zoom;
-
-        const newAnchors = insertPointInPath(localAnchors, { x, y }, element.isClosed);
-
+        const newAnchors = insertPointInPath(anchorsRef.current, { x, y }, element.isClosed);
         if (newAnchors) {
             setLocalAnchors(newAnchors);
             finalizeUpdate(newAnchors);
         }
     };
 
-    // Toggle Smooth/Sharp on Double Click
     const handleDoubleClick = (e, idx) => {
         e.stopPropagation();
-        const newAnchors = [...localAnchors];
+        const newAnchors = [...anchorsRef.current];
         const anchor = { ...newAnchors[idx] };
-
-        // Check if currently smooth (handles are extended)
         const isSmooth = getDistance(anchor.handleIn, anchor.point) > 0.1 || getDistance(anchor.handleOut, anchor.point) > 0.1;
 
         if (isSmooth) {
-            // Make Sharp (collapse handles to point)
             anchor.handleIn = { ...anchor.point };
             anchor.handleOut = { ...anchor.point };
         } else {
-            // Make Smooth (extend handles)
-            // Default extension: 20px horizontally
             anchor.handleIn = { x: anchor.point.x - 20, y: anchor.point.y };
             anchor.handleOut = { x: anchor.point.x + 20, y: anchor.point.y };
         }
-
         newAnchors[idx] = anchor;
         setLocalAnchors(newAnchors);
-
-        // Commit change immediately
         finalizeUpdate(newAnchors);
     };
 
-
     useEffect(() => {
-        let animationFrameId;
+        if (activeAnchorIdx === null) return;
 
-        const handleWindowMouseMove = (e) => {
+        const handlePointerMove = (e) => {
             if (activeAnchorIdx === null || !activePart) return;
 
-            // Calculate movement delta in screen pixels using clientX/Y for smoothness
             const dx = (e.clientX - lastMousePos.current.x) / zoom;
             const dy = (e.clientY - lastMousePos.current.y) / zoom;
-
             lastMousePos.current = { x: e.clientX, y: e.clientY };
 
             if (Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001) return;
 
-            // Update LOCAL state
             setLocalAnchors(prevAnchors => {
                 const newAnchors = [...prevAnchors];
                 const anchor = { ...newAnchors[activeAnchorIdx] };
@@ -214,32 +182,31 @@ const VectorOverlay = ({
             });
         };
 
-        const handleWindowMouseUp = () => {
+        const handlePointerUp = () => {
             if (activeAnchorIdx !== null) {
-                // Commit the local state to global state on mouse up
-                finalizeUpdate(localAnchors);
+                finalizeUpdate(anchorsRef.current);
             }
             setActiveAnchorIdx(null);
             setActivePart(null);
         };
 
-        if (activeAnchorIdx !== null) {
-            window.addEventListener('mousemove', handleWindowMouseMove);
-            window.addEventListener('mouseup', handleWindowMouseUp);
-        }
+        // Use pointermove/pointerup to be consistent with onPointerDown
+        // This ensures events fire correctly after setPointerCapture
+        window.addEventListener('pointermove', handlePointerMove);
+        window.addEventListener('pointerup', handlePointerUp);
 
         return () => {
-            window.removeEventListener('mousemove', handleWindowMouseMove);
-            window.removeEventListener('mouseup', handleWindowMouseUp);
-            cancelAnimationFrame(animationFrameId);
+            window.removeEventListener('pointermove', handlePointerMove);
+            window.removeEventListener('pointerup', handlePointerUp);
         };
-    }, [activeAnchorIdx, activePart, isAltPressed, zoom, localAnchors, finalizeUpdate]); // Dependencies needed for drag logic
+    }, [activeAnchorIdx, activePart, isAltPressed, zoom, finalizeUpdate]);
 
-    // Scaled sizes for UI elements so they stay constant visual size regardless of zoom
-    const pointRadius = (activePart === 'point' ? 6 : 5) / zoom;
+    // Scaled sizes for UI elements
+    const pointRadius = 5 / zoom;
+    const hitRadius = 15 / zoom; // Large invisible hit area for easier grabbing
     const handleRadius = 4 / zoom;
-    const lineWidth = 2 / zoom; // Slightly thicker for better visibility
-
+    const handleHitRadius = 12 / zoom; // Large invisible hit area for handles
+    const lineWidth = 2 / zoom; 
 
     if (!localAnchors || localAnchors.length === 0) return null;
 
@@ -254,7 +221,7 @@ const VectorOverlay = ({
                 width: '100%',
                 height: '100%',
                 overflow: 'visible',
-                pointerEvents: 'none' // Let events pass through empty space
+                pointerEvents: 'none' 
             }}
         >
             {/* Live Visible Path during Editing */}
@@ -265,7 +232,7 @@ const VectorOverlay = ({
                 strokeWidth={visualStrokeWidth}
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                style={{ pointerEvents: 'none' }} // Visual only
+                style={{ pointerEvents: 'none' }} 
             />
 
             {/* Rubber Band Line for Pen Tool */}
@@ -275,7 +242,7 @@ const VectorOverlay = ({
                     y1={localAnchors[localAnchors.length - 1].point.y}
                     x2={cursorPos.x - element.x}
                     y2={cursorPos.y - element.y}
-                    stroke="#3b82f6"
+                    stroke="#2563eb"
                     strokeWidth={visualScale * 2}
                     strokeDasharray={`${4 * visualScale}, ${4 * visualScale}`}
                     opacity={0.6}
@@ -301,7 +268,6 @@ const VectorOverlay = ({
 
                 if (!anchor || !anchor.point) return null;
 
-                // Only show "snap" feedback for the first point when using Pen tool
                 const showSnapFeedback = isFirst && currentTool === 'pen' && !element.isClosed;
 
                 return (
@@ -311,7 +277,7 @@ const VectorOverlay = ({
                             <line
                                 x1={anchor.point.x} y1={anchor.point.y}
                                 x2={anchor.handleIn.x} y2={anchor.handleIn.y}
-                                stroke="#4ade80"
+                                stroke="#f59e0b"
                                 strokeWidth={lineWidth / 2}
                                 strokeDasharray={`${4 / zoom}, ${4 / zoom}`}
                             />
@@ -320,59 +286,104 @@ const VectorOverlay = ({
                             <line
                                 x1={anchor.point.x} y1={anchor.point.y}
                                 x2={anchor.handleOut.x} y2={anchor.handleOut.y}
-                                stroke="#4ade80"
+                                stroke="#f59e0b"
                                 strokeWidth={lineWidth / 2}
                                 strokeDasharray={`${4 / zoom}, ${4 / zoom}`}
                             />
                         )}
 
-                        {/* Anchor Point (Main) */}
+                        {/* Anchor Hit Area (Invisible) */}
                         <circle
                             cx={anchor.point.x} cy={anchor.point.y}
-                            r={showSnapFeedback && isHovered ? pointRadius * 1.5 : pointRadius}
-                            fill={showSnapFeedback && isHovered ? "#8b5cf6" : (idx === activeAnchorIdx || isSelected ? "#f3f4f6" : "#ffffff")} // Highlight selected
-                            stroke={showSnapFeedback && isHovered ? "#ffffff" : (isSelected ? "#2563eb" : "#000000")} // Blue stroke if selected
-                            strokeWidth={lineWidth}
-                            style={{
-                                cursor: currentTool === 'pen' && isFirst ? 'pointer' : 'move'
-                            }}
-                            onMouseDown={(e) => handlePointMouseDown(e, idx, 'point')}
+                            r={hitRadius}
+                            fill="transparent"
+                            style={{ cursor: currentTool === 'pen' && isFirst && !element.isClosed ? 'pointer' : 'move' }}
+                            onPointerDown={(e) => handlePointMouseDown(e, idx, 'point')}
                             onDoubleClick={(e) => handleDoubleClick(e, idx)}
                             onMouseEnter={() => setHoveredIdx(idx)}
                             onMouseLeave={() => setHoveredIdx(null)}
                         />
 
+                        {/* Anchor Point (Visible) */}
+                        <circle
+                            cx={anchor.point.x} cy={anchor.point.y}
+                            r={showSnapFeedback && isHovered ? pointRadius * 1.5 : (activeAnchorIdx === idx && activePart === 'point' ? pointRadius * 1.2 : pointRadius)}
+                            fill={showSnapFeedback && isHovered ? "#8b5cf6" : (idx === activeAnchorIdx || (isSelected && currentTool === 'pen') ? "#2563eb" : "#ffffff")} 
+                            stroke="#2563eb" 
+                            strokeWidth={lineWidth}
+                            style={{
+                                pointerEvents: 'none',
+                                filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,0.2))'
+                            }}
+                        />
+
                         {/* Handle In Control */}
-                        {anchor.handleIn && (
-                            <circle
-                                cx={anchor.handleIn.x} cy={anchor.handleIn.y}
-                                r={handleRadius}
-                                fill="#4ade80"
-                                stroke="#ffffff"
-                                strokeWidth={lineWidth / 2}
-                                style={{
-                                    cursor: 'crosshair',
-                                    opacity: (anchor.handleIn.x === anchor.point.x && anchor.handleIn.y === anchor.point.y) ? 0.3 : 1
-                                }}
-                                onMouseDown={(e) => handlePointMouseDown(e, idx, 'handleIn')}
-                            />
-                        )}
+                        {anchor.handleIn && (() => {
+                            const hInDist = Math.hypot(anchor.handleIn.x - anchor.point.x, anchor.handleIn.y - anchor.point.y);
+                            const hInAtPoint = hInDist < 0.5;
+                            return (
+                            <g>
+                                {/* Handle In Hit Area */}
+                                {!hInAtPoint && (
+                                <circle
+                                    cx={anchor.handleIn.x} cy={anchor.handleIn.y}
+                                    r={handleHitRadius}
+                                    fill="transparent"
+                                    style={{ cursor: 'move', pointerEvents: 'auto' }}
+                                    onPointerDown={(e) => handlePointMouseDown(e, idx, 'handleIn')}
+                                    onMouseEnter={() => setHoveredHandle({ idx, part: 'handleIn' })}
+                                    onMouseLeave={() => setHoveredHandle(null)}
+                                />)}
+                                {/* Handle In Visual */}
+                                {!hInAtPoint && (
+                                <circle
+                                    cx={anchor.handleIn.x} cy={anchor.handleIn.y}
+                                    r={hoveredHandle?.idx === idx && hoveredHandle?.part === 'handleIn' ? handleRadius * 1.4 : handleRadius}
+                                    fill="#f59e0b"
+                                    stroke="#ffffff"
+                                    strokeWidth={lineWidth / 2}
+                                    style={{
+                                        pointerEvents: 'none',
+                                        filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,0.15))',
+                                        transition: 'r 0.1s'
+                                    }}
+                                />)}
+                            </g>
+                        );})()}
 
                         {/* Handle Out Control */}
-                        {anchor.handleOut && (
-                            <circle
-                                cx={anchor.handleOut.x} cy={anchor.handleOut.y}
-                                r={handleRadius}
-                                fill="#4ade80"
-                                stroke="#ffffff"
-                                strokeWidth={lineWidth / 2}
-                                style={{
-                                    cursor: 'crosshair',
-                                    opacity: (anchor.handleOut.x === anchor.point.x && anchor.handleOut.y === anchor.point.y) ? 0.3 : 1
-                                }}
-                                onMouseDown={(e) => handlePointMouseDown(e, idx, 'handleOut')}
-                            />
-                        )}
+                        {anchor.handleOut && (() => {
+                            const hOutDist = Math.hypot(anchor.handleOut.x - anchor.point.x, anchor.handleOut.y - anchor.point.y);
+                            const hOutAtPoint = hOutDist < 0.5;
+                            return (
+                            <g>
+                                {/* Handle Out Hit Area */}
+                                {!hOutAtPoint && (
+                                <circle
+                                    cx={anchor.handleOut.x} cy={anchor.handleOut.y}
+                                    r={handleHitRadius}
+                                    fill="transparent"
+                                    style={{ cursor: 'move', pointerEvents: 'auto' }}
+                                    onPointerDown={(e) => handlePointMouseDown(e, idx, 'handleOut')}
+                                    onMouseEnter={() => setHoveredHandle({ idx, part: 'handleOut' })}
+                                    onMouseLeave={() => setHoveredHandle(null)}
+                                />)}
+                                {/* Handle Out Visual */}
+                                {!hOutAtPoint && (
+                                <circle
+                                    cx={anchor.handleOut.x} cy={anchor.handleOut.y}
+                                    r={hoveredHandle?.idx === idx && hoveredHandle?.part === 'handleOut' ? handleRadius * 1.4 : handleRadius}
+                                    fill="#f59e0b"
+                                    stroke="#ffffff"
+                                    strokeWidth={lineWidth / 2}
+                                    style={{
+                                        pointerEvents: 'none',
+                                        filter: 'drop-shadow(0px 1px 2px rgba(0,0,0,0.15))',
+                                        transition: 'r 0.1s'
+                                    }}
+                                />)}
+                            </g>
+                        );})()}
 
                         {/* Snap label / hint */}
                         {showSnapFeedback && isHovered && (

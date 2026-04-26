@@ -3,6 +3,7 @@ const DB_NAME = 'SowntraAssets';
 const DB_VERSION = 1;
 const STORE_ASSETS = 'assets';
 const STORE_FOLDERS = 'folders';
+const STORE_PROJECTS = 'projects';
 
 class AssetStorage {
     constructor() {
@@ -29,6 +30,13 @@ class AssetStorage {
                 if (!db.objectStoreNames.contains(STORE_FOLDERS)) {
                     const folderStore = db.createObjectStore(STORE_FOLDERS, { keyPath: 'id' });
                     folderStore.createIndex('createdAt', 'createdAt', { unique: false });
+                }
+
+                // Projects store
+                if (!db.objectStoreNames.contains(STORE_PROJECTS)) {
+                    const projectStore = db.createObjectStore(STORE_PROJECTS, { keyPath: 'id' });
+                    projectStore.createIndex('lastModified', 'lastModified', { unique: false });
+                    projectStore.createIndex('title', 'title', { unique: false });
                 }
             };
 
@@ -188,6 +196,66 @@ class AssetStorage {
             const transaction = db.transaction([STORE_FOLDERS], 'readwrite');
             const store = transaction.objectStore(STORE_FOLDERS);
             const request = store.delete(id);
+            request.onsuccess = () => resolve(id);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    // --- Projects ---
+
+    async saveProject(project) {
+        if (!project.id) {
+            project.id = `local-${Date.now()}`;
+        }
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORE_PROJECTS], 'readwrite');
+            const store = transaction.objectStore(STORE_PROJECTS);
+            const request = store.put(project);
+
+            request.onsuccess = () => resolve(project);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async getProject(id) {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORE_PROJECTS], 'readonly');
+            const store = transaction.objectStore(STORE_PROJECTS);
+            const request = store.get(id);
+
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async getAllProjects() {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORE_PROJECTS], 'readonly');
+            const store = transaction.objectStore(STORE_PROJECTS);
+            const request = store.getAll();
+
+            request.onsuccess = () => {
+                const projects = request.result.sort((a, b) => {
+                    const dateA = new Date(a.lastModified || a.timestamp || 0);
+                    const dateB = new Date(b.lastModified || b.timestamp || 0);
+                    return dateB - dateA;
+                });
+                resolve(projects);
+            };
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async deleteProject(id) {
+        const db = await this.getDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORE_PROJECTS], 'readwrite');
+            const store = transaction.objectStore(STORE_PROJECTS);
+            const request = store.delete(id);
+
             request.onsuccess = () => resolve(id);
             request.onerror = () => reject(request.error);
         });

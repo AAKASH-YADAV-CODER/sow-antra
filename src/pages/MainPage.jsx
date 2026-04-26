@@ -26,7 +26,8 @@ import ContextualToolbar from '../features/canvas/components/ContextualToolbar';
 import PositionPanel from '../features/canvas/components/PositionPanel';
 
 import AnimationPanel from '../features/canvas/components/AnimationPanel';
-import VideoTimeline from '../features/canvas/components/VideoTimeline/VideoTimeline'; // Import VideoTimeline
+import VideoTimeline from '../features/canvas/components/VideoTimeline/VideoTimeline';
+import GlobalAudioPlayer from '../features/canvas/components/GlobalAudioPlayer';
 // Style imports
 import '../styles/MainPageAnimations.css';
 // Utility imports
@@ -48,8 +49,11 @@ import useTemplates from '../features/canvas/hooks/useTemplates';
 import useKeyboardShortcuts from '../features/canvas/hooks/useKeyboardShortcuts';
 import useHelpers from '../features/canvas/hooks/useHelpers';
 import useCollaboration from '../features/canvas/hooks/useCollaboration';
+import useOnlineStatus from '../hooks/useOnlineStatus';
+import { storage } from '../utils/storage';
 // UI Helper Components
 import CollaborationPresence from '../features/collaboration/components/CollaborationPresence';
+import ContentPlannerModal from '../features/canvas/components/modals/ContentPlannerModal';
 
 const musicTracks = [
   { id: 'lofi', name: 'Lofi Study', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
@@ -79,6 +83,9 @@ const Sowntra = () => {
   const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
   // history and historyIndex now managed by useHistory hook
   const [showGrid, setShowGrid] = useState(false);
+  const [showRulers, setShowRulers] = useState(false);
+  const [guides, setGuides] = useState([]); // Array of { id, axis: 'x'|'y', position }
+  const [showMargins, setShowMargins] = useState(false);
   const [snapToGrid, setSnapToGrid] = useState(false);
   // recording, mediaRecorder, recordingStartTime, recordingTimeElapsed now managed by useRecording hook
   // drawingPath, isDrawing now managed by useCanvasInteraction hook
@@ -132,6 +139,7 @@ const Sowntra = () => {
   const [showTimerModal, setShowTimerModal] = useState(false);
   const [showGridView, setShowGridView] = useState(false);
   const [showPagesStrip, setShowPagesStrip] = useState(false);
+  const [showContentPlannerModal, setShowContentPlannerModal] = useState(false);
 
   // Persistent Timer States
   const [timerSeconds, setTimerSeconds] = useState(0);
@@ -143,12 +151,351 @@ const Sowntra = () => {
   const [isProcessingBG, setIsProcessingBG] = useState(false);
   const [bgProcessingStatus, setBgProcessingStatus] = useState('');
   const [saveStatus, setSaveStatus] = useState('idle'); // 'idle', 'saving', 'saved', 'error'
+  const isOnline = useOnlineStatus();
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Video Editor State
   const [isVideoMode, setIsVideoMode] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [videoDuration, setVideoDuration] = useState(5); // Default 5s page duration
+  const isTimelineImport = useRef(false);
   // Global audio tracks state could be here or in pages
+
+  // --- Refs (declared early so they can be used by hooks below) ---
+  const canvasRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const audioInputRef = useRef(null);
+  const canvasContainerRef = useRef(null);
+  const loadProjectInputRef = useRef(null);
+  const zoomIndicatorTimeoutRef = useRef(null);
+  const templateAppliedRef = useRef(false);
+  const lastResizeTriggerRef = useRef(0);
+
+  // --- Hook Synchronization ---
+  // Center canvas function - maximizes canvas size while maintaining aspect ratio
+  const centerCanvas = useCallback((customSize) => {
+    const canvasContainer = canvasContainerRef.current;
+    if (!canvasContainer || canvasContainer.clientWidth === 0 || canvasContainer.clientHeight === 0) return;
+
+    const containerWidth = canvasContainer.clientWidth;
+    const containerHeight = canvasContainer.clientHeight;
+
+    // Use custom size if provided (for immediate updates before state propagation), otherwise use state
+    const targetWidth = customSize?.width || canvasSize.width || 100;
+    const targetHeight = customSize?.height || canvasSize.height || 100;
+
+    // Calculate available space with comfortable padding (80px on each side)
+    const availableWidth = Math.max(100, containerWidth - 160);
+    const availableHeight = Math.max(100, containerHeight - 160);
+
+    // Calculate zoom ratios to fill available space
+    const widthRatio = availableWidth / targetWidth;
+    const heightRatio = availableHeight / targetHeight;
+
+    // Use the smaller ratio to ensure entire canvas fits while maximizing size
+    const optimalZoom = Math.min(widthRatio, heightRatio);
+
+    // Set the zoom level with generous bounds for user control
+    const targetZoom = Math.max(0.1, Math.min(2, optimalZoom));
+    setZoomLevel(prev => {
+      // Avoid looping if change is microscopic
+      if (Math.abs(prev - targetZoom) < 0.005) return prev;
+      return targetZoom;
+    });
+
+    // Reset canvas offset to center
+    setCanvasOffset(prev => {
+      if (prev.x === 0 && prev.y === 0) return prev;
+      return { x: 0, y: 0 };
+    });
+  }, [canvasSize]);
+
+  // useHistory needs setCurrentPageElements, but useElements (which returns it) needs saveToHistory (from useHistory).
+  const setCurrentPageElementsRef = useRef(null);
+  const setCurrentPageElements = useCallback((...args) => {
+    if (setCurrentPageElementsRef.current) {
+      return setCurrentPageElementsRef.current(...args);
+    }
+    // Fallback if useElements hasn't initialized yet
+    setPages(prevPages => prevPages.map(page =>
+      page.id === currentPage ? {
+        ...page,
+        elements: typeof args[0] === 'function' ? args[0](page.elements) : args[0]
+      } : page
+    ));
+  }, [currentPage, setPages]);
+
+  // Custom Hooks - History Management
+  const {
+    saveToHistory,
+    undo,
+    redo,
+    historyIndex,
+    history
+  } = useHistory(setCurrentPageElements, setCanvasSize, setZoomLevel);
+
+  // Custom Hooks - Element Management
+  const {
+    getCurrentPageElements,
+    setCurrentPageElements: realSetCurrentPageElements,
+    addElement,
+    updateElement,
+    updateElements,
+    deleteElement,
+    duplicateElement,
+    toggleElementLock,
+    updateFilter,
+    groupElements,
+    ungroupElements,
+    changeZIndex,
+    reorderElement,
+    alignElements,
+    splitElement,
+    applyEditableTemplate
+  } = useElements({
+    pages,
+    currentPage,
+    setPages,
+    saveToHistory,
+    lockedElements,
+    setLockedElements,
+    selectedElement,
+    setSelectedElement,
+    selectedElements,
+    setSelectedElements,
+    setCurrentTool,
+    currentLanguage,
+    textDirection,
+    t,
+    filterOptions,
+    supportedLanguages,
+    canvasSize,
+    setCanvasSize,
+    setZoomLevel,
+    centerCanvas
+  });
+
+  // Sync the ref so useHistory uses the actual setter from useElements
+  useEffect(() => {
+    setCurrentPageElementsRef.current = realSetCurrentPageElements;
+  }, [realSetCurrentPageElements]);
+
+  // Custom Hooks - Export Management
+  const canvasBackgroundColor = pages.find(p => p.id === currentPage)?.backgroundColor || '#ffffff';
+  const {
+    exportAsImage,
+    exportAsPDF,
+    exportAsVideo,
+    getCanvasDataURL
+  } = useExport({
+    getCurrentPageElements,
+    canvasSize,
+    imageEffects,
+    backgroundColor: pages.find(p => p.id === currentPage)?.backgroundGradient || canvasBackgroundColor,
+    projectName
+  });
+
+  // Custom Hooks - Project Management (Save/Load)
+  const {
+    handleSaveClick,
+    saveProject,
+    confirmSave,
+    loadProject,
+    handleProjectFileLoad
+  } = useProjectManager({
+    pages,
+    currentPage,
+    canvasSize,
+    zoomLevel,
+    canvasOffset,
+    showGrid,
+    snapToGrid,
+    currentLanguage,
+    textDirection,
+    projectName,
+    setProjectName,
+    setShowSaveDialog,
+    setPages,
+    setCurrentPage,
+    setCanvasSize,
+    setZoomLevel,
+    setCanvasOffset,
+    setShowGrid,
+    setSnapToGrid,
+    setCurrentLanguage,
+    setTextDirection,
+    setSelectedElement,
+    setSelectedElements,
+    loadProjectInputRef,
+    centerCanvas,
+    projectId: currentProjectId // Pass currentProjectId to hook
+  });
+
+  // Silent save wrapper for background tasks
+  const handleSilentSave = useCallback(async () => {
+    setSaveStatus('saving');
+    try {
+      // Capture design snapshot before saving
+      let thumbnail = null;
+      try {
+        // Use heavily compressed jpeg at 320px width for silent saves to avoid 1MB/5MB payload limits on the backend API
+        thumbnail = await getCanvasDataURL('jpeg', 320);
+      } catch (snapshotError) {
+        console.warn('Failed to capture silent-save snapshot:', snapshotError);
+      }
+
+      const response = await saveProject({ title: projectName, thumbnail }, true);
+      setSaveStatus('saved');
+
+      // Robust ID capture
+      const newId = response?.data?.id ||
+        response?.data?.project?.id ||
+        response?.data?.data?.id ||
+        response?.data?._id;
+
+      if (!currentProjectId && newId) {
+        navigate(`?project=${newId}`, { replace: true });
+      }
+    } catch (error) {
+      console.error('Silent save failed:', error);
+      setSaveStatus('error');
+    }
+  }, [saveProject, currentProjectId, navigate, getCanvasDataURL, projectName]);
+
+  // Comment click handler (declared before useHelpers which references it)
+  const handleCommentClick = useCallback((el) => {
+    setSelectedElement(el.id);
+    setSelectedElements(new Set([el.id]));
+    setShowCommentPopup(true);
+  }, []);
+
+  // Custom Hooks - Canvas Interaction (must come BEFORE useHelpers)
+  const {
+    showAlignmentLines,
+    alignmentLines,
+    measurements,
+    handleMouseDown,
+    handleMouseMove,
+    handleMouseUp: handlePointerUp,
+    handleCanvasMouseDown,
+    handleSelectElement,
+    handleTextEdit,
+    handleWheel,
+    renderSelectionHandles,
+    penCursorPos
+  } = useCanvasInteraction({
+    getCurrentPageElements,
+    setCurrentPageElements,
+    updateElement,
+    saveToHistory,
+    addElement,
+    lockedElements,
+    selectedElements,
+    setSelectedElements,
+    selectedElement,
+    setSelectedElement,
+    currentTool,
+    zoomLevel,
+    canvasOffset,
+    setCanvasOffset,
+    snapToGrid,
+    canvasRef,
+    setTextEditing,
+    currentPage,
+    canvasSize,
+    frameEditing,
+    setFrameEditing
+  });
+
+  // Custom Hooks - Helper Functions
+  const {
+    handleImageUpload,
+    handleAudioUpload,
+    handleLogout,
+    handleCanvasMouseEnter,
+    handleCanvasMouseLeave,
+    renderElement
+  } = useHelpers({
+    textEffects,
+    imageEffects,
+    shapeEffects,
+    fontFamilies,
+    supportedLanguages,
+    stickerOptions,
+    addElement,
+    updateElement,
+    getCurrentPageElements,
+    selectedElements,
+    textEditing,
+    setTextEditing,
+    lockedElements,
+    currentTool,
+    currentLanguage,
+    textDirection,
+    handleMouseDown,
+    handleSelectElement,
+    renderSelectionHandles,
+    handleTextEdit,
+    getBackgroundStyle,
+    getFilterCSS,
+    parseCSS,
+    logout,
+    navigate,
+    setUploads,
+    setCanvasHighlighted,
+    zoom: zoomLevel,
+    onCommentClick: handleCommentClick,
+    frameEditing,
+    setFrameEditing,
+    penCursorPos,
+    setCurrentPage,
+    isTimelineImport,
+    pages,
+    setPages,
+    canvasSize,
+    currentPage
+  });
+
+  // Custom Hooks - Template Management
+  const {
+    applyTemplate,
+    createCustomTemplate
+  } = useTemplates({
+    setCanvasSize,
+    centerCanvas,
+    setShowTemplates,
+    setShowCustomTemplateModal,
+    customTemplateSize
+  });
+
+  // Wrap the getter to filter if playing/video mode
+  // TRULY GLOBAL MASTER RENDERING: Aggregate elements from all pages if in Video Mode
+  const getVisibleElements = useCallback(() => {
+    if (!isVideoMode) return getCurrentPageElements();
+    
+    let allVisible = [];
+    let currentStart = 0;
+    
+    pages.forEach(page => {
+      const pageStart = currentStart;
+      const pageElements = page.elements || [];
+      
+      pageElements.forEach(el => {
+        const globalStart = (el.startTime || 0) + pageStart;
+        const dur = el.duration || 5.0;
+        
+        // Element is visible if it overlaps with global currentTime
+        if (currentTime >= globalStart && currentTime < (globalStart + dur)) {
+          // Adjust position/offset logic if necessary, 
+          allVisible.push(el);
+        }
+      });
+      
+      currentStart += (page.duration || 5);
+    });
+    
+    return allVisible;
+  }, [pages, isVideoMode, currentTime, getCurrentPageElements]);
 
   // Load persistent uploads on mount
   useEffect(() => {
@@ -213,41 +560,75 @@ const Sowntra = () => {
     }
   }, [isTimerRunning, selectedMusicId, isMusicMuted]);
 
+  // Video playback and duration logic
+  // Master Video Duration Calculation (Sum of all pages)
+  useEffect(() => {
+    if (!isVideoMode) return;
+    
+    // Total duration is the sum of all page durations
+    const totalDuration = pages.reduce((sum, p) => sum + (p.duration || 5), 0);
+    
+    if (totalDuration !== videoDuration) {
+      setVideoDuration(totalDuration);
+    }
+  }, [pages, isVideoMode, videoDuration]);
+
+  // Auto-Page Switching based on Global currentTime
+  useEffect(() => {
+    if (!isVideoMode) return;
+
+    let currentStart = 0;
+    const targetPage = pages.find(page => {
+      const pageDuration = page.duration || 5;
+      const isWithinPage = currentTime >= currentStart && currentTime < (currentStart + pageDuration);
+      currentStart += pageDuration;
+      return isWithinPage;
+    });
+
+    if (targetPage && targetPage.id !== currentPage) {
+      setCurrentPage(targetPage.id);
+    }
+    // Handle the very end of the video case
+    if (currentTime >= videoDuration && pages.length > 0) {
+      const lastPage = pages[pages.length - 1];
+      if (lastPage.id !== currentPage) setCurrentPage(lastPage.id);
+    }
+  }, [currentTime, pages, isVideoMode, videoDuration, currentPage]);
+
   // Video Playback Loop
   useEffect(() => {
     let animationFrame;
     if (isVideoMode && isPlaying) {
-      const startTime = Date.now() - (currentTime * 1000);
+      let lastTimestamp = Date.now();
 
       const loop = () => {
         const now = Date.now();
-        const newTime = (now - startTime) / 1000;
+        const deltaTime = (now - lastTimestamp) / 1000;
+        lastTimestamp = now;
 
-        if (newTime >= videoDuration) {
-          // Loop
-          setCurrentTime(0);
-          // setStartTime to now? No, effect re-runs on currentTime change?
-          // Actually, if we set currentTime(0), the effect dependency `currentTime` changes, 
-          // triggering re-run with new start time.
-        } else {
-          setCurrentTime(newTime);
-          animationFrame = requestAnimationFrame(loop);
-        }
+        setCurrentTime(prevTime => {
+          const newTime = prevTime + deltaTime;
+          if (newTime >= videoDuration) {
+            setIsPlaying(false); // Stop playback at the end
+            return videoDuration; // Stay at the final point
+          }
+          return newTime;
+        });
+
+        animationFrame = requestAnimationFrame(loop);
       };
 
       animationFrame = requestAnimationFrame(loop);
     }
     return () => cancelAnimationFrame(animationFrame);
-  }, [isVideoMode, isPlaying, videoDuration, currentTime]); // minimal deps
+  }, [isVideoMode, isPlaying, videoDuration]); // Removed currentTime from dependencies
 
-  const canvasRef = useRef(null);
-  const fileInputRef = useRef(null);
-  // floatingToolbarRef removed as unused
-  const canvasContainerRef = useRef(null);
-  const loadProjectInputRef = useRef(null);
-  const zoomIndicatorTimeoutRef = useRef(null);
-  const templateAppliedRef = useRef(false);
-  const lastResizeTriggerRef = useRef(0);
+  // (Refs moved above centerCanvas to fix TDZ errors)
+
+
+  // Audio is now handled by <GlobalAudioPlayer> component (see JSX return section)
+
+
 
 
   // getCurrentPageElements will be provided by useElements hook below
@@ -264,43 +645,6 @@ const Sowntra = () => {
     // which is out of scope for this immediate task but should be added later.
   }, [currentPage]);
 
-  const centerCanvas = useCallback((customSize) => {
-    const canvasContainer = canvasContainerRef.current;
-    if (!canvasContainer || canvasContainer.clientWidth === 0 || canvasContainer.clientHeight === 0) return;
-
-    const containerWidth = canvasContainer.clientWidth;
-    const containerHeight = canvasContainer.clientHeight;
-
-    // Use custom size if provided (for immediate updates before state propagation), otherwise use state
-    const targetWidth = customSize?.width || canvasSize.width || 100;
-    const targetHeight = customSize?.height || canvasSize.height || 100;
-
-    // Calculate available space with comfortable padding (80px on each side)
-    const availableWidth = Math.max(100, containerWidth - 160);
-    const availableHeight = Math.max(100, containerHeight - 160);
-
-    // Calculate zoom ratios to fill available space
-    const widthRatio = availableWidth / targetWidth;
-    const heightRatio = availableHeight / targetHeight;
-
-    // Use the smaller ratio to ensure entire canvas fits while maximizing size
-    const optimalZoom = Math.min(widthRatio, heightRatio);
-
-    // Set the zoom level with generous bounds for user control
-    // Clamp to a reasonable range to avoid extreme "jumps" on initial load
-    const targetZoom = Math.max(0.1, Math.min(2, optimalZoom));
-    setZoomLevel(prev => {
-      // Avoid looping if change is microscopic
-      if (Math.abs(prev - targetZoom) < 0.005) return prev;
-      return targetZoom;
-    });
-
-    // Reset canvas offset to center
-    setCanvasOffset(prev => {
-      if (prev.x === 0 && prev.y === 0) return prev;
-      return { x: 0, y: 0 };
-    });
-  }, [canvasSize]);
 
   // Auto-fit whenever canvas size meaningful changes (e.g. template application)
   useEffect(() => {
@@ -320,12 +664,7 @@ const Sowntra = () => {
     i18n.changeLanguage(currentLanguage);
   }, [currentLanguage, i18n]);
 
-  // Comment click handler
-  const handleCommentClick = useCallback((el) => {
-    setSelectedElement(el.id);
-    setSelectedElements(new Set([el.id]));
-    setShowCommentPopup(true);
-  }, []);
+  // (handleCommentClick moved above useHelpers — see below)
 
   // Auto-fit canvas to screen on mount and resize
   useEffect(() => {
@@ -365,50 +704,77 @@ const Sowntra = () => {
   // Load project if projectId is provided
   useEffect(() => {
     const loadProject = async () => {
-      if (!currentProjectId || !currentUser) {
-        return; // Wait for user to be authenticated
+      if (!currentProjectId) {
+        return; 
       }
 
+      // 1. Try to load from Local Storage (IndexedDB) first for speed and offline access
       try {
-        // Ensure auth is ready before making the request
-        const { auth } = await import('../config/firebase');
-        if (!auth.currentUser) {
-          console.warn('User not authenticated, skipping project load');
-          return;
+        const localProject = await storage.getProject(currentProjectId);
+        if (localProject) {
+          console.log('Loaded project from local storage');
+          if (localProject.pages) setPages(localProject.pages);
+          if (localProject.currentPage) setCurrentPage(localProject.currentPage);
+          if (localProject.canvasSize) setCanvasSize(localProject.canvasSize);
+          if (localProject.projectName) setProjectName(localProject.projectName);
+          if (localProject.currentLanguage) setCurrentLanguage(localProject.currentLanguage);
+          if (localProject.textDirection) setTextDirection(localProject.textDirection);
+          
+          setTimeout(() => centerCanvas(), 100);
         }
+      } catch (err) {
+        console.warn('Failed to load from local storage:', err);
+      }
 
-        const response = await projectAPI.loadProject(currentProjectId);
-        const { projectData } = response.data;
+      // 2. If online, try to fetch the absolute latest from the cloud
+      if (isOnline && currentUser) {
+        try {
+          const { auth } = await import('../config/firebase');
+          if (!auth.currentUser) return;
 
-        if (projectData) {
-          if (projectData.pages) setPages(projectData.pages);
-          if (projectData.currentPage) setCurrentPage(projectData.currentPage);
-          if (projectData.canvasSize) setCanvasSize(projectData.canvasSize);
-          // Always auto-fit on load instead of restoring saved zoom
-          // if (projectData.zoomLevel) setZoomLevel(projectData.zoomLevel);
-          if (projectData.canvasOffset) setCanvasOffset(projectData.canvasOffset);
-          if (projectData.showGrid !== undefined) setShowGrid(projectData.showGrid);
-          if (projectData.snapToGrid !== undefined) setSnapToGrid(projectData.snapToGrid);
-          if (projectData.currentLanguage) setCurrentLanguage(projectData.currentLanguage);
-          if (projectData.textDirection) setTextDirection(projectData.textDirection);
+          const response = await projectAPI.loadProject(currentProjectId);
+          const { projectData } = response.data;
 
-          // Force fit to screen
-          setTimeout(() => {
-            centerCanvas();
-          }, 200);
-        }
-      } catch (error) {
-        console.error('Error loading project:', error);
-        // Log more details for debugging
-        if (error.response) {
-          console.error('Response status:', error.response.status);
-          console.error('Response data:', error.response.data);
+          if (projectData) {
+            // Only update if cloud version is different or local didn't exist
+            setPages(projectData.pages || []);
+            setCurrentPage(projectData.currentPage || 'page-1');
+            setCanvasSize(projectData.canvasSize || { width: 800, height: 600 });
+            if (projectData.title) setProjectName(projectData.title);
+            
+            // Save this latest version to local too
+            storage.saveProject({ id: currentProjectId, ...projectData });
+            
+            setTimeout(() => centerCanvas(), 200);
+          }
+        } catch (error) {
+          console.error('Error loading project from cloud:', error);
         }
       }
     };
 
     loadProject();
-  }, [currentProjectId, currentUser, centerCanvas]);
+  }, [currentProjectId, currentUser, isOnline, centerCanvas]);
+
+  // Handle automatic syncing when coming back online
+  useEffect(() => {
+    if (isOnline && currentProjectId) {
+      const syncProject = async () => {
+        setIsSyncing(true);
+        try {
+          // If we have local unsynced changes, projectAPI.updateProject would have been skipped 
+          // during offline saving. Let's trigger a silent save to push the latest local state.
+          await handleSilentSave();
+        } catch (err) {
+          console.error('Auto-sync failed:', err);
+        } finally {
+          setIsSyncing(false);
+        }
+      };
+      
+      syncProject();
+    }
+  }, [isOnline, currentProjectId, handleSilentSave]);
 
   // Load transliteration data
   useEffect(() => {
@@ -465,16 +831,6 @@ const Sowntra = () => {
 
 
 
-  const setCurrentPageElements = useCallback((newElementsOrFn) => {
-    setPages(prevPages => prevPages.map(page =>
-      page.id === currentPage ? {
-        ...page,
-        elements: typeof newElementsOrFn === 'function'
-          ? newElementsOrFn(page.elements)
-          : newElementsOrFn
-      } : page
-    ));
-  }, [currentPage]);
 
   // Need a way to inject time-based filtering into rendering without modifying useElements core logic too much.
   // Actually, CanvasWorkspace uses `getCurrentPageElements` via prop, or `useElements` hook?
@@ -485,103 +841,9 @@ const Sowntra = () => {
   // Wrap the getter to filter if playing/video mode
 
 
-  // Custom Hooks - History Management
-  const {
-    history,
-    historyIndex,
-    saveToHistory,
-    undo,
-    redo
-  } = useHistory(setCurrentPageElements, setCanvasSize, setZoomLevel);
 
-  // Custom Hooks - Element Management
-  const {
-    getCurrentPageElements,
-    addElement,
-    updateElement,
-    updateElements,
-    deleteElement,
-    duplicateElement,
-    toggleElementLock,
-    updateFilter,
-    groupElements,
-    ungroupElements,
-    changeZIndex,
-    reorderElement,
-    alignElements,
-    applyEditableTemplate
-  } = useElements({
-    pages,
-    currentPage,
-    setPages,
-    saveToHistory,
-    lockedElements,
-    setLockedElements,
-    selectedElement,
-    setSelectedElement,
-    selectedElements,
-    setSelectedElements,
-    setCurrentTool,
-    currentLanguage,
-    textDirection,
-    t,
-    filterOptions,
-    supportedLanguages,
-    canvasSize,
-    setCanvasSize,
-    setZoomLevel,
-    centerCanvas // Pass auto-fit function to hook
-  });
 
-  // Wrap the getter to filter if playing/video mode
-  const getVisibleElements = useCallback(() => {
-    const elements = getCurrentPageElements();
-    if (!isVideoMode) return elements;
-    return elements.filter(el => {
-      const start = el.startTime || 0;
-      const dur = el.duration || videoDuration; // default to page duration
-      return currentTime >= start && currentTime <= (start + dur);
-    });
-  }, [getCurrentPageElements, isVideoMode, currentTime, videoDuration]);
-
-  // Custom Hooks - Canvas Interaction
-  const {
-    drawingPath,
-    showAlignmentLines,
-    alignmentLines,
-    measurements, // Get measurements
-    handleMouseDown,
-    handleMouseMove,
-    handleMouseUp,
-    handleCanvasMouseDown,
-    handleSelectElement,
-    handleTextEdit,
-    handleWheel,
-    renderSelectionHandles,
-    penCursorPos
-  } = useCanvasInteraction({
-    getCurrentPageElements,
-    setCurrentPageElements,
-    updateElement,
-    saveToHistory,
-    addElement,
-    lockedElements,
-    selectedElements,
-    setSelectedElements,
-    selectedElement,
-    setSelectedElement,
-    currentTool,
-    zoomLevel,
-    canvasOffset,
-    setCanvasOffset,
-    snapToGrid,
-    canvasRef,
-    setTextEditing,
-    currentPage, // Add this
-    canvasSize,
-    frameEditing,
-    setFrameEditing
-  });
+  // (useCanvasInteraction moved above useHelpers to fix TDZ — see above)
 
   // Custom Hooks - Recording
   const {
@@ -608,6 +870,8 @@ const Sowntra = () => {
     movePage,
     playAnimations,
     resetAnimations,
+    splitPage,
+    updatePageDuration,
     zoom
   } = useCanvasUtils({
     getCurrentPageElements,
@@ -621,6 +885,8 @@ const Sowntra = () => {
     setZoomLevel,
     isPlaying,
     setIsPlaying,
+    setCurrentTime,
+    isVideoMode,
     setShowZoomIndicator,
     zoomIndicatorTimeoutRef
   });
@@ -936,192 +1202,6 @@ const Sowntra = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentLanguage, currentPage]);
 
-  // NOTE: The following functions are now provided by useCanvasInteraction hook:
-  // - calculateAlignmentLines
-  // - handleSelectElement
-  // - handleDrawing
-  // - finishDrawing
-  // - renderSelectionHandles
-  // - handleMouseDown
-  // - handleMouseMove
-  // - handleMouseUp
-  // - handleCanvasMouseDown
-  // - handleTextEdit
-
-  // Handle text change with transliteration support
-  // const handleTextChange = useCallback((e, elementId) => {
-  //   let newContent = e.target.textContent;
-  //   
-  //   if (transliterationEnabled && Object.keys(transliterationMap).length > 0) {
-  //     let transliteratedContent = newContent;
-  //     
-  //     Object.entries(transliterationMap).forEach(([english, native]) => {
-  //       const regex = new RegExp(english, 'gi');
-  //       transliteratedContent = transliteratedContent.replace(regex, native);
-  //     });
-  //     
-  //     newContent = transliteratedContent;
-  //     
-  //     if (e.target.textContent !== newContent) {
-  //       e.target.textContent = newContent;
-  //       const selection = window.getSelection();
-  //       const range = document.createRange();
-  //       range.selectNodeContents(e.target);
-  //       range.collapse(false);
-  //       selection.removeAllRanges();
-  //       selection.addRange(range);
-  //     }
-  //   }
-  //   
-  //   updateElement(elementId, { content: newContent });
-  // }, [transliterationEnabled, transliterationMap, updateElement]);
-
-  // NOTE: The following functions are now provided by useCanvasUtils hook:
-  // - addNewPage, deleteCurrentPage, renameCurrentPage
-  // - playAnimations, resetAnimations
-  // - zoom
-
-  // Custom Hooks - Export Management
-  const canvasBackgroundColor = pages.find(p => p.id === currentPage)?.backgroundColor || '#ffffff';
-  const {
-    exportAsImage,
-    exportAsPDF,
-    exportAsVideo,
-    getCanvasDataURL
-  } = useExport({
-    getCurrentPageElements,
-    canvasSize,
-    imageEffects,
-    backgroundColor: pages.find(p => p.id === currentPage)?.backgroundGradient || canvasBackgroundColor,
-    projectName
-  });
-
-  // Custom Hooks - Helper Functions
-  const {
-    handleImageUpload,
-    handleLogout,
-    handleCanvasMouseEnter,
-    handleCanvasMouseLeave,
-    renderElement,
-    renderDrawingPath
-  } = useHelpers({
-    textEffects,
-    imageEffects,
-    shapeEffects,
-    fontFamilies,
-    supportedLanguages,
-    stickerOptions,
-    addElement,
-    updateElement,
-    getCurrentPageElements,
-    selectedElements,
-    textEditing,
-    setTextEditing,
-    lockedElements,
-    currentTool,
-    currentLanguage,
-    textDirection,
-    handleMouseDown,
-    handleSelectElement,
-    renderSelectionHandles,
-    handleTextEdit,
-    getBackgroundStyle,
-    getFilterCSS,
-    parseCSS,
-    logout,
-    navigate,
-    setUploads,
-    setCanvasHighlighted,
-    zoom: zoomLevel,
-    onCommentClick: handleCommentClick,
-    frameEditing,
-    setFrameEditing,
-    penCursorPos,
-    setCurrentPage // Pass setCurrentPage to hook
-  });
-
-  // Custom Hooks - Template Management
-  const {
-    applyTemplate,
-    createCustomTemplate
-  } = useTemplates({
-    setCanvasSize,
-    centerCanvas,
-    setShowTemplates,
-    setShowCustomTemplateModal,
-    customTemplateSize
-  });
-
-  // NOTE: Helper functions now provided by useHelpers hook:
-  // - handleImageUpload, handleLogout, handleCanvasMouseEnter, handleCanvasMouseLeave
-  // - renderElement, renderDrawingPath, getEffectCSSWrapper, getCanvasEffectsWrapper
-
-  // Custom Hooks - Project Management (Save/Load)
-  const {
-    handleSaveClick,
-    saveProject,
-    confirmSave,
-    loadProject,
-    handleProjectFileLoad
-  } = useProjectManager({
-    pages,
-    currentPage,
-    canvasSize,
-    zoomLevel,
-    canvasOffset,
-    showGrid,
-    snapToGrid,
-    currentLanguage,
-    textDirection,
-    projectName,
-    setProjectName,
-    setShowSaveDialog,
-    setPages,
-    setCurrentPage,
-    setCanvasSize,
-    setZoomLevel,
-    setCanvasOffset,
-    setShowGrid,
-    setSnapToGrid,
-    setCurrentLanguage,
-    setTextDirection,
-    setSelectedElement,
-    setSelectedElements,
-    loadProjectInputRef,
-    centerCanvas,
-    projectId: currentProjectId // Pass currentProjectId to hook
-  });
-
-  // Silent save wrapper for background tasks
-  const handleSilentSave = useCallback(async () => {
-    setSaveStatus('saving');
-    try {
-      // Capture design snapshot before saving
-      let thumbnail = null;
-      try {
-        thumbnail = await getCanvasDataURL('png');
-      } catch (snapshotError) {
-        console.warn('Failed to capture silent-save snapshot:', snapshotError);
-      }
-
-      const response = await saveProject({ title: projectName, thumbnail }, true);
-      setSaveStatus('saved');
-
-      // Robust ID capture
-      const newId = response?.data?.id ||
-        response?.data?.project?.id ||
-        response?.data?.data?.id ||
-        response?.data?._id;
-
-      if (!currentProjectId && newId) {
-        navigate(`?project=${newId}`, { replace: true });
-      }
-    } catch (error) {
-      console.error('Silent save failed:', error);
-      setSaveStatus('error');
-    }
-  }, [saveProject, currentProjectId, navigate, getCanvasDataURL, projectName]);
-
   // Debounced Auto-save to backend
   useEffect(() => {
     // Only auto-save if there are elements or a non-default name
@@ -1149,21 +1229,6 @@ const Sowntra = () => {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [handleSilentSave, saveStatus]);
-
-  // NOTE: The following functions are now provided by useProjectManager hook:
-  // - handleSaveClick, saveProject, confirmSave, loadProject, handleProjectFileLoad
-
-  // RecordingStatus, TransliterationToggle, VideoSettings are now imported as components
-
-  // Language Help Modal
-  // LanguageHelpModal is now imported from components
-
-  // EffectsPanel is now imported from components
-
-  // Custom Template Modal Component
-  // CustomTemplateModal is now imported from components
-
-  // NOTE: renderElement and renderDrawingPath functions now provided by useHelpers hook
 
   // Custom Hooks - Clipboard
   const {
@@ -1204,22 +1269,37 @@ const Sowntra = () => {
     activeSidePanel,
     setActiveSidePanel,
     copyElements,
-    pasteElements
+    pasteElements,
+    splitElement,
+    splitPage,
+    onDeletePage: (id) => {
+      // Direct call to setPages to delete the page by ID
+      setPages(prev => prev.filter(p => p.id !== id));
+      // Reset selection
+      setSelectedElement(null);
+      setSelectedElements(new Set());
+    },
+    pages,
+    currentPage,
+    currentTime,
+    showRulers,
+    setShowRulers
   });
 
   // NOTE: Keyboard shortcuts handler now provided by useKeyboardShortcuts hook
   // This replaces the large useEffect with handleKeyDown function
 
 
-  // Add event listeners
+  // Add event listeners (using Pointer Events for precision drawing)
   useEffect(() => {
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('pointermove', handleMouseMove);
+    document.addEventListener('pointerup', handlePointerUp);
+    
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('pointermove', handleMouseMove);
+      document.removeEventListener('pointerup', handlePointerUp);
     };
-  }, [handleMouseMove, handleMouseUp]);
+  }, [handleMouseMove, handlePointerUp]);
 
   // Auto-apply template or custom size from URL if present
   useEffect(() => {
@@ -1270,8 +1350,39 @@ const Sowntra = () => {
     setSelectedElements(new Set());
   }, [setSelectedElement, setSelectedElements]);
 
+  const handleSplit = useCallback(() => {
+    if (selectedElement && splitElement) {
+      splitElement(selectedElement, currentTime);
+    } else if (splitPage) {
+      splitPage(currentTime);
+    }
+  }, [selectedElement, splitElement, splitPage, currentTime]);
+
+  const handleSelectElementFromTimeline = useCallback((id) => {
+    if (!id) {
+      setSelectedElement(null);
+      setSelectedElements(new Set());
+      return;
+    }
+    setSelectedElement(id);
+    setSelectedElements(new Set([id]));
+    
+    // Auto-scroll/jump to page if it's not the current one
+    const p = pages.find(p => p.elements?.some(el => el.id === id));
+    if (p && p.id !== currentPage) {
+      setCurrentPage(p.id);
+    }
+  }, [pages, currentPage, setSelectedElement, setSelectedElements, setCurrentPage]);
+
   return (
     <>
+      {/* Global Audio Player - handles all audio element playback synced to timeline */}
+      <GlobalAudioPlayer
+        pages={pages}
+        currentTime={currentTime}
+        isPlaying={isPlaying}
+        isMusicMuted={isMusicMuted}
+      />
       <div className={`h-screen flex flex-col ${textDirection === 'rtl' ? 'rtl-layout' : ''}`}>
         {/* Header - Responsive */}
         <TopHeader
@@ -1282,6 +1393,11 @@ const Sowntra = () => {
           centerCanvas={centerCanvas}
           showTemplates={showTemplates}
           setShowTemplates={setShowTemplates}
+          showRulers={showRulers}
+          setShowRulers={setShowRulers}
+          setGuides={setGuides}
+          showMargins={showMargins}
+          setShowMargins={setShowMargins}
           playAnimations={playAnimations}
           resetAnimations={resetAnimations}
           isPlaying={isPlaying}
@@ -1321,6 +1437,8 @@ const Sowntra = () => {
           isCreatorMode={searchParams.get('isCreatorMode') === 'true'}
           saveStatus={saveStatus}
           getCanvasDataURL={getCanvasDataURL}
+          isOnline={isOnline}
+          isSyncing={isSyncing}
         />
 
 
@@ -1331,15 +1449,12 @@ const Sowntra = () => {
             t={t}
             currentTool={currentTool}
             setCurrentTool={setCurrentTool}
-            addElement={(type, props) => {
-              if (type === 'template') {
-                applyEditableTemplate(props.templateId);
-              } else {
-                addElement(type, props);
-              }
-            }}
+            addElement={addElement}
+            applyEditableTemplate={applyEditableTemplate}
             fileInputRef={fileInputRef}
+            audioInputRef={audioInputRef}
             handleImageUpload={handleImageUpload}
+            handleAudioUpload={handleAudioUpload}
             loadProjectInputRef={loadProjectInputRef}
             handleProjectFileLoad={handleProjectFileLoad}
             undo={undo}
@@ -1354,11 +1469,17 @@ const Sowntra = () => {
             setUploads={setUploads}
             canvasSize={canvasSize}
             setCanvasSize={setCanvasSize}
+            setShowContentPlannerModal={setShowContentPlannerModal}
             activeSidePanel={activeSidePanel}
             setActiveSidePanel={(panel) => {
               setActiveSidePanel(panel);
-              if (panel === 'Video') {
-                setIsVideoMode(true);
+              // Keep video mode active for any media/editing tab once in video context
+              const videoTabs = ['Video', 'video', 'audio', 'images', 'uploads', 'elements', 'text', 'design'];
+              if (videoTabs.includes(panel)) {
+                // Only force true if we are already in video mode or selecting video/audio specifically
+                if (panel === 'video' || panel === 'audio' || isVideoMode) {
+                  setIsVideoMode(true);
+                }
               } else {
                 setIsVideoMode(false);
               }
@@ -1453,6 +1574,7 @@ const Sowntra = () => {
               zoomLevel={zoomLevel}
               canvasOffset={canvasOffset}
               handleCanvasMouseDown={handleCanvasMouseDown}
+              handlePointerUp={handlePointerUp}
               handleCanvasMouseEnter={handleCanvasMouseEnter}
               handleCanvasMouseLeave={handleCanvasMouseLeave}
               touchStartDistance={touchStartDistance}
@@ -1465,10 +1587,12 @@ const Sowntra = () => {
               setZoomLevel={setZoomLevel}
               showGrid={showGrid}
               setShowGrid={setShowGrid}
+              showRulers={showRulers}
+              guides={guides}
+              setGuides={setGuides}
+              showMargins={showMargins}
               getCurrentPageElements={getVisibleElements} // Video Mode Time Filtering
               renderElement={renderElement}
-              renderDrawingPath={renderDrawingPath}
-              drawingPath={drawingPath}
               showAlignmentLines={showAlignmentLines}
               alignmentLines={alignmentLines}
               onMouseMove={handleCanvasMouseMoveForCollaboration}
@@ -1499,42 +1623,126 @@ const Sowntra = () => {
               setIsTimerRunning={setIsTimerRunning}
               selectedMusicId={selectedMusicId}
               setSelectedMusicId={setSelectedMusicId}
+              isVideoMode={isVideoMode}
               musicTracks={musicTracks}
               isMusicMuted={isMusicMuted}
               setIsMusicMuted={setIsMusicMuted}
               measurements={measurements} // Pass measurements
+              currentTime={currentTime}
+              isPlaying={isPlaying}
             />
-          </div>
 
-          {/* Video Timeline (Bottom) */}
-          {isVideoMode && (
-            <div className="absolute left-0 right-0 bottom-0 h-64 z-[1002] animate-in slide-in-from-bottom duration-300">
+            {/* Video Timeline (Bottom) — inside flex-col so canvas shrinks instead of overlapping */}
+            {isVideoMode && (
+              <div className="flex-shrink-0 animate-in slide-in-from-bottom duration-300">
               <VideoTimeline
                 pages={pages}
                 currentPage={currentPage}
-                setCurrentPage={setCurrentPage}
+                setCurrentPage={(id) => {
+                  // Navigation Sync: Clicking a scene jumps the playhead to its start
+                  let startOffset = 0;
+                  for (let p of pages) {
+                    if (p.id === id) break;
+                    startOffset += (p.duration || 5);
+                  }
+                  setCurrentTime(startOffset);
+                  setCurrentPage(id);
+                }}
                 currentDetails={pages.find(p => p.id === currentPage) || {}}
                 onUpdateElement={updateElement}
-                onUpdatePageDuration={(newDuration) => {
-                  setVideoDuration(newDuration); // Update local state
-                  // Also update page data if we persist page duration
-                  setPages(prev => prev.map(p => p.id === currentPage ? { ...p, duration: newDuration } : p));
-                }}
+                onUpdatePageDuration={updatePageDuration}
                 currentTime={currentTime}
                 setCurrentTime={setCurrentTime}
                 isPlaying={isPlaying}
                 setIsPlaying={setIsPlaying}
                 duration={videoDuration}
                 selectedElement={selectedElement}
-                setSelectedElement={setSelectedElement}
-              // audioTracks={audioTracks}
+                setSelectedElement={handleSelectElementFromTimeline}
+                onAddClip={(id, type, action) => {
+                  if (type === 'audio') {
+                    setActiveSidePanel('audio');
+                    // Small delay to ensure panel is active if needed, but ref click is synchronous
+                    audioInputRef.current?.click();
+                    return;
+                  }
+
+                  if (action === 'import') {
+                    isTimelineImport.current = true;
+                    fileInputRef.current?.click();
+                  } else if (action === 'blank') {
+                    addElement('rectangle', { 
+                      fill: '#ffffff', 
+                      fitToCanvas: true,
+                      label: 'Blank'
+                    });
+                  } else {
+                    // Default behavior
+                    if (type === 'video' || type === 'image') fileInputRef.current?.click();
+                    else if (type === 'text') addElement('text');
+                    else if (type === 'audio') {
+                      setActiveSidePanel('audio');
+                      audioInputRef.current?.click();
+                    }
+                  }
+                }}
+                onAddPage={(action) => {
+                  const newPageId = `page-${Date.now()}`;
+                  const newPage = { id: newPageId, name: `Page ${pages.length + 1}`, elements: [], duration: 5.0, backgroundColor: '#ffffff' };
+                  
+                  setPages(prev => [...prev, newPage]);
+                  setCurrentPage(newPageId);
+                  setSelectedElement(null);
+                  setSelectedElements(new Set());
+
+                  if (action === 'import') {
+                    // Slight delay to ensure page context is set before triggering upload
+                    setTimeout(() => {
+                      isTimelineImport.current = true;
+                      fileInputRef.current?.click();
+                    }, 50);
+                  }
+                }}
+                onDeletePage={(id) => {
+                  if (pages.length <= 1) return;
+                  const newPages = pages.filter(p => p.id !== id);
+                  setPages(newPages);
+                  if (currentPage === id) {
+                    setCurrentPage(newPages[0].id);
+                  }
+                }}
+                onDuplicatePage={(id) => {
+                  const pageToDup = pages.find(p => p.id === id);
+                  if (pageToDup) {
+                    const newPageId = `page-${Date.now()}`;
+                    const newPage = { 
+                      ...pageToDup, 
+                      id: newPageId, 
+                      name: `${pageToDup.name} (Copy)`,
+                      // Ensure all elements get new IDs 
+                      elements: pageToDup.elements.map(el => ({ ...el, id: `el-${Math.random().toString(36).substr(2, 9)}` }))
+                    };
+                    setPages(prev => [...prev, newPage]);
+                    setCurrentPage(newPageId);
+                  }
+                }}
+                onDeleteClip={deleteElement}
+                onSplit={handleSplit}
+                onClipDoubleClick={(clipId, clipType) => {
+                  // Select the element on canvas
+                  setSelectedElement(clipId);
+                  // Open the relevant editing panel (Canva-like "mixed" panel switch)
+                  if (clipType === 'text') {
+                    setActiveSidePanel('text');
+                  } else if (clipType === 'element') {
+                    setActiveSidePanel('elements');
+                  }
+                }}
               />
             </div>
-          )}
+            )}
+          </div>
 
-          {/* Right Properties Panel - Hidden on mobile */}
-
-        </div>
+        </div> {/* end main-content */}
 
 
         {/* Side Panels Container (Left side) */}
@@ -1586,37 +1794,7 @@ const Sowntra = () => {
           isSidePanel={true}
         />
 
-        {/* Floating Toolbar for Selected Elements - Hidden when commenting */}
-        {!showCommentPopup && (
-          <FloatingToolbar
-            selectedElements={selectedElements}
-            pages={pages}
-            currentPage={currentPage}
-            groupElements={groupElements}
-            ungroupElements={ungroupElements}
-            duplicateElement={duplicateElement}
-            toggleElementLock={toggleElementLock}
-            deleteElement={deleteElement}
-            lockedElements={lockedElements}
-            zoomLevel={zoomLevel}
-            canvasOffset={canvasOffset}
-            canvasRef={canvasRef}
-            canvasSize={canvasSize}
-            onCommentClick={() => setShowCommentPopup(true)}
-            alignElements={alignElements}
-            changeZIndex={changeZIndex}
-            copyElements={copyElements}
-            copyStyle={copyStyle}
-            pasteElements={pasteElements}
-            pasteStyle={pasteStyle}
-            hasClipboard={hasClipboard}
-            hasStyleClipboard={hasStyleClipboard}
-            onShowLayers={() => {
-              setPositionPanelDefaultTab('layers');
-              setActiveSidePanel('position');
-            }}
-          />
-        )}
+
 
         {showCommentPopup && selectedElementData && (
           <CommentPopup
@@ -1654,6 +1832,9 @@ const Sowntra = () => {
           setCurrentTool={setCurrentTool}
           addElement={addElement}
           fileInputRef={fileInputRef}
+          audioInputRef={audioInputRef}
+          handleImageUpload={handleImageUpload}
+          handleAudioUpload={handleAudioUpload}
           undo={undo}
           redo={redo}
           historyIndex={historyIndex}
@@ -1699,6 +1880,12 @@ const Sowntra = () => {
           projectName={projectName}
           setProjectName={setProjectName}
           confirmSave={confirmSave}
+        />
+
+        <ContentPlannerModal 
+          isOpen={showContentPlannerModal} 
+          onClose={() => setShowContentPlannerModal(false)} 
+          getPreviewImage={getCanvasDataURL}
         />
 
         {/* Collaboration Presence - Show active users and cursors */}

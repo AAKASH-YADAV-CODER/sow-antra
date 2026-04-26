@@ -1,4 +1,3 @@
-import { Square, Type, Image, Smartphone, Monitor, FileText, Printer, Heart, Palette, Hexagon, Circle } from 'lucide-react';
 import { fontFamilies, socialMediaTemplates } from '../utils/constants';
 
 /**
@@ -117,7 +116,6 @@ for (let i = 1; i <= 1000; i++) {
     const bodyFont = fontFamilies[i * 13 % fontFamilies.length];
 
     const size = socialMediaTemplates[meta.sizeKey] || { width: 1080, height: 1080 };
-    const keyword = meta.keywords[i % meta.keywords.length];
 
     // Deterministic images for consistency
     const sharedImage = `https://picsum.photos/seed/${id}/800/800`;

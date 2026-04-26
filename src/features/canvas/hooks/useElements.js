@@ -50,6 +50,17 @@ const useElements = ({
   // Synchronous mirror of elements for rapid-fire interactions (like Pen tool)
   // We store pageId to ensure we don't use stale data after switching pages
   const elementsRef = useRef({ pageId: null, elements: [] });
+  const currentPageRef = useRef(currentPage);
+  const pagesRef = useRef(pages);
+
+  // Keep refs in sync with props
+  useEffect(() => {
+    currentPageRef.current = currentPage;
+  }, [currentPage]);
+
+  useEffect(() => {
+    pagesRef.current = pages;
+  }, [pages]);
 
   // Keep the ref in sync with pages prop
   useEffect(() => {
@@ -65,21 +76,34 @@ const useElements = ({
 
   // Get current page elements
   const getCurrentPageElements = useCallback(() => {
+    const activePageId = currentPageRef.current;
     // Priority: use the synchronous ref for interactions if it belongs to the current page
-    if (elementsRef.current && elementsRef.current.pageId === currentPage) {
+    if (elementsRef.current && elementsRef.current.pageId === activePageId) {
       return elementsRef.current.elements || [];
     }
-    const page = pages.find(p => p.id === currentPage);
+    const page = pagesRef.current.find(p => p.id === activePageId);
     return page ? (page.elements || []) : [];
-  }, [pages, currentPage]);
+  }, []);
 
-  // Set current page elements
-  const setCurrentPageElements = useCallback((newElements) => {
-    elementsRef.current = { pageId: currentPage, elements: newElements }; // Sync update
+  // Set current page elements — supports both direct arrays AND functional updaters (prevEl => newEl)
+  const setCurrentPageElements = useCallback((newElementsOrUpdater) => {
+    const activePageId = currentPageRef.current;
+    // Resolve functional updater BEFORE storing in the ref.
+    const currentSnapshot = (elementsRef.current?.pageId === activePageId)
+      ? (elementsRef.current.elements || [])
+      : (pagesRef.current.find(p => p.id === activePageId)?.elements || []);
+
+    const newElements = typeof newElementsOrUpdater === 'function'
+      ? newElementsOrUpdater(currentSnapshot)
+      : newElementsOrUpdater;
+
+    elementsRef.current = { pageId: activePageId, elements: newElements }; // Always an array
     setPages(prevPages => prevPages.map(page =>
-      page.id === currentPage ? { ...page, elements: newElements } : page
+      page.id === activePageId ? { ...page, elements: newElements } : page
     ));
-  }, [currentPage, setPages]);
+  }, [setPages]);
+
+  const currentPageDuration = pages.find(p => p.id === currentPage)?.duration || 5.0;
 
   // Add element to canvas
   const addElement = useCallback((type, properties = {}) => {
@@ -135,6 +159,11 @@ const useElements = ({
       return;
     }
 
+    // Get current page duration using refs to avoid stale closure
+    const activePageId = currentPageRef.current;
+    const activePage = pagesRef.current.find(p => p.id === activePageId);
+    const activePageDuration = activePage?.duration || 5.0;
+
     // Proportional sizing
     // Helper to create a single element
     const createElement = (elType, elProps, indexOffset = 0) => {
@@ -154,13 +183,16 @@ const useElements = ({
       const newElement = {
         id: generateId(),
         type: elType,
-        x: elProps.x !== undefined ? elProps.x : Math.round((canvasSize.width - width) / 2),
-        y: elProps.y !== undefined ? elProps.y : Math.round((canvasSize.height - height) / 2),
+        x: elProps.fitToCanvas ? 0 : (elProps.x !== undefined ? elProps.x : Math.round((canvasSize.width - width) / 2)),
+        y: elProps.fitToCanvas ? 0 : (elProps.y !== undefined ? elProps.y : Math.round((canvasSize.height - height) / 2)),
         rotation: 0,
         animation: null,
         zIndex: currentElements.length + indexOffset,
         locked: false,
+        name: elProps.name || (elType.charAt(0).toUpperCase() + elType.slice(1)),
         filters: JSON.parse(JSON.stringify(filterOptions)),
+        startTime: elProps.startTime !== undefined ? elProps.startTime : 0,
+        duration: elProps.duration !== undefined ? elProps.duration : activePageDuration,
         fill: elProps.fill || (elType === 'rectangle' ? '#3b82f6' :
           elType === 'circle' ? '#ef4444' :
             elType === 'triangle' ? '#10b981' :
@@ -212,6 +244,22 @@ const useElements = ({
         newElement.extrudeColor = elProps.extrudeColor || '#000000';
         newElement.angle = elProps.angle ?? 45;
         newElement.textAlign = elProps.textAlign || 'center';
+      } else if (elType === 'text_studio') {
+        newElement.content = elProps.content || 'YES!';
+        newElement.fontFamily = elProps.fontFamily || (supportedLanguages[currentLanguage]?.font || 'Gasoek One');
+        newElement.fontSize = (elProps.fontSize !== undefined ? elProps.fontSize : 64) * scaleFactor;
+        newElement.color = elProps.color || '#FFFFFF';
+        newElement.extrudeColor = elProps.extrudeColor || '#FFAC00';
+        newElement.extrudeDepth = (elProps.extrudeDepth !== undefined ? elProps.extrudeDepth : 15) * scaleFactor;
+        newElement.shadowEnabled = elProps.shadowEnabled !== undefined ? elProps.shadowEnabled : true;
+        newElement.shadowOffset = (elProps.shadowOffset !== undefined ? elProps.shadowOffset : 10) * scaleFactor;
+        newElement.shadowBlur = (elProps.shadowBlur !== undefined ? elProps.shadowBlur : 15) * scaleFactor;
+        newElement.shadowOpacity = elProps.shadowOpacity !== undefined ? elProps.shadowOpacity : 0.3;
+        newElement.shadowColor = elProps.shadowColor || '#000000';
+        newElement.letterSpacing = elProps.letterSpacing || 0;
+        newElement.lineHeight = elProps.lineHeight || 1.2;
+        newElement.textAlign = elProps.textAlign || 'center';
+        newElement.fontWeight = elProps.fontWeight || '900';
       } else if (elType === 'image') {
         newElement.src = elProps.src || '';
         newElement.crop = elProps.crop || { t: 0, b: 0, l: 0, r: 0 };
@@ -219,11 +267,25 @@ const useElements = ({
         if (!elProps.width && !elProps.height) {
           newElement.pendingAspectRatio = true;
         }
+      } else if (elType === 'video') {
+        newElement.src = elProps.src || '';
+        newElement.crop = elProps.crop || { t: 0, b: 0, l: 0, r: 0 };
+        // Mark as needing aspect ratio adjustment when metadata loads
+        if (!elProps.width && !elProps.height) {
+          newElement.pendingAspectRatio = true;
+        }
+      } else if (elType === 'audio') {
+        newElement.src = elProps.src || '';
+        newElement.startTime = elProps.startTime || 0;
+        newElement.duration = elProps.duration || activePageDuration; // Use page duration
+        newElement.height = 0;
       }
-      else if (elType === 'drawing') {
-        newElement.stroke = '#000000';
-        newElement.strokeWidth = 3 * scaleFactor;
-        newElement.path = elProps.path || [];
+      
+      if (elProps.fitToCanvas) {
+        newElement.x = 0;
+        newElement.y = 0;
+        newElement.width = canvasSize.width;
+        newElement.height = canvasSize.height;
       } else {
         Object.assign(newElement, elProps);
         newElement.width = width;
@@ -269,8 +331,9 @@ const useElements = ({
     setSelectedElement,
     setSelectedElements,
     zoomLevel,
-    setCurrentTool,
-    generateId
+    generateId,
+    pages, // Still needed for length calculation or other logic if any, but currentPage removed
+    setCurrentTool
   ]);
 
   // Apply a full template to the current page
@@ -365,41 +428,89 @@ const useElements = ({
 
   // Update element properties
   const updateElement = useCallback((id, updates, shouldSaveHistory = true) => {
-    console.log("useElements: updateElement called", id, updates, "currentElements:", elementsRef.current.elements);
-    // Synchronous update of the ref so subsequent calls in the same tick see it
-    if (elementsRef.current.pageId === currentPage) {
-      elementsRef.current.elements = elementsRef.current.elements.map(el =>
-        el.id === id ? { ...el, ...updates } : el
-      );
-    }
-
     setPages(prevPages => {
-      const newPages = prevPages.map(page => {
-        if (page.id === currentPage) {
-          const newElements = page.elements.map(el =>
-            el.id === id ? { ...el, ...updates } : el
-          );
-          return { ...page, elements: newElements };
+      let elementToMove = null;
+
+      // 1. Find the element across all pages
+      const updatedPages = prevPages.map((page, idx) => {
+        const elIndex = (page.elements || []).findIndex(el => el.id === id);
+        if (elIndex !== -1) {
+          elementToMove = { ...page.elements[elIndex], ...updates };
+
+          // If NOT a time-based move, just update in place
+          if (!('startTime' in updates)) {
+            const newElements = [...page.elements];
+            newElements[elIndex] = elementToMove;
+            return { ...page, elements: newElements };
+          }
+
+          // If it IS a time-based move, remove from old page to re-insert later
+          return { ...page, elements: page.elements.filter(el => el.id !== id) };
         }
         return page;
       });
 
+      if (!elementToMove) return prevPages;
+
+      // 2. Handle Global Timeline Logic (Mapping back to Local Page Time)
+      if ('startTime' in updates) {
+        const globalStart = updates.startTime;
+        let cumulative = 0;
+        let targetPageIndex = -1;
+
+        // Find which page this global timestamp belongs to
+        for (let i = 0; i < updatedPages.length; i++) {
+          const start = cumulative;
+          const end = cumulative + (updatedPages[i].duration || 5);
+          if (globalStart >= start && globalStart < end) {
+            targetPageIndex = i;
+            elementToMove.startTime = Math.max(0, globalStart - start);
+            break;
+          }
+          cumulative = end;
+        }
+
+        // Fallback: If dropped past the end, put in last page
+        if (targetPageIndex === -1) {
+          targetPageIndex = updatedPages.length - 1;
+          const lastPageStart = updatedPages.slice(0, -1).reduce((s, p) => s + (p.duration || 5), 0);
+          elementToMove.startTime = Math.max(0, globalStart - lastPageStart);
+        }
+
+        // Re-insert into target page
+        updatedPages[targetPageIndex].elements = [
+          ...(updatedPages[targetPageIndex].elements || []),
+          elementToMove
+        ];
+      }
+
+      // 3. Sync elementsRef if the change affected the current page
+      if (elementsRef.current.pageId === currentPage) {
+        const currentPageData = updatedPages.find(p => p.id === currentPage);
+        elementsRef.current.elements = currentPageData ? currentPageData.elements : [];
+      }
+
       if (shouldSaveHistory) {
-        const currentPageElements = newPages.find(p => p.id === currentPage)?.elements || [];
+        const currentPageElements = updatedPages.find(p => p.id === currentPage)?.elements || [];
         saveToHistory(currentPageElements);
       }
-      return newPages;
+
+      return updatedPages;
     });
   }, [currentPage, setPages, saveToHistory]);
 
   // Batch update elements
   const updateElements = useCallback((updatesArray, shouldSaveHistory = true) => {
     setPages(prevPages => {
+      // Create a map for O(1) lookups
+      const updatesMap = new Map();
+      updatesArray.forEach(u => updatesMap.set(u.id, u.updates));
+      
       const newPages = prevPages.map(page => {
         if (page.id === currentPage) {
           const newElements = page.elements.map(el => {
-            const update = updatesArray.find(u => u.id === el.id);
-            return update ? { ...el, ...update.updates } : el;
+            const updates = updatesMap.get(el.id);
+            return updates ? { ...el, ...updates } : el;
           });
           return { ...page, elements: newElements };
         }
@@ -426,24 +537,43 @@ const useElements = ({
   const deleteElement = useCallback((id) => {
     if (lockedElements.has(id)) return;
 
-    const currentElements = getCurrentPageElements();
-    const newElements = currentElements.filter(el => el.id !== id);
-    setCurrentPageElements(newElements);
-    if (selectedElement === id) setSelectedElement(null);
-    const newSelected = new Set(selectedElements);
-    newSelected.delete(id);
-    setSelectedElements(newSelected);
-    saveToHistory(newElements, canvasSize);
+    // Search across all pages to find and delete the element
+    setPages(prevPages => {
+      let elementFound = false;
+      const updatedPages = prevPages.map(page => {
+        const initialCount = (page.elements || []).length;
+        const filteredElements = (page.elements || []).filter(el => el.id !== id);
+        
+        if (filteredElements.length < initialCount) {
+          elementFound = true;
+          // If the element was on the current page, we should also track it for history
+          if (page.id === currentPage) {
+            saveToHistory(filteredElements, canvasSize);
+          }
+          return { ...page, elements: filteredElements };
+        }
+        return page;
+      });
+
+      if (elementFound) {
+        if (selectedElement === id) setSelectedElement(null);
+        const newSelected = new Set(selectedElements);
+        newSelected.delete(id);
+        setSelectedElements(newSelected);
+      }
+      
+      return updatedPages;
+    });
   }, [
     lockedElements,
-    getCurrentPageElements,
-    setCurrentPageElements,
+    currentPage,
+    setPages,
+    saveToHistory,
+    canvasSize,
     selectedElement,
     selectedElements,
-    saveToHistory,
     setSelectedElement,
-    setSelectedElements,
-    canvasSize
+    setSelectedElements
   ]);
 
   // Duplicate element
@@ -766,6 +896,74 @@ const useElements = ({
     saveToHistory(updatedElements, canvasSize);
   }, [lockedElements, getCurrentPageElements, setCurrentPageElements, saveToHistory, canvasSize]);
 
+  // Split element at current time
+  const splitElement = useCallback((id, globalTime) => {
+    if (lockedElements.has(id)) return;
+
+    setPages(prevPages => {
+      let elementToSplit = null;
+      let targetPageIndex = -1;
+      let accumulatedTime = 0;
+
+      // 1. Find the element and its page
+      for (let i = 0; i < prevPages.length; i++) {
+        const page = prevPages[i];
+        const elIndex = (page.elements || []).findIndex(el => el.id === id);
+        if (elIndex !== -1) {
+          elementToSplit = page.elements[elIndex];
+          targetPageIndex = i;
+          break;
+        }
+        accumulatedTime += (page.duration || 5);
+      }
+
+      if (!elementToSplit || targetPageIndex === -1) return prevPages;
+
+      const localSplitTime = globalTime - accumulatedTime;
+      const elStart = elementToSplit.startTime || 0;
+      const elDur = elementToSplit.duration || 5;
+
+      // Ensure split is within bounds
+      if (localSplitTime <= elStart || localSplitTime >= (elStart + elDur)) return prevPages;
+
+      const splitPointInClip = localSplitTime - elStart;
+
+      // Create part 1: Trim the end
+      const part1 = {
+        ...elementToSplit,
+        duration: splitPointInClip
+      };
+
+      // Create part 2: New ID, start at split time, trim the beginning
+      const part2 = {
+        ...elementToSplit,
+        id: generateId(),
+        startTime: localSplitTime,
+        duration: elDur - splitPointInClip,
+        // Important for audio/video sync: adjust offset
+        audioOffset: (elementToSplit.audioOffset || 0) + splitPointInClip
+      };
+
+      // Replace original with part 1 and part 2
+      const updatedPages = [...prevPages];
+      const pageElements = [...updatedPages[targetPageIndex].elements];
+      const originalIndex = pageElements.findIndex(el => el.id === id);
+      
+      pageElements.splice(originalIndex, 1, part1, part2);
+      updatedPages[targetPageIndex] = {
+        ...updatedPages[targetPageIndex],
+        elements: pageElements
+      };
+
+      // Select the second part after split
+      setSelectedElement(part2.id);
+      setSelectedElements(new Set([part2.id]));
+
+      saveToHistory(pageElements);
+      return updatedPages;
+    });
+  }, [lockedElements, setPages, generateId, setSelectedElement, setSelectedElements, saveToHistory]);
+
   return {
     getCurrentPageElements,
     setCurrentPageElements,
@@ -780,6 +978,7 @@ const useElements = ({
     ungroupElements,
     changeZIndex,
     reorderElement,
+    splitElement,
     alignElements,
     applyEditableTemplate
   };

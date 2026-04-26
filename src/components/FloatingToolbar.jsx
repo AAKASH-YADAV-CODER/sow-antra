@@ -13,7 +13,6 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
-  AlignJustify,
   AlignStartVertical,
   AlignCenterVertical,
   AlignEndVertical,
@@ -221,7 +220,11 @@ const FloatingToolbar = ({
     setActiveSubMenu(prev => prev === subMenu ? null : subMenu);
   }, []);
 
-  if (selectedElements.size === 0) return null;
+  const onlyAudioSelected = useMemo(() => {
+    return selectedElementsData.length > 0 && selectedElementsData.every(el => el.type === 'audio');
+  }, [selectedElementsData]);
+
+  if (selectedElements.size === 0 || onlyAudioSelected) return null;
 
   const isLocked = Array.from(selectedElements).every(id => lockedElements.has(id));
   const hasGroup = selectedElementsData.some(el => el.type === 'group');

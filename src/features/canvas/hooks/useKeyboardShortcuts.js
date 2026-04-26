@@ -35,7 +35,13 @@ const useKeyboardShortcuts = ({
   copyElements,
   pasteElements,
   splitPage,
-  currentTime
+  splitElement,
+  onDeletePage,
+  pages,
+  currentPage,
+  currentTime,
+  showRulers,
+  setShowRulers
 }) => {
 
   useEffect(() => {
@@ -46,10 +52,22 @@ const useKeyboardShortcuts = ({
       // Don't handle shortcuts when typing in input fields
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
-      // 'S' key: Split page at current time
+      // 'S' key: Split clip (if selected) or Scene at current time
       if (e.key.toLowerCase() === 's' && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
         e.preventDefault();
-        if (splitPage) splitPage(currentTime);
+        if (selectedElement && splitElement) {
+          splitElement(selectedElement, currentTime);
+        } else if (splitPage) {
+          splitPage(currentTime);
+        }
+      }
+
+      // Shift+R: Toggle Rulers
+      if (e.key === 'R' && e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        if (setShowRulers) {
+          setShowRulers(!showRulers);
+        }
       }
 
       // Delete/Backspace: Delete selected elements
@@ -63,6 +81,10 @@ const useKeyboardShortcuts = ({
           setSelectedElement(null);
           setSelectedElements(new Set());
           saveToHistory(newElements);
+        } else if (onDeletePage && pages && pages.length > 1) {
+          // If no elements selected, and we have the onDeletePage prop (Timeline Mode), 
+          // delete the current page/scene
+          onDeletePage(currentPage);
         }
       }
 
@@ -185,7 +207,13 @@ const useKeyboardShortcuts = ({
     copyElements,
     pasteElements,
     splitPage,
-    currentTime
+    splitElement,
+    onDeletePage,
+    pages,
+    currentPage,
+    currentTime,
+    showRulers,
+    setShowRulers
   ]);
 };
 

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, X, User, MessageCircle, Clock } from 'lucide-react';
+import { Send, X, MessageCircle, Clock } from 'lucide-react';
 
 const CommentPopup = ({
     element,

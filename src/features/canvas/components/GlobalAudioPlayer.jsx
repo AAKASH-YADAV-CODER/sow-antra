@@ -23,37 +23,35 @@ const GlobalAudioPlayer = ({ pages, currentTime, isPlaying, isMusicMuted }) => {
         }, []);
     }, [pages]);
 
-    // 2. Sync playback
+    // 2. Sync playback via refs
     useEffect(() => {
         allAudioElements.forEach(el => {
-            let audio = audioRefs.current[el.id];
-
-            // Create audio element if it doesn't exist
-            if (!audio) {
-                audio = new Audio(el.src);
-                audio.preload = 'auto'; // Force preload for lower latency
-                audioRefs.current[el.id] = audio;
-            } else if (audio.src !== el.src) {
-                audio.src = el.src;
-            }
+            const audio = audioRefs.current[el.id];
+            if (!audio) return;
 
             // Global Volume / Mute
-            audio.volume = isMusicMuted ? 0 : (el.volume !== undefined ? el.volume / 100 : 0.5);
+            const baseVolume = el.volume !== undefined ? el.volume / 100 : 1.0;
+            audio.volume = isMusicMuted ? 0 : baseVolume;
 
             const offset = el.audioOffset || 0;
             const localTime = currentTime - el.globalStartTime;
             const targetAudioTime = Math.max(0, localTime + offset);
 
             if (isPlaying && currentTime >= el.globalStartTime && currentTime < el.globalEndTime) {
-                // High-fidelity sync: adjust time if drift is > 100ms
-                if (Math.abs(audio.currentTime - targetAudioTime) > 0.1) {
+                // High-fidelity sync: adjust time if drift is > 150ms
+                if (Math.abs(audio.currentTime - targetAudioTime) > 0.15) {
                     audio.currentTime = targetAudioTime;
                 }
 
                 if (audio.paused) {
-                    audio.play().catch(err => {
-                        console.error("Audio playback failed:", err);
-                    });
+                    const playPromise = audio.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(err => {
+                            if (err.name !== 'AbortError') {
+                                console.warn("Audio playback issue (User interaction may be needed):", err);
+                            }
+                        });
+                    }
                 }
             } else {
                 // Should be paused
@@ -72,14 +70,26 @@ const GlobalAudioPlayer = ({ pages, currentTime, isPlaying, isMusicMuted }) => {
         const currentIds = new Set(allAudioElements.map(el => el.id));
         Object.keys(audioRefs.current).forEach(id => {
             if (!currentIds.has(id)) {
-                audioRefs.current[id].pause();
-                delete audioRefs.current[id];
+                if (audioRefs.current[id]) {
+                    audioRefs.current[id].pause();
+                    delete audioRefs.current[id];
+                }
             }
         });
-
     }, [allAudioElements, currentTime, isPlaying, isMusicMuted]);
 
-    return null; // Side-effect component
+    return (
+        <div style={{ display: 'none' }} id="global-audio-player">
+            {allAudioElements.map(el => (
+                <audio
+                    key={el.id}
+                    ref={ref => { if (ref) audioRefs.current[el.id] = ref; }}
+                    src={el.src}
+                    preload="auto"
+                />
+            ))}
+        </div>
+    );
 };
 
 export default GlobalAudioPlayer;

@@ -5,6 +5,7 @@ import styles from '../../../styles/MainPage.module.css';
 import { imageEffects } from '../../../utils/constants';
 import VectorOverlay from './VectorOverlay';
 import { generateSVGPath } from '../../../utils/bezier';
+import { getVariableWidthPath } from '../../../utils/strokeUtils';
 
 /**
  * CanvasElement Component
@@ -59,6 +60,9 @@ const CanvasElement = ({
   handleTextEdit,
   onCommentClick,
   zoom = 1,
+  currentTime = 0,
+  isPlaying = false,
+  pageStartTime = 0, // NEW: Start time of this page relative to video start
   frameEditing = null,
   setFrameEditing = () => { },
   penCursorPos = null
@@ -69,6 +73,22 @@ const CanvasElement = ({
   const needsComplexScript = ['hi', 'ta', 'te', 'bn', 'mr', 'gu', 'kn', 'ml', 'pa', 'or', 'ur', 'ar', 'he'].includes(currentLanguage);
   const isRTL = textDirection === 'rtl';
   const elementRef = React.useRef(null);
+  
+  // -- ANIMATION PREVIEW STATE --
+  const [isPreviewing, setIsPreviewing] = React.useState(false);
+  const lastAppliedRef = React.useRef(element.animation?.lastApplied);
+
+  // Trigger instant preview when animation is first applied
+  React.useEffect(() => {
+    if (element.animation?.lastApplied && element.animation.lastApplied !== lastAppliedRef.current) {
+      setIsPreviewing(true);
+      lastAppliedRef.current = element.animation.lastApplied;
+      const duration = (element.animation.duration || 1) * 1000;
+      const timer = setTimeout(() => setIsPreviewing(false), duration);
+      return () => clearTimeout(timer);
+    }
+  }, [element.animation?.lastApplied, element.animation?.duration]);
+
 
   // Sync scrollHeight with state height
   React.useEffect(() => {
@@ -78,12 +98,20 @@ const CanvasElement = ({
         updateElement(element.id, { height: newHeight }, false);
       }
     }
-  }, [element.width, element.fontSize, element.fontFamily, element.lineHeight, element.letterSpacing, element.padding, element.content, updateElement, element.id, element.height, element.type]);
+  }, [element.width, element.height, element.fontSize, element.fontFamily, element.lineHeight, element.letterSpacing, element.padding, element.content, updateElement, element.id, element.type]);
 
-  // Sync content only when NOT editing to prevent cursor jumps
+  // Sync content via innerText only when NOT editing AND when DOM is empty (e.g., after remount from key change)
+  // This prevents cursor jumping during editing while ensuring text is visible after remount.
   React.useEffect(() => {
-    if (element.type === 'text' && elementRef.current && !isEditing) {
-      elementRef.current.innerText = element.content || '';
+    if (element.type === 'text' && elementRef.current) {
+      const domContent = elementRef.current.textContent || '';
+      const stateContent = element.content || '';
+      // Only sync if: not currently editing, OR the DOM content is empty (freshly mounted)
+      if (!isEditing || domContent === '') {
+        if (elementRef.current.innerText !== stateContent) {
+          elementRef.current.innerText = stateContent;
+        }
+      }
     }
   }, [element.content, isEditing, element.type]);
 
@@ -111,59 +139,195 @@ const CanvasElement = ({
         // Keep width fixed (e.g. 200), adjust height
         const newHeight = element.width / aspect;
 
-        // Update element with new height and remove flag
-        // Use functional update to ensure we don't overwrite other parallel updates if any
-        // Actually updateElement wrapper handles it.
         updateElement(element.id, {
           height: newHeight,
           pendingAspectRatio: false
         });
       };
       img.src = element.src;
+    } else if (element.type === 'video' && element.pendingAspectRatio && element.src) {
+      const video = document.createElement('video');
+      video.onloadedmetadata = () => {
+        const aspect = video.videoWidth / video.videoHeight;
+        const newHeight = element.width / aspect;
+        updateElement(element.id, {
+          height: newHeight,
+          pendingAspectRatio: false
+        });
+      };
+      video.src = element.src;
     }
   }, [element.type, element.src, element.pendingAspectRatio, element.width, updateElement, element.id]);
+
+  const videoRef = React.useRef(null);
+
+  // Sync video playback and handle looping
+  React.useEffect(() => {
+    if (element.type === 'video' && videoRef.current) {
+      const video = videoRef.current;
+      
+      if (isPlaying) {
+        // Sync with timeline if playing
+        const localTime = Math.max(0, currentTime - pageStartTime - (element.startTime || 0));
+        // We only sync if the video is actually long enough, otherwise it loops naturally
+        if (video.duration > 0) {
+          if (Math.abs(video.currentTime - (localTime % video.duration)) > 0.2) {
+            video.currentTime = localTime % video.duration;
+          }
+        }
+        video.play().catch(err => console.log("Video play interrupted:", err));
+      } else {
+        // In edit mode, keep it playing for preview
+        video.play().catch(err => console.log("Video play interrupted:", err));
+      }
+    }
+  }, [element.type, isPlaying, currentTime, pageStartTime, element.startTime]);
 
 
 
   // Handle group element rendering
 
-  const style = {
+  // Animation Synchronization Logic (Canva-style)
+  const animStartTime = element.startTime || 0;
+  const animDuration = element.animation?.duration || 1;
+  // Local time relative to element start is (global currentTime - page relative start - element offset)
+  const animProgress = Math.max(0, currentTime - pageStartTime - animStartTime);
+  const hasAnimation = !!(element.animation?.type && element.animation.type !== 'none');
+
+  // Determine the real animation name (none = no animation assigned)
+  const realAnimName = hasAnimation
+    ? (element.animation.type === 'typewriter' ? 'wipe' : element.animation.type)
+    : 'none';
+
+  // Animation timing & play state logic:
+  //
+  // PREVIEW MODE (just clicked animation icon):
+  //   - Run from t=0, play state = running
+  //
+  // PLAYING (video timeline running):
+  //   - Sync to currentTime via negative delay, play state = running
+  //
+  // EDITING / PAUSED (default state):
+  //   - Keep animation name set but paused AT THE END FRAME
+  //   - delay = -animDuration forces fill-mode:both to show the 'to' (fully visible) state
+  //   - This prevents elements from disappearing when animation is assigned but not playing
+
+  let effectiveAnimName;
+  let syncDelay;
+  let animationPlayState;
+
+  if (!hasAnimation) {
+    // No animation — plain element, no CSS animation at all
+    effectiveAnimName = 'none';
+    syncDelay = '0s';
+    animationPlayState = 'paused';
+  } else if (isPreviewing) {
+    // Instant preview from start
+    effectiveAnimName = realAnimName;
+    syncDelay = '0s';
+    animationPlayState = 'running';
+  } else if (isPlaying) {
+    // Sync with timeline playhead
+    effectiveAnimName = realAnimName;
+    syncDelay = `-${animProgress}s`;
+    animationPlayState = 'running';
+  } else {
+    // Editing / paused — always keep element FULLY VISIBLE:
+    //
+    // normal direction (Beginning/Middle entrance):
+    //   Use negative delay to fast-forward to end frame (fully visible) ✅
+    //
+    // reverse direction (End exit):
+    //   Use animationName='none' — no CSS animation applied at all.
+    //   This prevents animation-fill-mode:forwards from freezing the element
+    //   at the invisible exit state after a preview completes. ✅
+    //   During isPreviewing or isPlaying the reverse animation fires correctly.
+    const isReverse = element.animation?.animationDirection === 'reverse';
+    if (isReverse) {
+      // No animation in editing mode — element is naturally visible
+      effectiveAnimName = 'none';
+      syncDelay = '0s';
+    } else {
+      effectiveAnimName = realAnimName;
+      syncDelay = `-${animDuration}s`;
+    }
+    animationPlayState = 'paused';
+  }
+
+  // -- LAYERED STYLE DEFINITIONS --
+  // Layer 1: Outer (Position & Size) - Handles canvas placement
+  const outerStyle = {
     position: 'absolute',
     left: element.x,
     top: element.y,
     width: element.width,
     height: element.height,
-    transform: element.transform3d
-      ? `rotate(${element.rotation || 0}deg) perspective(${element.transform3d.perspective || 1000}px) rotateX(${element.transform3d.rotateX || 0}deg) rotateY(${element.transform3d.rotateY || 0}deg) scale(${element.transform3d.scale || 1})`
-      : `rotate(${element.rotation || 0}deg)`,
     zIndex: element.zIndex,
     cursor: isLocked ? 'not-allowed' : (currentTool === 'select' ? 'move' : 'default'),
-    filter: element.filters ? getFilterCSS(element.filters) : 'none',
-    // Prioritize direct opacity property, fallback to filter-based opacity
-    opacity: element.opacity !== undefined
-      ? element.opacity
-      : (element.filters?.opacity ? element.filters.opacity.value / 100 : 1),
-    // Animation Support
-    // Logic: Map 'typewriter' to 'wipe' for non-text elements to avoid distortion
-    // Logic: Map 'typewriter' to 'wipe' for ALL elements to avoid layout shifts/reflow issues on text
-    animationName: (element.animation?.type === 'typewriter')
-      ? 'wipe'
-      : (element.animation?.type || 'none'),
-    animationDuration: `${element.animation?.duration || 1}s`,
-    animationDelay: `${element.animation?.delay || 0}s`,
+    visibility: element.hidden ? 'hidden' : 'visible',
+    pointerEvents: 'auto',
+  };
+
+  // Layer 2: Animation (Playback & Sync) - Handles dynamic CSS animations
+  const animationStyle = {
+    width: '100%',
+    height: '100%',
+    animationName: effectiveAnimName,
+    animationDuration: `${animDuration}s`,
+    animationDelay: syncDelay,
+    animationPlayState: animationPlayState,
     animationIterationCount: element.animation?.iteration || 1,
     animationFillMode: 'both',
     animationTimingFunction: (element.animation?.type === 'scrapbook') ? 'steps(5)' : 'ease',
+    // 'normal' = entrance (plays forward), 'reverse' = exit (plays backward)
+    animationDirection: element.animation?.animationDirection || 'normal',
+    overflow: 'visible',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  };
+
+  // Layer 3: Inner (Visual Props) - Handles static transforms, opacity, and filters
+  const innerStyle = {
+    width: '100%',
+    height: '100%',
+    transform: element.transform3d
+      ? `rotate(${element.rotation || 0}deg) perspective(${element.transform3d.perspective || 1000}px) rotateX(${element.transform3d.rotateX || 0}deg) rotateY(${element.transform3d.rotateY || 0}deg) scale(${element.transform3d.scale || 1})`
+      : `rotate(${element.rotation || 0}deg)`,
+    filter: element.filters ? getFilterCSS(element.filters) : 'none',
+    opacity: element.opacity !== undefined
+      ? element.opacity
+      : (element.filters?.opacity ? element.filters.opacity.value / 100 : 1),
+    mixBlendMode: element.blendMode || 'normal',
     WebkitBackfaceVisibility: (element.type === 'type_extrude' || element.transform3d) ? 'visible' : 'hidden',
     backfaceVisibility: (element.type === 'type_extrude' || element.transform3d) ? 'visible' : 'hidden',
     transformStyle: element.transform3d ? 'preserve-3d' : 'flat',
-    mixBlendMode: element.blendMode || 'normal',
   };
 
-  // Apply effects CSS
+  // Apply custom effects (like shadows or glows) to the inner style
   const effectCSS = getEffectCSS(element);
   if (effectCSS) {
-    Object.assign(style, parseCSS(effectCSS));
+    Object.assign(innerStyle, parseCSS(effectCSS));
+  }
+
+  // Easy Reflections Mode
+  if (element.reflection?.enabled) {
+    const { position = 'below', offset = 50, opacity = 50 } = element.reflection;
+    const alpha = (opacity / 100).toFixed(2);
+    const gapPx = offset / 2; // Map 0-100 to 0-50px gap
+
+    let gradientFallback = '';
+    if (position === 'below') {
+      gradientFallback = `linear-gradient(to bottom, rgba(255, 255, 255, ${alpha}), transparent)`;
+    } else if (position === 'above') {
+      gradientFallback = `linear-gradient(to top, rgba(255, 255, 255, ${alpha}), transparent)`;
+    } else if (position === 'left') {
+      gradientFallback = `linear-gradient(to left, rgba(255, 255, 255, ${alpha}), transparent)`;
+    } else if (position === 'right') {
+      gradientFallback = `linear-gradient(to right, rgba(255, 255, 255, ${alpha}), transparent)`;
+    }
+
+    innerStyle.WebkitBoxReflect = `${position} ${gapPx}px ${gradientFallback}`;
   }
 
 
@@ -171,7 +335,6 @@ const CanvasElement = ({
   let content;
   if (element.type === 'text') {
     const textElementStyle = {
-      ...style,
       fontSize: (element.textPosition === 'superscript' || element.textPosition === 'subscript')
         ? element.fontSize * 0.65
         : element.fontSize,
@@ -185,7 +348,7 @@ const CanvasElement = ({
       fontStyle: element.fontStyle,
       textDecoration: element.textDecoration,
       textTransform: element.textTransform,
-      color: style.color || element.color, // Respect effect color (like transparent) if set
+      color: innerStyle.color || element.color, // Respect effect color (like transparent) if set
       textAlign: isRTL ? 'right' : element.textAlign,
       cursor: isLocked ? 'not-allowed' : (isEditing ? 'text' : (currentTool === 'select' ? 'move' : 'default')),
       outline: 'none',
@@ -207,18 +370,10 @@ const CanvasElement = ({
 
     content = (
       <div
+        key={`text-${element.id}-${element.animation?.type || 'none'}-${element.animation?.lastApplied || 0}`}
         id={`element-${element.id}`}
-        style={{
-          ...style,
-          height: 'auto',
-          display: 'flex',
-          // Vertical alignment (Text Anchor) mapping
-          alignItems: element.textAnchor === 'top' ? 'flex-start' : (element.textAnchor === 'bottom' ? 'flex-end' : 'center'),
-          justifyContent: element.textAlign === 'center' ? 'center' : (element.textAlign === 'right' ? 'flex-end' : 'flex-start'),
-          overflow: 'visible'
-        }}
-        className={`${styles.textElement || ''} text-element ${needsComplexScript ? 'complex-script' : ''} ${element.fillType === 'gradient' ? 'text-gradient' : ''}`}
-        onMouseDown={(e) => {
+        style={outerStyle}
+        onPointerDown={(e) => {
           e.stopPropagation();
           if (isLocked) {
             if (handleSelectElement) handleSelectElement(e, element.id);
@@ -235,6 +390,20 @@ const CanvasElement = ({
           }
         }}
       >
+        <div style={animationStyle}>
+          <div
+            style={{
+              ...innerStyle,
+              ...textElementStyle,
+              height: element.height || 'auto',
+              minHeight: (element.fontSize || 20) * 1.2,
+              display: 'flex',
+              alignItems: element.textAnchor === 'top' ? 'flex-start' : (element.textAnchor === 'bottom' ? 'flex-end' : 'center'),
+              justifyContent: element.textAlign === 'center' ? 'center' : (element.textAlign === 'right' ? 'flex-end' : 'flex-start'),
+              overflow: 'visible'
+            }}
+            className={`${styles.textElement || ''} text-element ${needsComplexScript ? 'complex-script' : ''} ${element.fillType === 'gradient' ? 'text-gradient' : ''}`}
+          >
         {/* Background Effect Layer */}
         {element.textEffect === 'background' && (
           <div
@@ -297,84 +466,69 @@ const CanvasElement = ({
               e.preventDefault();
             }
           }}
-        />
+        >
+          {/* Render content as children ONLY when not editing, to prevent React from resetting cursor position.
+              When editing, the browser manages the DOM content natively via contentEditable.
+              This ensures text is always visible on first render and after key-based remounts (e.g., on animation apply). */}
+          {!isEditing ? (element.content || '') : null}
+        </div>
       </div>
+    </div>
+  </div>
     );
-  } else if (element.type === 'rectangle') {
-    const rectangleStyle = {
-      ...style,
-      backgroundColor: (element.fillType === 'solid' || !element.fillType) ? (element.fill || '#cbd5e1') : 'transparent',
-      background: element.fillType === 'gradient' ? getBackgroundStyle(element) : undefined,
-      border: `${element.strokeWidth}px solid ${element.stroke}`,
-      borderRadius: element.borderRadius,
+  } else if (element.type === 'text_studio') {
+    const rad = (45 * Math.PI) / 180;
+    const depth = element.extrudeDepth || 15;
+    let textShadow = '';
+    
+    // Extrusion solid shadow
+    for (let i = 1; i <= depth; i++) {
+        const sx = Math.cos(rad) * i;
+        const sy = Math.sin(rad) * i;
+        textShadow += `${sx}px ${sy}px 0px ${element.extrudeColor || '#FFAC00'}, `;
+    }
+    
+    // Drop shadow (blur)
+    if (element.shadowEnabled !== false) {
+        const sx = Math.cos(rad) * (depth + (element.shadowOffset || 10));
+        const sy = Math.sin(rad) * (depth + (element.shadowOffset || 10));
+        textShadow += `${sx}px ${sy}px ${element.shadowBlur || 15}px rgba(0,0,0,${element.shadowOpacity || 0.3})`;
+    } else {
+        if (textShadow.length > 0) {
+            textShadow = textShadow.slice(0, -2);
+        }
+    }
+
+    const textStudioStyle = {
+      ...outerStyle,
+      ...innerStyle,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: element.textAlign === 'center' ? 'center' : (element.textAlign === 'right' ? 'flex-end' : 'flex-start'),
+      padding: '20px', // Prevent shadow clipping inside bounding box
+      overflow: 'visible'
+    };
+
+    const textStyle = {
+      fontFamily: element.fontFamily || 'Inter',
+      fontSize: element.fontSize || 64,
+      fontWeight: element.fontWeight || '900',
+      color: element.color || '#FFFFFF',
+      textAlign: element.textAlign || 'center',
+      letterSpacing: `${element.letterSpacing || 0}px`,
+      lineHeight: element.lineHeight || 1.2,
+      textShadow: textShadow,
+      whiteSpace: 'pre-wrap',
+      wordBreak: 'break-word',
+      width: '100%'
     };
 
     content = (
       <div
+        key={`textstudio-${element.id}-${element.animation?.type || 'none'}-${element.animation?.lastApplied || 0}`}
         id={`element-${element.id}`}
-        className={`${styles.shapeElement || ''} ${element.fillType === 'gradient' ? 'gradient-fix' : ''}`}
-        style={rectangleStyle}
-        onMouseDown={(e) => {
-          e.stopPropagation();
-          if (isLocked) {
-            if (handleSelectElement) handleSelectElement(e, element.id);
-          } else {
-            handleMouseDown(e, element.id);
-          }
-        }}
-      />
-    );
-  } else if (element.type === 'circle') {
-    const circleStyle = {
-      ...style,
-      backgroundColor: (element.fillType === 'solid' || !element.fillType) ? (element.fill || '#cbd5e1') : 'transparent',
-      background: element.fillType === 'gradient' ? getBackgroundStyle(element) : undefined,
-      border: `${element.strokeWidth}px solid ${element.stroke}`,
-      borderRadius: '50%',
-    };
-
-    content = (
-      <div
-        id={`element-${element.id}`}
-        className={`${styles.shapeElement || ''} ${element.fillType === 'gradient' ? 'gradient-fix' : ''}`}
-        style={circleStyle}
-        onMouseDown={(e) => {
-          e.stopPropagation();
-          if (isLocked) {
-            if (handleSelectElement) handleSelectElement(e, element.id);
-          } else {
-            handleMouseDown(e, element.id);
-          }
-        }}
-      />
-    );
-  } else if (element.type === 'triangle') {
-    const clipPathId = `triangle-clip-${element.id}`;
-
-    const triangleStyle = {
-      ...style,
-      width: element.width,
-      height: element.height
-    };
-
-    const fillStyle = {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      width: '100%',
-      height: '100%',
-      backgroundColor: (element.fillType === 'solid' || !element.fillType) ? (element.fill || '#cbd5e1') : 'transparent',
-      background: element.fillType === 'gradient' ? getBackgroundStyle(element) : undefined,
-      clipPath: `url(#${clipPathId})`,
-      WebkitClipPath: `url(#${clipPathId})`
-    };
-
-    content = (
-      <div
-        id={`element-${element.id}`}
-        className={`${styles.shapeElement || ''}`}
-        style={triangleStyle}
-        onMouseDown={(e) => {
+        style={outerStyle}
+        onPointerDown={(e) => {
           e.stopPropagation();
           if (isLocked) {
             if (handleSelectElement) handleSelectElement(e, element.id);
@@ -383,39 +537,149 @@ const CanvasElement = ({
           }
         }}
       >
-        {/* Fill layer */}
-        <div
-          className={element.fillType === 'gradient' ? 'gradient-fix' : ''}
-          style={fillStyle}
-        />
+        <div style={animationStyle}>
+          <div style={{ ...innerStyle, ...textStudioStyle }}>
+            <div style={textStyle}>
+              {element.content}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  } else if (element.type === 'rectangle') {
+    const rectangleStyle = {
+      ...(element.fillType === 'gradient' 
+        ? { background: getBackgroundStyle(element) } 
+        : { backgroundColor: element.fillType === 'solid' || !element.fillType ? (element.fill || '#cbd5e1') : 'transparent' }),
+      border: `${element.strokeWidth}px solid ${element.stroke}`,
+      borderRadius: element.borderRadius,
+    };
 
-        {/* Stroke layer using SVG */}
-        <svg
-          width="100%"
-          height="100%"
-          style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
-          viewBox={`0 0 ${element.width} ${element.height}`}
-          preserveAspectRatio="none"
-        >
-          <defs>
-            <clipPath id={clipPathId} clipPathUnits="objectBoundingBox">
-              <polygon points="0.5,0 1,1 0,1" />
-            </clipPath>
-          </defs>
-          <polygon
-            points={`${element.width / 2},0 ${element.width},${element.height} 0,${element.height}`}
-            fill="none"
-            stroke={element.stroke || '#000000'}
-            strokeWidth={element.strokeWidth ?? 2}
+    content = (
+      <div
+        key={`rect-${element.id}-${element.animation?.type || 'none'}-${element.animation?.lastApplied || 0}`}
+        id={`element-${element.id}`}
+        style={outerStyle}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          if (isLocked) {
+            if (handleSelectElement) handleSelectElement(e, element.id);
+          } else {
+            handleMouseDown(e, element.id);
+          }
+        }}
+      >
+        <div style={animationStyle}>
+          <div
+            className={`${styles.shapeElement || ''} ${element.fillType === 'gradient' ? 'gradient-fix' : ''}`}
+            style={{ ...innerStyle, ...rectangleStyle }}
           />
-        </svg>
+        </div>
+      </div>
+    );
+  } else if (element.type === 'circle') {
+    const circleStyle = {
+      ...(element.fillType === 'gradient' 
+        ? { background: getBackgroundStyle(element) } 
+        : { backgroundColor: element.fillType === 'solid' || !element.fillType ? (element.fill || '#cbd5e1') : 'transparent' }),
+      border: `${element.strokeWidth}px solid ${element.stroke}`,
+      borderRadius: '50%',
+    };
+
+    content = (
+      <div
+        key={`circle-${element.id}-${element.animation?.type || 'none'}-${element.animation?.lastApplied || 0}`}
+        id={`element-${element.id}`}
+        style={outerStyle}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          if (isLocked) {
+            if (handleSelectElement) handleSelectElement(e, element.id);
+          } else {
+            handleMouseDown(e, element.id);
+          }
+        }}
+      >
+        <div style={animationStyle}>
+          <div
+            className={`${styles.shapeElement || ''} ${element.fillType === 'gradient' ? 'gradient-fix' : ''}`}
+            style={{ ...innerStyle, ...circleStyle }}
+          />
+        </div>
+      </div>
+    );
+  } else if (element.type === 'triangle') {
+    const clipPathId = `triangle-clip-${element.id}`;
+
+
+    const fillStyle = {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: '100%',
+      height: '100%',
+      ...(element.fillType === 'gradient' 
+        ? { background: getBackgroundStyle(element) } 
+        : {}), // Solid fills are handled directly by the SVG polygon
+      clipPath: `url(#${clipPathId})`,
+      WebkitClipPath: `url(#${clipPathId})`
+    };
+
+    content = (
+      <div
+        key={`triangle-${element.id}-${element.animation?.type || 'none'}-${element.animation?.lastApplied || 0}`}
+        id={`element-${element.id}`}
+        style={outerStyle}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          if (isLocked) {
+            if (handleSelectElement) handleSelectElement(e, element.id);
+          } else {
+            handleMouseDown(e, element.id);
+          }
+        }}
+      >
+        <div style={animationStyle}>
+          <div
+            className={`${styles.shapeElement || ''}`}
+            style={{ ...innerStyle, width: element.width, height: element.height }}
+          >
+            {/* Fill layer (Gradients only, solid fills drawn by SVG) */}
+            {element.fillType === 'gradient' && (
+              <div
+                className="gradient-fix"
+                style={fillStyle}
+              />
+            )}
+
+            {/* Stroke layer using SVG */}
+            <svg
+              width="100%"
+              height="100%"
+              style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
+              viewBox={`0 0 ${element.width} ${element.height}`}
+              preserveAspectRatio="none"
+            >
+              <defs>
+                <clipPath id={clipPathId} clipPathUnits="objectBoundingBox">
+                  <polygon points="0.5,0 1,1 0,1" />
+                </clipPath>
+              </defs>
+              <polygon
+                points={`${element.width / 2},0 ${element.width},${element.height} 0,${element.height}`}
+                fill={element.fillType === 'gradient' ? 'none' : (element.fill || '#cbd5e1')}
+                stroke={element.stroke || '#000000'}
+                strokeWidth={element.strokeWidth ?? 2}
+              />
+            </svg>
+          </div>
+        </div>
       </div>
     );
   } else if (element.type === 'image') {
     const isCropping = element.isCropping;
 
     const imageContainerStyle = {
-      ...style,
       overflow: element.transform3d ? 'visible' : 'hidden',
       borderRadius: element.borderRadius,
       pointerEvents: 'auto',
@@ -606,10 +870,10 @@ const CanvasElement = ({
 
     content = (
       <div
+        key={`image-${element.id}-${element.animation?.type || 'none'}-${element.animation?.lastApplied || 0}`}
         id={`element-${element.id}`}
-        style={imageContainerStyle}
-        className={styles.imageElement || ''}
-        onMouseDown={(e) => {
+        style={outerStyle}
+        onPointerDown={(e) => {
           e.stopPropagation();
           if (isLocked) {
             if (handleSelectElement) handleSelectElement(e, element.id);
@@ -619,7 +883,6 @@ const CanvasElement = ({
           }
         }}
         onClick={(e) => {
-          // Allow selection via click too if needed, but mousedown covers it usually
           if (isLocked) {
             e.stopPropagation();
             handleSelectElement(e, element.id);
@@ -629,67 +892,75 @@ const CanvasElement = ({
           }
         }}
       >
-        {/* Geometric Shadow Layer */}
-        {geometricShadow}
+        <div style={animationStyle}>
+          <div
+            style={{ ...innerStyle, ...imageContainerStyle }}
+            className={styles.imageElement || ''}
+          >
+            {/* Geometric Shadow Layer */}
+            {geometricShadow}
 
-        {/* Base Image (Background) - Visible if overlaying or if no effect AND no shadow, or intensity 0 */}
-        {(showOverlay || (!effectFilter && !shadowFilterCSS) || intensity === 0) && (
-          <img
-            src={element.src}
-            alt=""
-            style={{
-              ...imgStyle,
-              filter: adjustFilter, // Only adjustments, no effect
-              position: showOverlay ? 'absolute' : (imgStyle.position || 'relative'),
-              top: showOverlay ? 0 : 'auto',
-              left: showOverlay ? 0 : 'auto'
-            }}
-            draggable={false}
-          />
-        )}
+            {/* Base Image (Background) - Visible if overlaying or if no effect AND no shadow, or intensity 0 */}
+            {(showOverlay || (!effectFilter && !shadowFilterCSS) || intensity === 0) && (
+              <img
+                src={element.src}
+                alt=""
+                style={{
+                  ...imgStyle,
+                  filter: adjustFilter, // Only adjustments, no effect
+                  position: showOverlay ? 'absolute' : (imgStyle.position || 'relative'),
+                  top: showOverlay ? 0 : 'auto',
+                  left: showOverlay ? 0 : 'auto'
+                }}
+                draggable={false}
+              />
+            )}
 
-        {/* Filtered Image (Overlay) - Visible if intensity > 0 or if there's a shadow */}
-        {(showOverlay || (!!effectFilter && intensity === 1) || !!shadowFilterCSS) && (
-          <img
-            src={element.src}
-            alt=""
-            style={{
-              ...imgStyle,
-              filter: finalFilter, // Adjustments + Effect
-              opacity: intensity,
-              position: showOverlay ? 'absolute' : (imgStyle.position || 'relative'),
-              top: showOverlay ? 0 : 'auto',
-              left: showOverlay ? 0 : 'auto'
-            }}
-            draggable={false}
-          />
-        )}
-        {/* Crop Overlay (optional, for future specialized cropping UI) */}
-        {isCropping && (
-          <div className="absolute inset-0 border-2 border-white pointer-events-none shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] z-10">
-            <div className="absolute top-1/3 left-0 w-full h-px bg-white/50" />
-            <div className="absolute top-2/3 left-0 w-full h-px bg-white/50" />
-            <div className="absolute left-1/3 top-0 h-full w-px bg-white/50" />
-            <div className="absolute left-2/3 top-0 h-full w-px bg-white/50" />
+            {/* Filtered Image (Overlay) - Visible if intensity > 0 or if there's a shadow */}
+            {(showOverlay || (!!effectFilter && intensity === 1) || !!shadowFilterCSS) && (
+              <img
+                src={element.src}
+                alt=""
+                style={{
+                  ...imgStyle,
+                  filter: finalFilter, // Adjustments + Effect
+                  opacity: intensity,
+                  position: showOverlay ? 'absolute' : (imgStyle.position || 'relative'),
+                  top: showOverlay ? 0 : 'auto',
+                  left: showOverlay ? 0 : 'auto'
+                }}
+                draggable={false}
+              />
+            )}
+            {/* Crop Overlay */}
+            {isCropping && (
+              <div className="absolute inset-0 border-2 border-white pointer-events-none shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] z-10">
+                <div className="absolute top-1/3 left-0 w-full h-px bg-white/50" />
+                <div className="absolute top-2/3 left-0 w-full h-px bg-white/50" />
+                <div className="absolute left-1/3 top-0 h-full w-px bg-white/50" />
+                <div className="absolute left-2/3 top-0 h-full w-px bg-white/50" />
+              </div>
+            )}
+
+            {/* SVG Filter Definition */}
+            {shadowFilterSVG && (
+              <svg width="100%" height="100%" style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', visibility: 'visible' }}>
+                <defs>
+                  {shadowFilterSVG}
+                </defs>
+              </svg>
+            )}
           </div>
-        )}
-
-        {/* SVG Filter Definition */}
-        {shadowFilterSVG && (
-          <svg width="100%" height="100%" style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', visibility: 'visible' }}>
-            <defs>
-              {shadowFilterSVG}
-            </defs>
-          </svg>
-        )}
+        </div>
       </div>
     );
   } else if (element.type === 'line' || element.type === 'line_double') {
     content = (
-      <svg
+      <div
+        key={`line-${element.id}-${element.animation?.type || 'none'}-${element.animation?.lastApplied || 0}`}
         id={`element-${element.id}`}
-        style={{ ...style, overflow: 'visible' }}
-        onMouseDown={(e) => {
+        style={outerStyle}
+        onPointerDown={(e) => {
           e.stopPropagation();
           if (isLocked) {
             if (handleSelectElement) handleSelectElement(e, element.id);
@@ -698,39 +969,50 @@ const CanvasElement = ({
           }
         }}
       >
-        <line
-          x1={0}
-          y1={element.height / 2}
-          x2={element.width}
-          y2={element.height / 2}
-          stroke={element.stroke}
-          strokeWidth={element.strokeWidth}
-          strokeDasharray={element.strokeDasharray}
-          strokeLinecap={element.strokeLinecap}
-        />
-        {element.type === 'line_double' && (
-          <line
-            x1={0}
-            y1={element.height / 2 + (element.strokeWidth || 2) * 2}
-            x2={element.width}
-            y2={element.height / 2 + (element.strokeWidth || 2) * 2}
-            stroke={element.stroke}
-            strokeWidth={element.strokeWidth}
-            strokeDasharray={element.strokeDasharray}
-            strokeLinecap={element.strokeLinecap}
-          />
-        )}
-      </svg>
+        <div style={animationStyle}>
+          <div style={{ ...innerStyle, overflow: 'visible' }}>
+            <svg
+              width="100%"
+              height="100%"
+              style={{ overflow: 'visible' }}
+            >
+              <line
+                x1={0}
+                y1={element.height / 2}
+                x2={element.width}
+                y2={element.height / 2}
+                stroke={element.stroke}
+                strokeWidth={element.strokeWidth}
+                strokeDasharray={element.strokeDasharray}
+                strokeLinecap={element.strokeLinecap}
+              />
+              {element.type === 'line_double' && (
+                <line
+                  x1={0}
+                  y1={element.height / 2 + (element.strokeWidth || 2) * 2}
+                  x2={element.width}
+                  y2={element.height / 2 + (element.strokeWidth || 2) * 2}
+                  stroke={element.stroke}
+                  strokeWidth={element.strokeWidth}
+                  strokeDasharray={element.strokeDasharray}
+                  strokeLinecap={element.strokeLinecap}
+                />
+              )}
+            </svg>
+          </div>
+        </div>
+      </div>
     );
   } else if (element.type === 'arrow' || element.type === 'arrow_double') {
     const isArrow = element.type === 'arrow';
     const isDoubleArrow = element.type === 'arrow_double';
 
     content = (
-      <svg
+      <div
+        key={`arrow-${element.id}-${element.animation?.type || 'none'}-${element.animation?.lastApplied || 0}`}
         id={`element-${element.id}`}
-        style={{ ...style, overflow: 'visible' }}
-        onMouseDown={(e) => {
+        style={outerStyle}
+        onPointerDown={(e) => {
           e.stopPropagation();
           if (isLocked) {
             if (handleSelectElement) handleSelectElement(e, element.id);
@@ -738,52 +1020,60 @@ const CanvasElement = ({
             handleMouseDown(e, element.id);
           }
         }}
-        width="100%"
-        height="100%"
-        viewBox={`0 0 ${element.width} ${element.height}`}
-        preserveAspectRatio="none"
       >
-        {(isDoubleArrow || isArrow) && (
-          <defs>
-            {isDoubleArrow && (
-              <marker
-                id={`arrowhead-start-${element.id}`}
-                markerWidth="10"
-                markerHeight="7"
-                refX="0"
-                refY="3.5"
-                orient="auto"
-                markerUnits="strokeWidth"
-              >
-                <polygon points="10 0, 0 3.5, 10 7" fill={element.stroke || '#000000'} />
-              </marker>
-            )}
-            <marker
-              id={`arrowhead-end-${element.id}`}
-              markerWidth="10"
-              markerHeight="7"
-              refX="10"
-              refY="3.5"
-              orient="auto"
-              markerUnits="strokeWidth"
+        <div style={animationStyle}>
+          <div style={{ ...innerStyle, overflow: 'visible' }}>
+            <svg
+              width="100%"
+              height="100%"
+              viewBox={`0 0 ${element.width} ${element.height}`}
+              preserveAspectRatio="none"
+              style={{ overflow: 'visible' }}
             >
-              <polygon points="0 0, 10 3.5, 0 7" fill={element.stroke || '#000000'} />
-            </marker>
-          </defs>
-        )}
-        <line
-          x1={0}
-          y1={element.height / 2}
-          x2={element.width}
-          y2={element.height / 2}
-          stroke={element.stroke || '#000000'}
-          strokeWidth={element.strokeWidth || 2}
-          strokeDasharray={element.strokeDasharray}
-          strokeLinecap="round"
-          markerStart={isDoubleArrow ? `url(#arrowhead-start-${element.id})` : undefined}
-          markerEnd={isArrow || isDoubleArrow ? `url(#arrowhead-end-${element.id})` : undefined}
-        />
-      </svg>
+              {(isDoubleArrow || isArrow) && (
+                <defs>
+                  {isDoubleArrow && (
+                    <marker
+                      id={`arrowhead-start-${element.id}`}
+                      markerWidth="10"
+                      markerHeight="7"
+                      refX="0"
+                      refY="3.5"
+                      orient="auto"
+                      markerUnits="strokeWidth"
+                    >
+                      <polygon points="10 0, 0 3.5, 10 7" fill={element.stroke || '#000000'} />
+                    </marker>
+                  )}
+                  <marker
+                    id={`arrowhead-end-${element.id}`}
+                    markerWidth="10"
+                    markerHeight="7"
+                    refX="10"
+                    refY="3.5"
+                    orient="auto"
+                    markerUnits="strokeWidth"
+                  >
+                    <polygon points="0 0, 10 3.5, 0 7" fill={element.stroke || '#000000'} />
+                  </marker>
+                </defs>
+              )}
+              <line
+                x1={0}
+                y1={element.height / 2}
+                x2={element.width}
+                y2={element.height / 2}
+                stroke={element.stroke || '#000000'}
+                strokeWidth={element.strokeWidth || 2}
+                strokeDasharray={element.strokeDasharray}
+                strokeLinecap="round"
+                markerStart={isDoubleArrow ? `url(#arrowhead-start-${element.id})` : undefined}
+                markerEnd={isArrow || isDoubleArrow ? `url(#arrowhead-end-${element.id})` : undefined}
+              />
+            </svg>
+          </div>
+        </div>
+      </div>
     );
   } else if (element.type === 'star') {
     const clipPathId = `star-clip-${element.id}`;
@@ -808,11 +1098,6 @@ const CanvasElement = ({
       clipPathPoints += x + ',' + y + ' ';
     }
 
-    const starStyle = {
-      ...style,
-      width: element.width,
-      height: element.height
-    };
 
     const fillStyle = {
       position: 'absolute',
@@ -846,10 +1131,10 @@ const CanvasElement = ({
 
     content = (
       <div
+        key={`star-${element.id}-${element.animation?.type || 'none'}-${element.animation?.lastApplied || 0}`}
         id={`element-${element.id}`}
-        className={`${styles.shapeElement || ''}`}
-        style={starStyle}
-        onMouseDown={(e) => {
+        style={outerStyle}
+        onPointerDown={(e) => {
           e.stopPropagation();
           if (isLocked) {
             if (handleSelectElement) handleSelectElement(e, element.id);
@@ -858,32 +1143,39 @@ const CanvasElement = ({
           }
         }}
       >
-        {/* Fill layer */}
-        <div
-          className={element.fillType === 'gradient' ? 'gradient-fix' : ''}
-          style={fillStyle}
-        />
+        <div style={animationStyle}>
+          <div
+            className={`${styles.shapeElement || ''}`}
+            style={{ ...innerStyle, width: element.width, height: element.height }}
+          >
+            {/* Fill layer */}
+            <div
+              className={element.fillType === 'gradient' ? 'gradient-fix' : ''}
+              style={fillStyle}
+            />
 
-        {/* Stroke layer using SVG */}
-        <svg
-          width="100%"
-          height="100%"
-          style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
-          viewBox={`0 0 ${element.width} ${element.height}`}
-          preserveAspectRatio="none"
-        >
-          <defs>
-            <clipPath id={clipPathId} clipPathUnits="objectBoundingBox">
-              <polygon points={clipPathPoints} />
-            </clipPath>
-          </defs>
-          <path
-            d={strokePath}
-            fill="none"
-            stroke={element.stroke || '#000000'}
-            strokeWidth={element.strokeWidth ?? 2}
-          />
-        </svg>
+            {/* Stroke layer using SVG */}
+            <svg
+              width="100%"
+              height="100%"
+              style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
+              viewBox={`0 0 ${element.width} ${element.height}`}
+              preserveAspectRatio="none"
+            >
+              <defs>
+                <clipPath id={clipPathId} clipPathUnits="objectBoundingBox">
+                  <polygon points={clipPathPoints} />
+                </clipPath>
+              </defs>
+              <path
+                d={strokePath}
+                fill="none"
+                stroke={element.stroke || '#000000'}
+                strokeWidth={element.strokeWidth ?? 2}
+              />
+            </svg>
+          </div>
+        </div>
       </div>
     );
   } else if (element.type === 'regularPolygon') {
@@ -907,7 +1199,8 @@ const CanvasElement = ({
     path += 'Z';
 
     const polygonStyle = {
-      ...style,
+      ...outerStyle,
+      ...innerStyle,
       backgroundColor: 'transparent', // We use SVG fill
       border: 'none',
       borderRadius: '0'
@@ -939,10 +1232,10 @@ const CanvasElement = ({
 
     content = (
       <div
+        key={`poly-${element.id}-${element.animation?.type || 'none'}-${element.animation?.lastApplied || 0}`}
         id={`element-${element.id}`}
-        className={`${styles.shapeElement || ''}`}
-        style={polygonStyle}
-        onMouseDown={(e) => {
+        style={outerStyle}
+        onPointerDown={(e) => {
           e.stopPropagation();
           if (isLocked) {
             if (handleSelectElement) handleSelectElement(e, element.id);
@@ -951,59 +1244,61 @@ const CanvasElement = ({
           }
         }}
       >
-        {/* Fill layer */}
-        <div
-          className={element.fillType === 'gradient' ? 'gradient-fix' : ''}
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            backgroundColor: (element.fillType === 'solid' || !element.fillType) ? (element.fill || '#cbd5e1') : 'transparent',
-            background: element.fillType === 'gradient' ? getBackgroundStyle(element) : undefined,
-            clipPath: `url(#${clipPathId})`,
-            WebkitClipPath: `url(#${clipPathId})`
-          }}
-        />
+        <div style={animationStyle}>
+          <div
+            className={`${styles.shapeElement || ''}`}
+            style={{ ...innerStyle, ...polygonStyle }}
+          >
+            {/* Fill layer */}
+            <div
+              className={element.fillType === 'gradient' ? 'gradient-fix' : ''}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                backgroundColor: (element.fillType === 'solid' || !element.fillType) ? (element.fill || '#cbd5e1') : 'transparent',
+                background: element.fillType === 'gradient' ? getBackgroundStyle(element) : undefined,
+                clipPath: `url(#${clipPathId})`,
+                WebkitClipPath: `url(#${clipPathId})`
+              }}
+            />
 
-        {/* Stroke layer */}
-        <svg
-          width="100%"
-          height="100%"
-          style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
-          viewBox={`0 0 ${element.width} ${element.height}`}
-          preserveAspectRatio="none"
-        >
-          <defs>
-            <clipPath id={clipPathId} clipPathUnits="objectBoundingBox">
-              <polygon points={clipPoints} />
-            </clipPath>
-          </defs>
-          <path
-            d={path}
-            fill="none"
-            stroke={element.stroke || '#000000'}
-            strokeWidth={element.strokeWidth ?? 2}
-          />
-        </svg>
+            {/* Stroke layer */}
+            <svg
+              width="100%"
+              height="100%"
+              style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
+              viewBox={`0 0 ${element.width} ${element.height}`}
+              preserveAspectRatio="none"
+            >
+              <defs>
+                <clipPath id={clipPathId} clipPathUnits="objectBoundingBox">
+                  <polygon points={clipPoints} />
+                </clipPath>
+              </defs>
+              <path
+                d={path}
+                fill="none"
+                stroke={element.stroke || '#000000'}
+                strokeWidth={element.strokeWidth ?? 2}
+              />
+            </svg>
+          </div>
+        </div>
       </div>
     );
   } else if (element.type === 'drawing' && element.path && element.path.length > 1) {
-    if (element.path.length < 2) return null;
-
-    let pathData = 'M ' + element.path[0].x + ' ' + element.path[0].y;
-    for (let i = 1; i < element.path.length; i++) {
-      pathData += ' L ' + element.path[i].x + ' ' + element.path[i].y;
-    }
+    // Use the variable-width path generator for pressure-sensitive final rendering
+    const pathData = getVariableWidthPath(element.path, element.strokeWidth || 4);
 
     content = (
-      <svg
+      <div
+        key={`drawing-${element.id}-${element.animation?.type || 'none'}-${element.animation?.lastApplied || 0}`}
         id={`element-${element.id}`}
-        style={{ ...style, overflow: 'visible' }}
-        viewBox={`0 0 ${element.width} ${element.height}`}
-        preserveAspectRatio="none"
-        onMouseDown={(e) => {
+        style={outerStyle}
+        onPointerDown={(e) => {
           e.stopPropagation();
           if (isLocked) {
             if (handleSelectElement) handleSelectElement(e, element.id);
@@ -1012,15 +1307,24 @@ const CanvasElement = ({
           }
         }}
       >
-        <path
-          d={pathData}
-          fill="none"
-          stroke={element.stroke || '#000000'}
-          strokeWidth={element.strokeWidth || 2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+        <div style={animationStyle}>
+          <div style={{ ...innerStyle, overflow: 'visible' }}>
+            <svg
+              style={{ overflow: 'visible' }}
+              viewBox={`0 0 ${element.width} ${element.height}`}
+              preserveAspectRatio="none"
+              width="100%"
+              height="100%"
+            >
+              <path
+                d={pathData}
+                fill={element.stroke || '#000000'}
+                stroke="none"
+              />
+            </svg>
+          </div>
+        </div>
+      </div>
     );
   } else if (['trapezoid', 'parallelogram', 'triangle_right', 'cross', 'speech_bubble', 'speech_bubble_round', 'thought_bubble', 'callout', 'location', 'shield', 'banner', 'ribbon', 'search', 'diamond', 'heart'].includes(element.type)) {
     const w = element.width;
@@ -1099,10 +1403,10 @@ const CanvasElement = ({
 
     content = (
       <div
+        key={`shape-${element.id}-${element.animation?.type || 'none'}-${element.animation?.lastApplied || 0}`}
         id={`element-${element.id}`}
-        className={`${styles.shapeElement || ''}`}
-        style={{ ...style, backgroundColor: 'transparent', border: 'none' }}
-        onMouseDown={(e) => {
+        style={outerStyle}
+        onPointerDown={(e) => {
           e.stopPropagation();
           if (isLocked) {
             if (handleSelectElement) handleSelectElement(e, element.id);
@@ -1111,45 +1415,53 @@ const CanvasElement = ({
           }
         }}
       >
-        {/* Fill layer */}
-        <div
-          className={element.fillType === 'gradient' ? 'gradient-fix' : ''}
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            backgroundColor: (element.fillType === 'solid' || !element.fillType) ? (element.fill || '#cbd5e1') : 'transparent',
-            background: element.fillType === 'gradient' ? getBackgroundStyle(element) : undefined,
-            clipPath: `url(#${clipPathId})`,
-            WebkitClipPath: `url(#${clipPathId})`
-          }}
-        />
+        <div style={animationStyle}>
+          <div
+            className={`${styles.shapeElement || ''}`}
+            style={{ ...innerStyle, backgroundColor: 'transparent', border: 'none' }}
+          >
+            {/* Fill layer (Gradients only, solid fills drawn by SVG to prevent clip-path animation bugs) */}
+            {element.fillType === 'gradient' && (
+              <div
+                className="gradient-fix"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  background: getBackgroundStyle(element),
+                  clipPath: `url(#${clipPathId})`,
+                  WebkitClipPath: `url(#${clipPathId})`
+                }}
+              />
+            )}
 
-        {/* Stroke layer */}
-        <svg
-          width="100%"
-          height="100%"
-          style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', overflow: 'visible' }}
-          viewBox={`0 0 ${w} ${h}`}
-          preserveAspectRatio="none"
-        >
-          <defs>
-            <clipPath id={clipPathId} clipPathUnits="userSpaceOnUse">
-              <path d={svgPath} />
-            </clipPath>
-          </defs>
-          <path
-            d={svgPath}
-            fill="none"
-            stroke={element.stroke || '#000000'}
-            strokeWidth={element.strokeWidth ?? 2}
-            strokeDasharray={element.strokeDasharray}
-            strokeLinecap={element.strokeLinecap}
-            vectorEffect="non-scaling-stroke"
-          />
-        </svg>
+            {/* Stroke layer */}
+            <svg
+              width="100%"
+              height="100%"
+              style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', overflow: 'visible' }}
+              viewBox={`0 0 ${w} ${h}`}
+              preserveAspectRatio="none"
+            >
+              <defs>
+                <clipPath id={clipPathId} clipPathUnits="userSpaceOnUse">
+                  <path d={svgPath} />
+                </clipPath>
+              </defs>
+              <path
+                d={svgPath}
+                fill={element.fillType === 'gradient' ? 'none' : (element.fill || '#cbd5e1')}
+                stroke={element.stroke || '#000000'}
+                strokeWidth={element.strokeWidth ?? 2}
+                strokeDasharray={element.strokeDasharray}
+                strokeLinecap={element.strokeLinecap}
+                vectorEffect="non-scaling-stroke"
+              />
+            </svg>
+          </div>
+        </div>
       </div>
     );
 
@@ -1176,82 +1488,87 @@ const CanvasElement = ({
 
     content = (
       <div
+        key={`extrude-${element.id}-${element.animation?.type || 'none'}-${element.animation?.lastApplied || 0}`}
         id={`element-${element.id}`}
-        style={{
-          ...style,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          overflow: 'visible',
-          backgroundColor: 'transparent',
-          border: 'none',
-          pointerEvents: 'none',
-          backfaceVisibility: 'visible',
-          WebkitBackfaceVisibility: 'visible',
-        }}
+        style={outerStyle}
       >
-        {/* Inner Target Wrapper */}
-        <div
-          style={{
-            position: 'relative',
-            pointerEvents: 'auto',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '100%',
-            height: '100%',
-            overflow: 'visible',
-            transformStyle: 'preserve-3d', // Enable true 3D layering
-          }}
-          onMouseDown={(e) => {
-            e.stopPropagation();
-            handleSelectElement(e, element.id);
-            handleMouseDown(e, element.id);
-          }}
-        >
-          {/* 3D Extrude Layers */}
-          {Array.from({ length: numLayers }).map((_, i) => {
-            const offset = (i + 1) * step;
-            const x = Math.cos(radians) * offset;
-            const y = Math.sin(radians) * offset;
-            return (
+        <div style={animationStyle}>
+          <div
+            style={{
+              ...innerStyle,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'visible',
+              backgroundColor: 'transparent',
+              border: 'none',
+              pointerEvents: 'none',
+            }}
+          >
+            {/* Inner Target Wrapper */}
+            <div
+              style={{
+                position: 'relative',
+                pointerEvents: 'auto',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '100%',
+                height: '100%',
+                overflow: 'visible',
+                transformStyle: 'preserve-3d', // Enable true 3D layering
+              }}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                handleSelectElement(e, element.id);
+                handleMouseDown(e, element.id);
+              }}
+            >
+              {/* 3D Extrude Layers */}
+              {Array.from({ length: numLayers }).map((_, i) => {
+                const offset = (i + 1) * step;
+                const x = Math.cos(radians) * offset;
+                const y = Math.sin(radians) * offset;
+                return (
+                  <div
+                    key={i}
+                    className="whitespace-pre select-none"
+                    style={{
+                      ...textStyle,
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      // Use a small negative translateZ for layers to stay behind the face
+                      transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px)) translateZ(-${i + 1}px)`,
+                      color: element.extrudeColor || '#000000',
+                      zIndex: i + 1,
+                      opacity: 1,
+                      pointerEvents: 'none',
+                      overflow: 'visible'
+                    }}
+                  >
+                    {(element.content || '').toUpperCase()}
+                  </div>
+                );
+              })}
+
+              {/* Main Surface (Face) */}
               <div
-                key={i}
                 className="whitespace-pre select-none"
                 style={{
                   ...textStyle,
-                  position: 'absolute',
-                  top: '50%',
-                  left: '50%',
-                  // Use a small negative translateZ for layers to stay behind the face
-                  transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px)) translateZ(-${i + 1}px)`,
-                  color: element.extrudeColor || '#000000',
-                  zIndex: i + 1,
-                  opacity: 1,
-                  pointerEvents: 'none',
+                  position: 'relative',
+                  // Positive translateZ ensures it's always in front of layers
+                  transform: 'translate(0, 0) translateZ(1px)',
+                  color: element.color || '#ff0000',
+                  zIndex: 1000,
+                  textShadow: element.borderWidth ? `${element.extrudeColor || '#000'} -${element.borderWidth}px -${element.borderWidth}px 0, ${element.extrudeColor || '#000'} ${element.borderWidth}px -${element.borderWidth}px 0, ${element.extrudeColor || '#000'} -${element.borderWidth}px ${element.borderWidth}px 0, ${element.extrudeColor || '#000'} ${element.borderWidth}px ${element.borderWidth}px 0` : 'none',
                   overflow: 'visible'
                 }}
               >
                 {(element.content || '').toUpperCase()}
               </div>
-            );
-          })}
-
-          {/* Main Surface (Face) */}
-          <div
-            className="whitespace-pre select-none"
-            style={{
-              ...textStyle,
-              position: 'relative',
-              // Positive translateZ ensures it's always in front of layers
-              transform: 'translate(0, 0) translateZ(1px)',
-              color: element.color || '#ff0000',
-              zIndex: 1000,
-              textShadow: element.borderWidth ? `${element.extrudeColor || '#000'} -${element.borderWidth}px -${element.borderWidth}px 0, ${element.extrudeColor || '#000'} ${element.borderWidth}px -${element.borderWidth}px 0, ${element.extrudeColor || '#000'} -${element.borderWidth}px ${element.borderWidth}px 0, ${element.extrudeColor || '#000'} ${element.borderWidth}px ${element.borderWidth}px 0` : 'none',
-              overflow: 'visible'
-            }}
-          >
-            {(element.content || '').toUpperCase()}
+            </div>
           </div>
         </div>
       </div>
@@ -1420,23 +1737,14 @@ const CanvasElement = ({
 
     content = (
       <div
+        key={`frame-${element.id}-${element.animation?.type || 'none'}-${element.animation?.lastApplied || 0}`}
         id={`element-${element.id}`}
         style={{
-          ...style,
+          ...outerStyle,
           // IMPORTANT: When editing, we MUST allow overflow to see the ghost image outside
           overflow: isEditingFrame ? 'visible' : 'hidden',
-          backgroundColor: hasContent ? 'transparent' : '#f3f4f6',
-          // [FIX] Restore box interaction: Remove clip-path from the root div.
-          // The inner containers and clip-defs will handle the visual masking.
-          clipPath: 'none',
-          WebkitClipPath: 'none',
-          border: (hasContent && !isEditingFrame) ? 'none' : '2px dashed #d1d5db',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderRadius: isCircle ? '50%' : isRounded ? (element.borderRadius || 20) + 'px' : '0'
         }}
-        onMouseDown={(e) => {
+        onPointerDown={(e) => {
           e.stopPropagation();
           if (isLocked) {
             if (handleSelectElement) handleSelectElement(e, element.id);
@@ -1453,6 +1761,21 @@ const CanvasElement = ({
         onDrop={handleDrop}
         onDragOver={handleDragOver}
       >
+        <div style={animationStyle}>
+          <div
+             style={{
+              ...innerStyle,
+              width: '100%',
+              height: '100%',
+              backgroundColor: hasContent ? 'transparent' : '#f3f4f6',
+              border: (hasContent && !isEditingFrame) ? 'none' : '2px dashed #d1d5db',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: isCircle ? '50%' : isRounded ? (element.borderRadius || 20) + 'px' : '0',
+              overflow: isEditingFrame ? 'visible' : 'hidden',
+            }}
+          >
 
 
         {/* GHOST CONTENT - Visible OUTSIDE the mask when editing */}
@@ -1469,7 +1792,7 @@ const CanvasElement = ({
               zIndex: 1, // Above backdrop, below mask
               overflow: 'visible' // Allow ghost content to overflow its container
             }}
-            onMouseDown={(e) => {
+            onPointerDown={(e) => {
               e.stopPropagation();
               handleMouseDown(e, element.id, 'drag');
             }}
@@ -1727,82 +2050,82 @@ const CanvasElement = ({
             </clipPath>
           </defs>
         </svg>
-      </div>
-    );
-  } else if (element.type === 'vector_path') {
-    const d = generateSVGPath(element.bezierAnchors, element.isClosed);
-    content = (
-      <div
-        id={`element-${element.id}`}
-        style={{
-          ...style,
-          pointerEvents: 'none' // Allow background clicks, children will catch selectively
-        }}
-        className={styles.canvasElement}
-      >
-        <div
-          style={{ width: '100%', height: '100%', pointerEvents: 'auto' }}
-          onMouseDown={(e) => {
-            e.stopPropagation();
-            if (isLocked) {
-              if (handleSelectElement) handleSelectElement(e, element.id);
-            } else {
-              handleMouseDown(e, element.id);
-            }
-          }}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (handleSelectElement) handleSelectElement(e, element.id);
-          }}
-        >
-          <svg
-            width="100%"
-            height="100%"
-            viewBox={`0 0 ${element.width} ${element.height}`}
-            style={{ overflow: 'visible' }}
-          >
-            {/* Hide static path if VectorOverlay is rendering the live one */}
-            {!(isSelected && (currentTool === 'pen' || isEditing)) && (
-              <path
-                d={d}
-                fill={element.fill || 'none'}
-                stroke={element.stroke || '#000'}
-                strokeWidth={element.strokeWidth || 2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            )}
-          </svg>
-
-          {/* Vector Editing Overlay */}
-          {(isSelected && (currentTool === 'pen' || isEditing)) && (
-            <VectorOverlay
-              element={element}
-              zoom={zoom}
-              currentTool={currentTool}
-              onUpdate={updateElement}
-              cursorPos={penCursorPos}
-            />
-          )}
+          </div>
         </div>
       </div>
     );
-  } else if (element.type === 'sticker') {
+  } else if (element.type === 'vector_path') {
+    const d = generateSVGPath(element.bezierAnchors, element.isClosed);    content = (
+      <div
+        key={`vector-${element.id}-${element.animation?.type || 'none'}-${element.animation?.lastApplied || 0}`}
+        id={`element-${element.id}`}
+        style={outerStyle}
+      >
+        <div style={animationStyle}>
+          <div
+            style={{
+              ...innerStyle,
+              pointerEvents: 'none'
+            }}
+            className={styles.canvasElement}
+          >
+            <div
+              style={{ width: '100%', height: '100%', pointerEvents: 'auto' }}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                if (isLocked) {
+                  if (handleSelectElement) handleSelectElement(e, element.id);
+                } else {
+                  handleMouseDown(e, element.id);
+                }
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (handleSelectElement) handleSelectElement(e, element.id);
+              }}
+            >
+              <svg
+                width="100%"
+                height="100%"
+                viewBox={`0 0 ${element.width} ${element.height}`}
+                style={{ overflow: 'visible' }}
+              >
+                {/* Hide static path if VectorOverlay is rendering the live one */}
+                {!(isSelected && (currentTool === 'pen' || isEditing)) && (
+                  <path
+                    d={d}
+                    fill={element.fill || 'none'}
+                    stroke={element.stroke || '#000'}
+                    strokeWidth={element.strokeWidth || 2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                )}
+              </svg>
+
+              {/* Vector Editing Overlay */}
+              {(element.type === 'vector_path' && (currentTool === 'pen' || isSelected || isEditing)) && (
+                <VectorOverlay
+                  element={element}
+                  zoom={zoom}
+                  currentTool={currentTool}
+                  onUpdate={updateElement}
+                  cursorPos={penCursorPos}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  } else if (element.type === 'video') {
+
     content = (
       <div
+        key={`video-${element.id}-${element.animation?.type || 'none'}-${element.animation?.lastApplied || 0}`}
         id={`element-${element.id}`}
-        className={element.fillType === 'gradient' ? 'gradient-fix' : ''}
-        style={{
-          ...style,
-          backgroundColor: element.fillType === 'solid' ? element.fill : 'transparent',
-          background: element.fillType === 'gradient' ? getBackgroundStyle(element) : undefined,
-          borderRadius: '50%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: '40px',
-        }}
-        onMouseDown={(e) => {
+        style={outerStyle}
+        onPointerDown={(e) => {
           e.stopPropagation();
           if (isLocked) {
             if (handleSelectElement) handleSelectElement(e, element.id);
@@ -1811,68 +2134,146 @@ const CanvasElement = ({
           }
         }}
       >
-        {stickerOptions.find(s => s.name === element.sticker)?.icon || '😊'}
+        <div style={animationStyle}>
+          <div
+            style={{
+              ...innerStyle,
+              backgroundColor: 'transparent',
+              overflow: 'hidden'
+            }}
+            className={styles.canvasElement}
+          >
+            <video
+              ref={videoRef}
+              src={element.src}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                filter: getFilterCSS(element.filters || {}),
+                opacity: element.opacity !== undefined ? element.opacity : 1,
+                ...getEffectCSS(element)
+              }}
+              autoPlay
+              muted
+              loop
+              playsInline
+            />
+          </div>
+        </div>
+      </div>
+    );
+  } else if (element.type === 'sticker') {
+    content = (
+      <div
+        key={`sticker-${element.id}-${element.animation?.type || 'none'}-${element.animation?.lastApplied || 0}`}
+        id={`element-${element.id}`}
+        style={outerStyle}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          if (isLocked) {
+            if (handleSelectElement) handleSelectElement(e, element.id);
+          } else {
+            handleMouseDown(e, element.id);
+          }
+        }}
+      >
+        <div style={animationStyle}>
+          <div
+            style={{
+              ...innerStyle,
+              backgroundColor: element.fillType === 'solid' ? element.fill : 'transparent',
+              background: element.fillType === 'gradient' ? getBackgroundStyle(element) : undefined,
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '40px',
+            }}
+            className={element.fillType === 'gradient' ? 'gradient-fix' : ''}
+          >
+            {stickerOptions.find(s => s.name === element.sticker)?.icon || '😊'}
+          </div>
+        </div>
       </div>
     );
   } else if (element.type === 'group') {
-    const groupOutlineStyle = {
-      position: 'absolute',
-      left: element.x,
-      top: element.y,
-      width: element.width,
-      height: element.height,
-      zIndex: element.zIndex,
-      cursor: isLocked ? 'not-allowed' : 'move',
-      border: 'none',
-      pointerEvents: 'auto'
-    };
-
     content = (
-      <div id={`element-${element.id}`}>
-        {/* Group outline */}
-        <div
-          style={groupOutlineStyle}
-          onMouseDown={(e) => {
-            e.stopPropagation();
-            if (isLocked) {
-              if (handleSelectElement) handleSelectElement(e, element.id);
-            } else {
-              handleMouseDown(e, element.id);
-            }
-          }}
-        />
-
-        {/* Render group children */}
-        {getCurrentPageElements()
-          .filter(el => el.groupId === element.id)
-          .map(el => (
-            <CanvasElement
-              key={el.id}
-              element={el}
-              selectedElements={selectedElements}
-              textEditing={textEditing}
-              lockedElements={lockedElements}
-              currentTool={currentTool}
-              currentLanguage={currentLanguage}
-              textDirection={textDirection}
-              fontFamilies={fontFamilies}
-              supportedLanguages={supportedLanguages}
-              stickerOptions={stickerOptions}
-              handleMouseDown={handleMouseDown}
-              handleSelectElement={handleSelectElement}
-              updateElement={updateElement}
-              setTextEditing={setTextEditing}
-              getCurrentPageElements={getCurrentPageElements}
-              getBackgroundStyle={getBackgroundStyle}
-              getFilterCSS={getFilterCSS}
-              getEffectCSS={getEffectCSS}
-              parseCSS={parseCSS}
-              renderSelectionHandles={renderSelectionHandles}
-              handleTextEdit={handleTextEdit}
-              onCommentClick={onCommentClick}
-              zoom={zoom}
+      <div id={`element-${element.id}`} style={outerStyle}>
+        <div style={animationStyle}>
+          <div
+            style={{
+              ...innerStyle,
+              backgroundColor: 'transparent',
+              border: 'none',
+              pointerEvents: 'none'
+            }}
+          >
+            {/* Group interaction area */}
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                cursor: isLocked ? 'not-allowed' : 'move',
+                pointerEvents: 'auto',
+                zIndex: 1
+              }}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                if (isLocked) {
+                  if (handleSelectElement) handleSelectElement(e, element.id);
+                } else {
+                  handleMouseDown(e, element.id);
+                }
+              }}
             />
-          ))}
+
+            {/* Render group children with RELATIVE positions (offset from group origin) */}
+            {getCurrentPageElements()
+              .filter(el => el.groupId === element.id)
+              .map(el => {
+                // Children store their absolute page positions.
+                // Since this div is positioned at group.x, group.y (via outerStyle),
+                // we must subtract the group's origin to get the correct visual position.
+                const relEl = {
+                  ...el,
+                  x: el.x - element.x,
+                  y: el.y - element.y,
+                };
+                return (
+                  <CanvasElement
+                    key={el.id}
+                    element={relEl}
+                    selectedElements={selectedElements}
+                    textEditing={textEditing}
+                    lockedElements={lockedElements}
+                    currentTool={currentTool}
+                    currentLanguage={currentLanguage}
+                    textDirection={textDirection}
+                    fontFamilies={fontFamilies}
+                    supportedLanguages={supportedLanguages}
+                    stickerOptions={stickerOptions}
+                    handleMouseDown={handleMouseDown}
+                    handleSelectElement={handleSelectElement}
+                    updateElement={updateElement}
+                    setTextEditing={setTextEditing}
+                    getCurrentPageElements={getCurrentPageElements}
+                    getBackgroundStyle={getBackgroundStyle}
+                    getFilterCSS={getFilterCSS}
+                    getEffectCSS={getEffectCSS}
+                    parseCSS={parseCSS}
+                    renderSelectionHandles={renderSelectionHandles}
+                    handleTextEdit={handleTextEdit}
+                    onCommentClick={onCommentClick}
+                    zoom={zoom}
+                    currentTime={currentTime}
+                    isPlaying={isPlaying}
+                    isPreviewing={isPreviewing}
+                  />
+                );
+              })}
+          </div>
+        </div>
       </div>
     );
   }
@@ -1901,7 +2302,7 @@ const CanvasElement = ({
             cursor: 'pointer',
             pointerEvents: 'auto'
           }}
-          onMouseDown={(e) => {
+          onPointerDown={(e) => {
             e.stopPropagation();
             handleSelectElement(e, element.id);
           }}
@@ -1932,7 +2333,7 @@ const CanvasElement = ({
             transform: `rotate(${element.rotation || 0}deg)`,
             transformOrigin: `${-element.width / 2 + 14 / zoom}px ${element.height / 2 + 14 / zoom}px`
           }}
-          onMouseDown={(e) => {
+          onPointerDown={(e) => {
             e.stopPropagation();
             onCommentClick && onCommentClick(element);
           }}
@@ -1967,6 +2368,12 @@ export default memo(CanvasElement, (prevProps, nextProps) => {
   if (prevProps.zoom !== nextProps.zoom) return false;
   if (prevProps.currentTool !== nextProps.currentTool) return false;
   if (prevProps.currentLanguage !== nextProps.currentLanguage) return false;
+  
+  // 7. Playback state changed (CRITICAL for animations)
+  // We MUST re-render on currentTime change even when playing for sync
+  if (prevProps.isPlaying !== nextProps.isPlaying) return false;
+  if (prevProps.currentTime !== nextProps.currentTime) return false;
+  if (prevProps.isSelected !== nextProps.isSelected) return false;
 
   // Otherwise, skip re-render
   return true;

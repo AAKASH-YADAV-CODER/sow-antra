@@ -1,15 +1,12 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { boardAPI } from '../services/api';
 import {
-  Users,
   Settings,
   Share2,
   Home,
-  Search,
   Plus,
-  MoreHorizontal,
   Download,
   X,
   UserPlus,
@@ -17,6 +14,7 @@ import {
   Check,
   Trash2
 } from 'lucide-react';
+import WhiteboardWorkspace from '../features/whiteboard/components/WhiteboardWorkspace';
 
 const WhiteboardPage = () => {
   const { boardId } = useParams();
@@ -25,7 +23,6 @@ const WhiteboardPage = () => {
   const [board, setBoard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [activeUsers, setActiveUsers] = useState([]);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('editor');
@@ -36,22 +33,34 @@ const WhiteboardPage = () => {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [boardTitle, setBoardTitle] = useState('');
 
+  const stageRef = useRef(null);
+
   useEffect(() => {
     const fetchBoardData = async () => {
       try {
         setLoading(true);
-        const response = await boardAPI.getBoard(boardId);
-        setBoard(response.data);
-        setBoardTitle(response.data.title || 'Untitled Whiteboard');
-
-        // Fetch board members
-        const membersResponse = await boardAPI.listBoardMembers(boardId);
-        setBoardMembers(Array.isArray(membersResponse.data) ? membersResponse.data : []);
-
+        if (boardId?.startsWith('local_')) {
+           setBoard({ id: boardId, title: 'Local Whiteboard' });
+           setBoardTitle('Local Whiteboard');
+           setBoardMembers([]);
+        } else {
+           try {
+             const response = await boardAPI.getBoard(boardId);
+             setBoard(response.data);
+             setBoardTitle(response.data.title || 'Untitled Whiteboard');
+             const membersResponse = await boardAPI.listBoardMembers(boardId);
+             setBoardMembers(Array.isArray(membersResponse.data) ? membersResponse.data : []);
+           } catch (apiErr) {
+             console.warn("API board fetch failed, treating as local board.", apiErr);
+             setBoard({ id: boardId, title: 'Untitled Whiteboard (Local)' });
+             setBoardTitle('Untitled Whiteboard (Local)');
+             setBoardMembers([]);
+           }
+        }
         setError(null);
       } catch (err) {
-        console.error('Error fetching board:', err);
-        setError('Failed to load whiteboard. It may have been deleted or you may not have access.');
+        console.error('Error in board logic:', err);
+        setError('Failed to setup whiteboard. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -110,6 +119,20 @@ const WhiteboardPage = () => {
     }
   };
 
+  const handleDownload = (quality = 'high') => {
+    if (!stageRef.current) return;
+    
+    // High quality export
+    const pixelRatio = quality === 'high' ? 3 : 1;
+    const uri = stageRef.current.toDataURL({ pixelRatio });
+    const link = document.createElement('a');
+    link.download = `${boardTitle.replace(/\s+/g, '_')}_${quality}.png`;
+    link.href = uri;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
@@ -141,46 +164,62 @@ const WhiteboardPage = () => {
     <div className="flex flex-col h-screen bg-[#f8f9fa] overflow-hidden">
       {/* Top Bar */}
       <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 z-50">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => navigate('/home')}
-            className="p-2 hover:bg-gray-100 rounded-lg text-gray-400 transition-all"
-          >
-            <Home size={20} />
-          </button>
-          <div className="h-6 w-px bg-gray-200 mx-1" />
-          <div className="flex flex-col min-w-0">
-            {isEditingTitle ? (
-              <input
-                autoFocus
-                type="text"
-                value={boardTitle}
-                onChange={(e) => setBoardTitle(e.target.value)}
-                onBlur={handleTitleSave}
-                onKeyDown={(e) => e.key === 'Enter' && handleTitleSave()}
-                className="text-sm font-bold text-gray-900 bg-gray-50 border-none focus:ring-2 focus:ring-purple-200 rounded px-1 -ml-1 outline-none w-full max-w-[200px]"
-              />
-            ) : (
-              <h1
-                onClick={() => setIsEditingTitle(true)}
-                className="text-sm font-bold text-gray-900 leading-tight cursor-pointer hover:bg-gray-50 px-1 -ml-1 rounded transition-colors truncate max-w-[300px]"
-                title="Click to rename"
-              >
-                {board?.title || 'Untitled Whiteboard'}
-              </h1>
-            )}
-            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Editing Workspace</p>
+        <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3">
+             <button
+              onClick={() => navigate('/home')}
+              className="p-2 hover:bg-gray-100 rounded-xl text-gray-400 transition-all active:scale-95"
+            >
+              <Home size={18} />
+            </button>
+            <span className="handwritten-logo select-none">Sowntra</span>
+          </div>
+
+          <div className="h-8 w-px bg-gray-100 mx-1" />
+
+          {/* Project Info & Quick Menus */}
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              {isEditingTitle ? (
+                <input
+                  autoFocus
+                  type="text"
+                  value={boardTitle}
+                  onChange={(e) => setBoardTitle(e.target.value)}
+                  onBlur={handleTitleSave}
+                  onKeyDown={(e) => e.key === 'Enter' && handleTitleSave()}
+                  className="text-sm font-black text-gray-900 bg-gray-50 border-none focus:ring-2 focus:ring-purple-200 rounded px-1 -ml-1 outline-none w-full max-w-[200px]"
+                />
+              ) : (
+                <h1
+                  onClick={() => setIsEditingTitle(true)}
+                  className="text-sm font-black text-gray-900 leading-tight cursor-pointer hover:bg-gray-50 px-2 -ml-2 rounded-lg transition-colors truncate max-w-[300px]"
+                >
+                  {board?.title || 'Untitled Whiteboard'}
+                </h1>
+              )}
+              <div className="flex items-center gap-1 bg-gray-50 rounded-lg px-1.5 py-0.5 border border-gray-100">
+                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                 <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">Live</span>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-4 mt-0.5">
+              {['File', 'Edit', 'View', 'Canvas'].map(item => (
+                <button key={item} className="text-[10px] font-bold text-gray-400 hover:text-purple-600 transition-colors uppercase tracking-widest">{item}</button>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* User Presence Mini List */}
-          <div className="flex -space-x-2 mr-4">
+        <div className="flex items-center gap-4">
+          {/* User Presence */}
+          <div className="flex -space-x-2 mr-2">
             {boardMembers.slice(0, 3).map((member, i) => (
               <div
                 key={member.id}
-                className={`w-8 h-8 rounded-full border-2 border-white flex items-center justify-center text-white text-[10px] font-bold shadow-sm
-                  ${['bg-blue-500', 'bg-green-500', 'bg-pink-500'][i % 3]}
+                className={`w-8 h-8 rounded-full border-2 border-white flex items-center justify-center text-white text-[10px] font-black shadow-sm transition-transform hover:scale-110 hover:z-10
+                  ${['bg-purple-500', 'bg-indigo-500', 'bg-pink-500', 'bg-amber-500'][i % 4]}
                 `}
                 title={member.name || member.email}
               >
@@ -194,53 +233,44 @@ const WhiteboardPage = () => {
             )}
           </div>
 
-          <button
-            onClick={() => setShowInviteModal(true)}
-            className="flex items-center gap-2 px-4 h-10 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold text-sm transition-all shadow-md shadow-purple-50"
-          >
-            <Share2 size={16} /> Share
-          </button>
-          <button className="p-2.5 hover:bg-gray-100 rounded-lg text-gray-500 transition-all">
-            <Download size={20} />
-          </button>
-          <button className="p-2.5 hover:bg-gray-100 rounded-lg text-gray-500 transition-all">
-            <Settings size={20} />
-          </button>
+          <div className="h-8 w-px bg-gray-100" />
+
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setShowInviteModal(true)}
+              className="flex items-center gap-2 px-5 h-10 bg-gray-900 hover:bg-black text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg active:scale-95"
+            >
+              <Share2 size={14} /> Share
+            </button>
+            
+            <div className="group relative">
+              <button 
+                className="p-2.5 hover:bg-gray-100 rounded-xl text-gray-500 transition-all active:scale-95"
+                title="Download Options"
+              >
+                <Download size={20} />
+              </button>
+              <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-gray-100 p-2 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-all translate-y-2 group-hover:translate-y-0 z-[100]">
+                 <button onClick={() => handleDownload('standard')} className="w-full text-left p-3 hover:bg-gray-50 rounded-xl flex flex-col">
+                   <span className="text-xs font-black text-gray-800 uppercase tracking-tighter">Standard (1x)</span>
+                   <span className="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Fast & Lightweight</span>
+                 </button>
+                 <button onClick={() => handleDownload('high')} className="w-full text-left p-3 hover:bg-purple-50 rounded-xl flex flex-col">
+                   <span className="text-xs font-black text-purple-600 uppercase tracking-tighter">Studio Quality (3x)</span>
+                   <span className="text-[9px] text-purple-400 font-bold uppercase tracking-widest">Pixel Perfect PNG</span>
+                 </button>
+              </div>
+            </div>
+
+            <button className="p-2.5 hover:bg-gray-100 rounded-xl text-gray-500 transition-all active:scale-95">
+              <Settings size={20} />
+            </button>
+          </div>
         </div>
       </header>
 
       {/* Main Canvas Area */}
-      <main className="flex-1 relative bg-white overflow-hidden flex items-center justify-center">
-        {/* Placeholder for the real Fabric.js or SVG canvas */}
-        <div className="text-center">
-          <div className="w-24 h-24 bg-purple-50 text-purple-200 rounded-3xl flex items-center justify-center mb-6 mx-auto">
-            <Plus size={48} />
-          </div>
-          <h2 className="text-xl font-bold text-gray-300">Whiteboard Canvas Coming Soon</h2>
-          <p className="text-sm text-gray-400 mt-2">The Real-Time Whiteboard engine is initializing...</p>
-        </div>
-
-        {/* Floating Toolbars Sidebar */}
-        <div className="absolute left-6 top-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 flex flex-col gap-2 z-40">
-          {['pointer', 'text', 'image', 'shape', 'pen', 'sticky'].map(tool => (
-            <button
-              key={tool}
-              className="w-12 h-12 flex items-center justify-center rounded-xl hover:bg-gray-50 text-gray-400 hover:text-purple-600 transition-all"
-            >
-              <div className="w-6 h-6 border-2 border-current rounded-sm flex items-center justify-center opacity-50">
-                {tool.charAt(0).toUpperCase()}
-              </div>
-            </button>
-          ))}
-        </div>
-
-        {/* Zoom Controls */}
-        <div className="absolute right-6 bottom-6 bg-white rounded-xl shadow-lg border border-gray-100 flex items-center p-1 z-40">
-          <button className="p-2 hover:bg-gray-50 text-gray-500 rounded-lg text-sm font-bold">—</button>
-          <span className="px-3 text-xs font-black text-gray-400">100%</span>
-          <button className="p-2 hover:bg-gray-50 text-gray-500 rounded-lg text-sm font-bold">+</button>
-        </div>
-      </main>
+      <WhiteboardWorkspace stageRef={stageRef} />
 
       {/* Share Modal */}
       {showInviteModal && (

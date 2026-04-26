@@ -213,7 +213,6 @@ const ColorPanel = ({
             updatePageBackground(cssString, gradient);
             return;
         }
-        const property = selectedElementData.type === 'text' ? 'color' : 'fill';
 
         updateElement(selectedElement, {
             fillType: 'gradient',

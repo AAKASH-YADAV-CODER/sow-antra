@@ -12,10 +12,20 @@ import {
   Trash2,
   Grid,
   Award,
-  Maximize2
+  Maximize2,
+  Film,
+  Music,
+  Video,
+  Box,
+  Tv,
+  MoreHorizontal,
+  Calendar,
+  Camera,
+  Palette
 } from 'lucide-react';
 import { shapeCategories } from '../../../config/shapesLibrary';
 import { frameCategories } from '../../../config/frameLibrary';
+
 import { fontCombinations } from '../../../config/fontCombinations';
 import { editableTemplates } from '../../../config/editableTemplates';
 import ColorPanel from './ColorPanel';
@@ -26,6 +36,16 @@ import MeshGradientPanel from './MeshGradientPanel';
 import FrameMakerPanel from './FrameMakerPanel';
 import { TypeExtrudePanel } from './TypeExtrudePanel';
 import TransformImagePanel from './TransformImagePanel';
+import { TextStudioPanel } from './TextStudioPanel';
+import EasyReflectionPanel from './EasyReflectionPanel';
+import Model3DPanel from './Model3DPanel';
+import ColorPopPanel from './ColorPopPanel';
+import CartoonifyPanel from './CartoonifyPanel';
+import PhotoEnhancerPanel from './PhotoEnhancerPanel';
+import BadTVPanel from './BadTVPanel';
+import TypeFillPanel from './TypeFillPanel';
+import { TypeWarpPanel } from './TypeWarpPanel';
+import DuotonePanel from './DuotonePanel';
 
 /**
  * ToolsSidebar Component
@@ -39,7 +59,9 @@ const ToolsSidebar = ({
   setCurrentTool,
   addElement,
   fileInputRef,
+  audioInputRef,
   handleImageUpload,
+  handleAudioUpload,
   loadProjectInputRef,
   handleProjectFileLoad,
   undo,
@@ -70,6 +92,7 @@ const ToolsSidebar = ({
   setUploads, // New prop for folder updates
   canvasSize,
   setCanvasSize,
+  setShowContentPlannerModal,
 }) => {
   const [activePanel, setActivePanel] = useState('elements');
   const [searchQuery, setSearchQuery] = useState('');
@@ -166,7 +189,7 @@ const ToolsSidebar = ({
   useEffect(() => {
     if (activeSidePanel === 'none') {
       setActivePanel(null);
-    } else if (['design', 'elements', 'text', 'uploads', 'color', 'crop', 'editImage', 'blendImage', 'meshGradient', 'brandkit', 'apps', 'typeExtrude', 'transformImage'].includes(activeSidePanel)) {
+    } else if (['design', 'elements', 'text', 'uploads', 'color', 'crop', 'editImage', 'blendImage', 'meshGradient', 'brandkit', 'apps', 'typeExtrude', 'transformImage', 'textStudio', 'easyReflection', 'more', 'typeFill', 'typeWarp', 'photoEnhancer', 'duotone'].includes(activeSidePanel)) {
       setActivePanel(activeSidePanel);
     }
   }, [activeSidePanel]);
@@ -206,9 +229,11 @@ const ToolsSidebar = ({
     { id: 'text', icon: Type, label: 'Text' },
     { id: 'pen', icon: CustomPenIcon, label: 'Pen' }, // Pen Tool Added
     { id: 'uploads', icon: Upload, label: 'Uploads' },
-
+    { id: 'video', icon: Film, label: 'Videos' },
+    { id: 'audio', icon: Music, label: 'Audio' },
     { id: 'brandkit', icon: Award, label: 'Brand Kit' },
     { id: 'apps', icon: Grid, label: 'Apps' },
+    { id: 'more', icon: MoreHorizontal, label: 'More' },
   ];
 
   const handleTabClick = (id) => {
@@ -267,30 +292,88 @@ const ToolsSidebar = ({
       {activePanel && activePanel !== 'editImage' && activePanel !== 'blendImage' && activePanel !== 'meshGradient' && (
         <div className="w-80 bg-white h-full flex flex-col animate-slide-in-left overflow-hidden shadow-xl border-r border-gray-100 z-30">
 
-          {/* Panel Header */}
-          <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
-            <h2 className="text-lg font-bold capitalize text-gray-800">
-              {activePanel === 'color' ? 'Colour' :
-                activePanel === 'crop' ? 'Crop' :
-                  activePanel === 'frameMaker' ? 'Frame Maker' :
-                    activePanel === 'typeExtrude' ? 'TypeExtrude' :
-                      activePanel === 'transformImage' ? 'Transform Image' :
-                        (navTabs.find(t => t.id === activePanel)?.label || 'Panel')}
-            </h2>
-            <button
-              onClick={() => {
-                setActivePanel(null);
-                if (activeSidePanel === activePanel) setActiveSidePanel('none');
-              }}
-              className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <X size={20} />
-            </button>
-          </div>
+          {/* Panel Header - Hidden for TypeFill & TypeWarp as they have their own back headers */}
+          {activePanel !== 'typeFill' && activePanel !== 'typeWarp' && activePanel !== 'colorPop' && activePanel !== 'photoEnhancer' && (
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
+              <h2 className="text-lg font-bold capitalize text-gray-800">
+                {activePanel === 'color' ? 'Colour' :
+                  activePanel === 'crop' ? 'Crop' :
+                    activePanel === 'frameMaker' ? 'Frame Maker' :
+                      activePanel === 'typeExtrude' ? 'TypeExtrude' :
+                        activePanel === 'textStudio' ? 'Text Studio Maker' :
+                          activePanel === 'transformImage' ? 'Transform Image' :
+                            activePanel === 'typeFill' ? 'TypeFill Pattern' :
+                              activePanel === 'typeWarp' ? 'TypeWarp' :
+                                (navTabs.find(t => t.id === activePanel)?.label || 'Panel')}
+              </h2>
+              <button
+                onClick={() => {
+                  setActivePanel(null);
+                  if (activeSidePanel === activePanel) setActiveSidePanel('none');
+                }}
+                className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+          )}
 
           {/* Panel Content (Scrollable) */}
           <div className="flex-1 overflow-y-auto p-4 light-scrollbar">
             {/* ... Content remains the same ... */}
+
+            {/* TEXT STUDIO PANEL */}
+            {activePanel === 'textStudio' && (
+              <div className="h-full -mx-4 -mt-4">
+                <TextStudioPanel
+                  isOpen={activePanel === 'textStudio'}
+                  onClose={() => {
+                    setActivePanel(null);
+                    setActiveSidePanel('none');
+                  }}
+                  addElement={addElement}
+                  updateElement={updateElement}
+                  selectedElement={selectedElement}
+                  selectedElementData={selectedElementData}
+                  canvasSize={canvasSize}
+                />
+              </div>
+            )}
+
+            {/* TYPEFILL PANEL */}
+            {activePanel === 'typeFill' && (
+              <div className="h-full -mx-4 -mt-4">
+                <TypeFillPanel
+                  isOpen={activePanel === 'typeFill'}
+                  onClose={() => {
+                    // Go back to apps panel instead of closing completely
+                    setActivePanel('apps');
+                    setActiveSidePanel('apps');
+                  }}
+                  addElement={addElement}
+                  canvasSize={canvasSize}
+                />
+              </div>
+            )}
+
+            {/* TYPEWARP PANEL */}
+            {activePanel === 'typeWarp' && (
+              <div className="h-full -mx-4 -mt-4">
+                <TypeWarpPanel
+                  isOpen={activePanel === 'typeWarp'}
+                  onClose={() => {
+                    // Go back to apps panel instead of closing completely
+                    setActivePanel('apps');
+                    setActiveSidePanel('apps');
+                  }}
+                  addElement={addElement}
+                  updateElement={updateElement}
+                  selectedElement={selectedElement}
+                  selectedElementData={selectedElementData}
+                  canvasSize={canvasSize}
+                />
+              </div>
+            )}
 
             {/* DESIGN PANEL */}
             {activePanel === 'design' && (
@@ -383,6 +466,38 @@ const ToolsSidebar = ({
                       </div>
                     ))}
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* MORE PANEL */}
+            {activePanel === 'more' && (
+              <div className="space-y-6">
+                 <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-5 rounded-2xl text-white shadow-lg relative overflow-hidden">
+                    <div className="relative z-10">
+                        <h3 className="text-lg font-bold mb-1 flex items-center gap-2">
+                           Discover More
+                        </h3>
+                        <p className="text-[11px] opacity-90 leading-relaxed font-medium">
+                           Powerful tools to take Sowntra further.
+                        </p>
+                    </div>
+                </div>
+
+                <div className="space-y-3">
+                   <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Apps & Integrations</h3>
+                   <button 
+                     onClick={() => setShowContentPlannerModal && setShowContentPlannerModal(true)}
+                     className="w-full flex items-center gap-4 p-4 rounded-xl border border-gray-100 bg-gray-50 hover:bg-white hover:border-purple-200 hover:shadow-md transition-all group text-left"
+                   >
+                      <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center text-purple-600 group-hover:scale-110 transition-transform shrink-0">
+                         <Calendar size={24} />
+                      </div>
+                      <div>
+                         <h4 className="text-sm font-bold text-gray-800 group-hover:text-purple-700 transition-colors">Content Planner</h4>
+                         <p className="text-[10px] text-gray-500 mt-0.5 leading-tight">Schedule and publish your designs directly.</p>
+                      </div>
+                   </button>
                 </div>
               </div>
             )}
@@ -553,7 +668,7 @@ const ToolsSidebar = ({
 
                 {/* Element Categories Pills */}
                 <div className="flex flex-wrap gap-2 mb-2">
-                  {['All', 'Shapes', 'Frames', 'Devices', 'Organic', 'Fraction', 'Text', 'Grids', 'Lines', 'Arrows', 'Social'].map(cat => (
+                  {['All', 'Shapes', 'Frames', 'Devices', 'Organic', 'Fraction', 'Text', 'Grids', 'Lines', 'Arrows', 'Callouts', 'Social'].map(cat => (
                     <button
                       key={cat}
                       onClick={() => setSelectedElementCategory(cat)}
@@ -570,15 +685,16 @@ const ToolsSidebar = ({
                 {/* Categories */}
                 {[...shapeCategories, ...frameCategories].filter(cat => {
                   if (selectedElementCategory === 'All') return true;
-                  if (selectedElementCategory === 'Shapes') return ['basic', 'design', 'callouts', 'ui'].includes(cat.id);
+                  if (selectedElementCategory === 'Shapes') return ['basic', 'design', 'ui'].includes(cat.id);
                   if (selectedElementCategory === 'Frames') return ['basic_frames'].includes(cat.id);
                   if (selectedElementCategory === 'Devices') return ['device_frames'].includes(cat.id);
                   if (selectedElementCategory === 'Organic') return ['organic_frames'].includes(cat.id);
                   if (selectedElementCategory === 'Fraction') return ['fraction_frames'].includes(cat.id);
-                  if (selectedElementCategory === 'Text') return ['text_mask_frames'].includes(cat.id);
-                  if (selectedElementCategory === 'Grids') return ['grid_frames'].includes(cat.id);
+                  if (selectedElementCategory === 'Text') return ['text_mask_frames', 'number_frames'].includes(cat.id);
+                  if (selectedElementCategory === 'Grids') return ['grid_frames', 'collage_frames'].includes(cat.id);
                   if (selectedElementCategory === 'Lines') return ['lines'].includes(cat.id);
                   if (selectedElementCategory === 'Arrows') return ['arrows'].includes(cat.id);
+                  if (selectedElementCategory === 'Callouts') return ['callouts'].includes(cat.id);
                   if (selectedElementCategory === 'Social') return ['social_frames'].includes(cat.id);
                   return false;
                 }).map((category) => (
@@ -730,11 +846,10 @@ const ToolsSidebar = ({
               <div className="space-y-6">
                 <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
                   <div className="flex justify-between items-start mb-2">
-                    <h3 className="text-sm font-bold text-blue-800">Pen Tool</h3>
-                    <span className="text-[10px] px-1.5 py-0.5 bg-blue-200 text-blue-700 rounded font-mono">v1.1 - Refined</span>
+                    <h3 className="text-sm font-bold text-blue-800">Vector Draw</h3>
                   </div>
                   <p className="text-xs text-blue-600 leading-relaxed">
-                    Click on the canvas to start drawing a vector path. Click again to add points, or click and drag to create curves.
+                    Click on the canvas to add anchor points. Click and drag to create smooth Bezier curves. Use handles to refine your path.
                   </p>
                 </div>
 
@@ -999,6 +1114,23 @@ const ToolsSidebar = ({
                 <div className="grid grid-cols-1 gap-4">
                   <div
                     onClick={() => {
+                      setActivePanel('textStudio');
+                      setActiveSidePanel('textStudio');
+                    }}
+                    className="group flex items-center gap-4 p-4 bg-white border border-gray-100 rounded-2xl hover:border-pink-500 hover:shadow-xl transition-all cursor-pointer overflow-hidden relative"
+                  >
+                    <div className="w-14 h-14 bg-pink-50 rounded-xl flex items-center justify-center text-pink-600 group-hover:bg-pink-600 group-hover:text-white transition-colors">
+                      <Type size={28} className="group-hover:scale-110 transition-transform" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-gray-900 group-hover:text-pink-600 transition-colors">Text Studio</h4>
+                      <p className="text-xs text-gray-500">Create beautiful 3D text and typography</p>
+                    </div>
+                    <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-pink-100 text-pink-700 text-[10px] font-bold rounded">HOT</div>
+                  </div>
+
+                  <div
+                    onClick={() => {
                       setActivePanel('frameMaker');
                       setActiveSidePanel('frameMaker');
                     }}
@@ -1067,6 +1199,23 @@ const ToolsSidebar = ({
 
                   <div
                     onClick={() => {
+                      setActivePanel('typeFill');
+                      setActiveSidePanel('typeFill');
+                    }}
+                    className="group flex items-center gap-4 p-4 bg-white border border-gray-100 rounded-2xl hover:border-indigo-600 hover:shadow-xl transition-all cursor-pointer overflow-hidden relative"
+                  >
+                    <div className="w-14 h-14 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors overflow-hidden">
+                      <div className="text-xs font-black rotate-[-15deg] group-hover:scale-125 transition-transform text-indigo-600 group-hover:text-white">ABC</div>
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-gray-900 group-hover:text-indigo-600 transition-colors text-sm">TypeFill Pattern</h4>
+                      <p className="text-[10px] text-gray-500">Fill text with tiny repeating images</p>
+                    </div>
+                    <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded">NEW</div>
+                  </div>
+
+                  <div
+                    onClick={() => {
                       setActivePanel('transformImage');
                       setActiveSidePanel('transformImage');
                     }}
@@ -1081,6 +1230,149 @@ const ToolsSidebar = ({
                     </div>
                     <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded">NEW</div>
                   </div>
+
+                    <div
+                      onClick={() => {
+                        setActivePanel('easyReflection');
+                        setActiveSidePanel('easyReflection');
+                      }}
+                      className="group flex items-center gap-4 p-4 bg-white border border-gray-100 rounded-2xl hover:border-purple-600 hover:shadow-xl transition-all cursor-pointer overflow-hidden relative"
+                    >
+                      <div className="w-14 h-14 bg-purple-50 rounded-xl flex items-center justify-center text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-hover:scale-110 transition-transform">
+                          <path d="M4 12V4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8"/>
+                          <path d="M4 16v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/>
+                          <line x1="2" y1="14" x2="22" y2="14"/>
+                        </svg>
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-gray-900 group-hover:text-purple-600 transition-colors">Easy Reflections</h4>
+                        <p className="text-xs text-gray-500">Create beautiful fades and reflections</p>
+                      </div>
+                      <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-purple-100 text-purple-700 text-[10px] font-bold rounded">NEW</div>
+                    </div>
+
+                    <div
+                      onClick={() => {
+                        setActivePanel('model3d');
+                        setActiveSidePanel('model3d');
+                      }}
+                      className="group flex items-center gap-4 p-4 bg-white border border-gray-100 rounded-2xl hover:border-blue-600 hover:shadow-xl transition-all cursor-pointer overflow-hidden relative"
+                    >
+                      <div className="w-14 h-14 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                        <Box size={28} className="group-hover:scale-110 transition-transform" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors">3D Model Viewer</h4>
+                        <p className="text-xs text-gray-500">Upload and preview STL, OBJ, GLB models</p>
+                      </div>
+                      <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded">NEW</div>
+                    </div>
+
+                    <div
+                      onClick={() => {
+                        setActivePanel('typeWarp');
+                        setActiveSidePanel('typeWarp');
+                      }}
+                      className="group flex items-center gap-4 p-4 bg-white border border-gray-100 rounded-2xl hover:border-purple-600 hover:shadow-xl transition-all cursor-pointer overflow-hidden relative"
+                    >
+                      <div className="w-14 h-14 bg-purple-50 rounded-xl flex items-center justify-center text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                        <Type size={28} className="group-hover:scale-110 transition-transform" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-gray-900 group-hover:text-purple-600 transition-colors">TypeWarp</h4>
+                        <p className="text-xs text-gray-500">Bend, wave, and distort your text creatively</p>
+                      </div>
+                      <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-purple-100 text-purple-700 text-[10px] font-bold rounded">NEW</div>
+                    </div>
+
+                    <div
+                      onClick={() => {
+                        setActivePanel('badTV');
+                        setActiveSidePanel('badTV');
+                      }}
+                      className="group flex items-center gap-4 p-4 bg-white border border-gray-100 rounded-2xl hover:border-[#ff4b2b] hover:shadow-xl transition-all cursor-pointer overflow-hidden relative"
+                    >
+                      <div className="w-14 h-14 bg-red-50 rounded-xl flex items-center justify-center text-[#ff4b2b] group-hover:bg-[#ff4b2b] group-hover:text-white transition-colors">
+                        <Tv size={28} className="group-hover:scale-110 transition-transform" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-gray-900 group-hover:text-[#ff4b2b] transition-colors">Bad TV</h4>
+                        <p className="text-xs text-gray-500">Add retro TV glitch and noise effects</p>
+                      </div>
+                      <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-red-100 text-red-700 text-[10px] font-bold rounded">NEW</div>
+                    </div>
+
+                    <div
+                      onClick={() => {
+                        setActivePanel('colorPop');
+                        setActiveSidePanel('colorPop');
+                      }}
+                      className="group flex items-center gap-4 p-4 bg-white border border-gray-100 rounded-2xl hover:border-teal-600 hover:shadow-xl transition-all cursor-pointer overflow-hidden relative"
+                    >
+                      <div className="w-14 h-14 bg-teal-50 rounded-xl flex items-center justify-center text-teal-600 group-hover:bg-teal-600 group-hover:text-white transition-colors">
+                        <Camera size={28} className="group-hover:scale-110 transition-transform" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-gray-900 group-hover:text-teal-600 transition-colors">Color Pop</h4>
+                        <p className="text-xs text-gray-500">B&W backgrounds, vivid foregrounds</p>
+                      </div>
+                      <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-teal-100 text-teal-700 text-[10px] font-bold rounded">NEW</div>
+                    </div>
+
+                    <div
+                      onClick={() => {
+                        setActivePanel('cartoonify');
+                        setActiveSidePanel('cartoonify');
+                      }}
+                      className="group flex items-center gap-4 p-4 bg-white border border-gray-100 rounded-2xl hover:border-orange-500 hover:shadow-xl transition-all cursor-pointer overflow-hidden relative"
+                    >
+                      <div className="w-14 h-14 bg-orange-50 rounded-xl flex items-center justify-center text-orange-500 group-hover:bg-orange-500 group-hover:text-white transition-colors">
+                        <ImageIcon size={28} className="group-hover:scale-110 transition-transform" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-gray-900 group-hover:text-orange-500 transition-colors">Cartoonify</h4>
+                        <p className="text-xs text-gray-500">Turn your photos into comic art</p>
+                      </div>
+                      <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-bold rounded">NEW</div>
+                    </div>
+
+                    <div
+                      onClick={() => {
+                        setActivePanel('photoEnhancer');
+                        setActiveSidePanel('photoEnhancer');
+                      }}
+                      className="group flex items-center gap-4 p-4 bg-white border border-gray-100 rounded-2xl hover:border-violet-500 hover:shadow-xl transition-all cursor-pointer overflow-hidden relative"
+                    >
+                      <div className="w-14 h-14 bg-violet-50 rounded-xl flex items-center justify-center text-violet-500 group-hover:bg-violet-500 group-hover:text-white transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="group-hover:scale-110 transition-transform"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-gray-900 group-hover:text-violet-500 transition-colors">Photo Enhancer</h4>
+                        <p className="text-xs text-gray-500">Upscale low quality to HD quality</p>
+                      </div>
+                      <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-violet-100 text-violet-700 text-[10px] font-bold rounded">NEW</div>
+                    </div>
+                    
+                    <div
+                      onClick={() => {
+                        setActivePanel('duotone');
+                        setActiveSidePanel('duotone');
+                      }}
+                      className="group flex items-center gap-4 p-4 bg-white border border-gray-100 rounded-2xl hover:border-teal-500 hover:shadow-xl transition-all cursor-pointer overflow-hidden relative"
+                    >
+                      <div className="w-14 h-14 bg-teal-50 rounded-xl flex items-center justify-center text-teal-500 group-hover:bg-teal-500 group-hover:text-white transition-colors">
+                        <Palette size={28} className="group-hover:scale-110 transition-transform" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-gray-900 group-hover:text-teal-600 transition-colors">Duotone</h4>
+                        <p className="text-xs text-gray-500">Apply high-contrast color effects</p>
+                      </div>
+                      <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-teal-100 text-teal-700 text-[10px] font-bold rounded">NEW</div>
+                    </div>
+
+
+
                 </div>
               </div>
             )}
@@ -1138,6 +1430,168 @@ const ToolsSidebar = ({
                 selectedElementData={selectedElementData}
               />
             )}
+
+            {activePanel === 'easyReflection' && (
+              <EasyReflectionPanel
+                isOpen={true}
+                onClose={() => {
+                  setActivePanel('apps');
+                  setActiveSidePanel('apps');
+                }}
+                selectedElement={selectedElement}
+                selectedElementData={selectedElementData}
+                updateElement={updateElement}
+              />
+            )}
+
+            {activePanel === 'model3d' && (
+              <Model3DPanel
+                isOpen={true}
+                onClose={() => {
+                  setActivePanel('apps');
+                  setActiveSidePanel('apps');
+                }}
+                addElement={addElement}
+              />
+            )}
+
+            {activePanel === 'badTV' && (
+              <BadTVPanel
+                isOpen={true}
+                onClose={() => {
+                  setActivePanel('apps');
+                  setActiveSidePanel('apps');
+                }}
+                addElement={addElement}
+              />
+            )}
+
+            {activePanel === 'colorPop' && (
+              <ColorPopPanel
+                isOpen={true}
+                onClose={() => {
+                  setActivePanel('apps');
+                  setActiveSidePanel('apps');
+                }}
+                selectedElement={selectedElement}
+                selectedElementData={selectedElementData}
+                updateElement={updateElement}
+                addElement={addElement}
+              />
+            )}
+
+            {activePanel === 'cartoonify' && (
+              <CartoonifyPanel
+                isOpen={true}
+                onClose={() => {
+                  setActivePanel('apps');
+                  setActiveSidePanel('apps');
+                }}
+                selectedElement={selectedElement}
+                selectedElementData={selectedElementData}
+                updateElement={updateElement}
+                addElement={addElement}
+              />
+            )}
+
+            {activePanel === 'photoEnhancer' && (
+              <PhotoEnhancerPanel
+                isOpen={true}
+                onClose={() => {
+                  setActivePanel('apps');
+                  setActiveSidePanel('apps');
+                }}
+                selectedElement={selectedElement}
+                selectedElementData={selectedElementData}
+                updateElement={updateElement}
+                addElement={addElement}
+              />
+            )}
+
+            {activePanel === 'duotone' && (
+              <DuotonePanel
+                isOpen={true}
+                onClose={() => {
+                  setActivePanel('apps');
+                  setActiveSidePanel('apps');
+                }}
+                selectedElement={selectedElement}
+                selectedElementData={selectedElementData}
+                updateElement={updateElement}
+                addElement={addElement}
+              />
+            )}
+
+
+
+            {/* VIDEO PANEL */}
+            {activePanel === 'video' && (
+              <div className="space-y-6">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-blue-100 flex items-center justify-center gap-2 transition-all"
+                >
+                  <Upload size={20} />
+                  Upload Video
+                </button>
+
+                <div className="grid grid-cols-2 gap-4">
+                  {[
+                    { id: 'v1', name: 'Nature', thumbnail: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=200', src: 'https://www.w3schools.com/html/mov_bbb.mp4' },
+                    { id: 'v2', name: 'City', thumbnail: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=200', src: 'https://www.w3schools.com/html/movie.mp4' },
+                    { id: 'v3', name: 'abstract', thumbnail: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=200', src: 'https://www.sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4' },
+                  ].map(video => (
+                    <div
+                      key={video.id}
+                      onClick={() => addElement('video', { src: video.src })}
+                      className="group cursor-pointer relative aspect-video bg-gray-100 rounded-xl overflow-hidden border border-gray-100 hover:border-blue-500 transition-all"
+                    >
+                      <img src={video.thumbnail} alt={video.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+                      <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Video className="text-white" size={24} />
+                      </div>
+                      <div className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-black/50 text-white text-[10px] font-bold rounded uppercase">{video.name}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* AUDIO PANEL */}
+            {activePanel === 'audio' && (
+              <div className="space-y-6">
+                <button
+                  onClick={() => audioInputRef.current?.click()}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-purple-100 flex items-center justify-center gap-2 transition-all"
+                >
+                  <Upload size={20} />
+                  Upload Audio
+                </button>
+
+                <div className="space-y-3">
+                  {[
+                    { id: 'a1', name: 'Lofi Study', duration: '2:34', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
+                    { id: 'a2', name: 'Nature Relax', duration: '3:15', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3' },
+                    { id: 'a3', name: 'Corporate Beat', duration: '1:45', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3' },
+                  ].map(audio => (
+                    <div
+                      key={audio.id}
+                      onClick={() => addElement('audio', { name: audio.name, src: audio.url })}
+                      className="flex items-center gap-3 p-3 bg-white border border-gray-100 rounded-xl hover:border-purple-500 hover:shadow-md cursor-pointer transition-all group"
+                    >
+                      <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-all">
+                        <Music size={20} />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-xs font-bold text-gray-800">{audio.name}</h4>
+                        <p className="text-[10px] text-gray-500">{audio.duration}</p>
+                      </div>
+                      <Plus size={16} className="text-gray-400 group-hover:text-purple-600" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1186,8 +1640,15 @@ const ToolsSidebar = ({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,video/*"
         onChange={handleImageUpload}
+        className="hidden"
+      />
+      <input
+        ref={audioInputRef}
+        type="file"
+        accept="audio/*, .mp3, .wav, .ogg, .m4a"
+        onChange={handleAudioUpload}
         className="hidden"
       />
       <input
@@ -1311,7 +1772,7 @@ const arePropsEqual = (prevProps, nextProps) => {
     if (prevProps.lastColorChange !== nextProps.lastColorChange) return false;
   }
 
-  if (panel === 'crop' || panel === 'editImage') {
+  if (panel === 'crop' || panel === 'editImage' || panel === 'model3d') {
     if (prevProps.selectedElement !== nextProps.selectedElement) return false;
     if (prevProps.selectedElementData !== nextProps.selectedElementData) return false;
     if (prevProps.isProcessingBG !== nextProps.isProcessingBG) return false;
@@ -1319,7 +1780,8 @@ const arePropsEqual = (prevProps, nextProps) => {
   }
 
   // 'elements', 'text', 'uploads', 'pen' panels do NOT depend on pages/selection (mostly)
-  // They just dispatch actions (addElement).
+  // 
+
 
   return true;
 };

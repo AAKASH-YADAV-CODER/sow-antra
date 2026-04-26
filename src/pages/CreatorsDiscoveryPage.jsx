@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, LayoutGrid, Heart, Eye, ArrowLeft, LayoutTemplate, Palette, Smartphone, Monitor } from 'lucide-react';
+import { Search, Heart, Eye, ArrowLeft } from 'lucide-react';
 import { editableTemplates, templateCategories } from '../config/editableTemplates';
 
 const CreatorsDiscoveryPage = () => {

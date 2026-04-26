@@ -107,7 +107,7 @@ const useClipboard = ({
         }
 
         saveToHistory(newElements, canvasSize);
-    }, [clipboard, getCurrentPageElements, setCurrentPageElements, setSelectedElements, setSelectedElement, saveToHistory]);
+    }, [clipboard, getCurrentPageElements, setCurrentPageElements, setSelectedElements, setSelectedElement, saveToHistory, canvasSize]);
 
     // Paste style to selected elements
     const pasteStyle = useCallback(() => {
