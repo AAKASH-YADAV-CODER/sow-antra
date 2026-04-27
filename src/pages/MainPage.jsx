@@ -333,6 +333,12 @@ const Sowntra = () => {
 
   // Silent save wrapper for background tasks
   const handleSilentSave = useCallback(async () => {
+    // CRITICAL SAFEGUARD: Never save if pages are missing (prevent accidental data loss)
+    if (!pages || pages.length === 0) {
+      console.warn('Silent save blocked: No pages found. This prevents overwriting valid cloud data with an empty state.');
+      return;
+    }
+
     setSaveStatus('saving');
     try {
       // Capture design snapshot before saving
@@ -360,7 +366,7 @@ const Sowntra = () => {
       console.error('Silent save failed:', error);
       setSaveStatus('error');
     }
-  }, [saveProject, currentProjectId, navigate, getCanvasDataURL, projectName]);
+  }, [saveProject, currentProjectId, navigate, getCanvasDataURL, projectName, pages]);
 
   // Comment click handler (declared before useHelpers which references it)
   const handleCommentClick = useCallback((el) => {
@@ -733,17 +739,29 @@ const Sowntra = () => {
           if (!auth.currentUser) return;
 
           const response = await projectAPI.loadProject(currentProjectId);
-          const { projectData } = response.data;
+          
+          // Robust data extraction from various possible response structures
+          const fetchedData = response.data?.projectData || 
+                            response.data?.project || 
+                            response.data?.data || 
+                            response.data;
 
-          if (projectData) {
-            // Only update if cloud version is different or local didn't exist
-            setPages(projectData.pages || []);
-            setCurrentPage(projectData.currentPage || 'page-1');
-            setCanvasSize(projectData.canvasSize || { width: 800, height: 600 });
-            if (projectData.title) setProjectName(projectData.title);
+          if (fetchedData) {
+            // CRITICAL: Only update pages if we actually received non-empty pages
+            // This prevents the "0/0 pages" issue if the API returns a partial or empty object
+            if (fetchedData.pages && Array.isArray(fetchedData.pages) && fetchedData.pages.length > 0) {
+              console.log('Syncing cloud pages to state');
+              setPages(fetchedData.pages);
+            }
+            
+            if (fetchedData.currentPage) setCurrentPage(fetchedData.currentPage);
+            if (fetchedData.canvasSize) setCanvasSize(fetchedData.canvasSize);
+            
+            const fetchedTitle = fetchedData.title || fetchedData.projectName || fetchedData.name;
+            if (fetchedTitle) setProjectName(fetchedTitle);
             
             // Save this latest version to local too
-            storage.saveProject({ id: currentProjectId, ...projectData });
+            storage.saveProject({ id: currentProjectId, ...fetchedData });
             
             setTimeout(() => centerCanvas(), 200);
           }
@@ -756,25 +774,32 @@ const Sowntra = () => {
     loadProject();
   }, [currentProjectId, currentUser, isOnline, centerCanvas]);
 
-  // Handle automatic syncing when coming back online
+  // Handle automatic syncing when changes occur (debounced)
   useEffect(() => {
-    if (isOnline && currentProjectId) {
-      const syncProject = async () => {
-        setIsSyncing(true);
-        try {
-          // If we have local unsynced changes, projectAPI.updateProject would have been skipped 
-          // during offline saving. Let's trigger a silent save to push the latest local state.
-          await handleSilentSave();
-        } catch (err) {
-          console.error('Auto-sync failed:', err);
-        } finally {
-          setIsSyncing(false);
-        }
-      };
+    // Only sync if online, we have a project, and we actually have pages to save
+    if (isOnline && currentProjectId && pages && pages.length > 0) {
       
-      syncProject();
+      // Debounce the sync to prevent flickering during active editing
+      // and to avoid infinite save loops
+      const syncTimer = setTimeout(() => {
+        const syncProject = async () => {
+          setIsSyncing(true);
+          try {
+            // Trigger a silent save to push the latest local state to cloud
+            await handleSilentSave();
+          } catch (err) {
+            console.error('Auto-sync failed:', err);
+          } finally {
+            setIsSyncing(false);
+          }
+        };
+        
+        syncProject();
+      }, 3000); // 3-second debounce (Wait for user to stop editing for 3 seconds)
+      
+      return () => clearTimeout(syncTimer);
     }
-  }, [isOnline, currentProjectId, handleSilentSave]);
+  }, [isOnline, currentProjectId, handleSilentSave, pages]);
 
   // Load transliteration data
   useEffect(() => {
