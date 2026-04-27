@@ -1,14 +1,26 @@
-
 /**
  * Canva-style Shapes Library Configuration
  * Defines categories, variants, and element properties for the "Elements" panel.
  */
 
 import {
-    Square, Circle, Triangle, Star, Hexagon,
-    ArrowRight, Minus, MessageSquare, Heart,
-    XCircle, MapPin,
-    Bookmark, CreditCard, Layout, Shield, Flag, Cloud
+    Square,
+    Circle,
+    Triangle,
+    Star,
+    Hexagon,
+    ArrowRight,
+    Minus,
+    MessageSquare,
+    Heart,
+    XCircle,
+    MapPin,
+    Bookmark,
+    CreditCard,
+    Layout,
+    Shield,
+    Flag,
+    Cloud
 } from 'lucide-react';
 
 export const shapeCategories = [

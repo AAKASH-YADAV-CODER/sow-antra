@@ -12,7 +12,6 @@ const HomePage = () => {
   const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [showCreatePopup, setShowCreatePopup] = useState(false);
   const [isCustomSizeView, setIsCustomSizeView] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -158,7 +157,6 @@ const HomePage = () => {
         return (isNaN(dateB) ? 0 : dateB) - (isNaN(dateA) ? 0 : dateA);
       });
       setProjects(unique);
-      setError(null);
 
       // Warn if partial failure
       if (projRes.status === 'rejected' || boardRes.status === 'rejected') {
@@ -168,14 +166,13 @@ const HomePage = () => {
         console.warn(`Partial sync success. Failed: ${failed.join(', ')}`);
         // Just show a small warning if one worked
         if (unique.length > 0) {
-          setError(`Partial sync: ${failed.join(', ')} unavailable.`);
+          console.warn(`Partial sync: ${failed.join(', ')} unavailable.`);
         } else {
-          setError(`Unable to sync designs: ${failed.join(', ')} returned errors.`);
+          console.warn(`Unable to sync designs: ${failed.join(', ')} returned errors.`);
         }
       }
     } catch (error) {
       console.error('Error refreshing designs:', error);
-      setError(error.message || 'Failed to fetch designs. Please check your connection.');
     } finally {
       setLoading(false);
     }
@@ -200,13 +197,7 @@ const HomePage = () => {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [currentUser, refreshDesigns]);
 
-  const handleGetStarted = () => {
-    navigate('/main');
-  };
-
-  const handleStartDesigning = () => {
-    navigate('/main');
-  };
+  // Unused handlers removed for ESLint
 
   const handleMyProjects = async () => {
     setActiveTab('projects');
@@ -270,22 +261,30 @@ const HomePage = () => {
     setIsCustomSizeView(false);
   };
 
-  const handleTeamCollaboration = async () => {
+  const handleCreateWhiteboard = async () => {
     try {
-      // Create a new board/workspace for collaboration
-      const response = await boardAPI.createBoard({
-        title: `${currentUser?.displayName || 'My'} Workspace`,
-        description: 'Collaborative whiteboard workspace',
-        isPublic: false
-      });
-
-      // Navigate to the whiteboard
-      navigate(`/whiteboard/${response.data.id}`);
-    } catch (error) {
-      console.error('Error creating workspace:', error);
-      alert('Failed to create workspace. Please try again.');
+      const newBoard = { title: 'Untitled Whiteboard' };
+      try {
+         const response = await boardAPI.createBoard(newBoard);
+         const boardId = response.data.id || response.data._id;
+         if (boardId) {
+           window.open(`/whiteboard/${boardId}`, '_blank');
+           return;
+         }
+      } catch (apiError) {
+         console.warn('Backend board creation failed, falling back to local whiteboard...', apiError);
+         // Fallback to local isolated board
+         const localId = `local_${Date.now()}`;
+         window.open(`/whiteboard/${localId}`, '_blank');
+      }
+    } catch (err) {
+      console.error('Failed to create whiteboard:', err);
+      // Fallback
+      window.open(`/whiteboard/local_${Date.now()}`, '_blank');
     }
   };
+
+  // Unused handleTeamCollaboration removed for ESLint
 
   const getUserInitial = () => {
     if (currentUser?.displayName) {
@@ -418,6 +417,8 @@ const HomePage = () => {
                           if (cat.name === 'Custom Size') {
                             setShowCreatePopup(true);
                             setIsCustomSizeView(true);
+                          } else if (cat.name === 'Whiteboard') {
+                            handleCreateWhiteboard();
                           } else {
                             setActiveTab('templates');
                           }

@@ -383,11 +383,44 @@ const PositionPanel = ({
                                 );
                             })}
 
-                            {displayedElements.length === 0 && (
+                            {displayedElements.length === 0 && layerFilter === 'overlapping' && (
                                 <div className="text-center py-10 text-gray-500 text-sm">
-                                    {layerFilter === 'overlapping'
-                                        ? 'No overlapping elements found.'
-                                        : 'No elements on this page.'}
+                                    No overlapping elements found.
+                                </div>
+                            )}
+
+                            {/* Canvas Background Layer at the bottom */}
+                            {layerFilter === 'all' && (
+                                <div
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedElement(null);
+                                        if (setSelectedElements) {
+                                            setSelectedElements(new Set());
+                                        }
+                                    }}
+                                    className={`flex items-center gap-3 p-2 rounded-lg border cursor-pointer hover:shadow-sm transition-all relative ${!selectedElement && (!selectedElements || selectedElements.size === 0)
+                                        ? 'border-purple-500 bg-purple-50'
+                                        : 'border-transparent hover:border-gray-200 bg-white hover:bg-gray-50'
+                                        }`}
+                                >
+                                    {/* Spacer to align with other layers without drag handle */}
+                                    <div className="w-[22px]" />
+
+                                    {/* Thumbnail / Icon */}
+                                    <div className={`w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 text-gray-500 ${!selectedElement && (!selectedElements || selectedElements.size === 0) ? 'bg-white' : 'bg-gray-100'}`}>
+                                        <Square size={14} />
+                                    </div>
+
+                                    {/* Element Info */}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-xs font-medium text-gray-700 truncate capitalize">
+                                            Canvas
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Indicates Canvas is essentially the unmovable locked bottom layer */}
+                                    <Lock size={12} className="text-gray-400 mr-2" />
                                 </div>
                             )}
                         </div>

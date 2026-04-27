@@ -13,11 +13,8 @@ import {
     Search,
     TrendingUp,
     Users,
-    Smartphone,
-    Youtube,
     Maximize,
     X,
-    FileText
 } from 'lucide-react';
 import { socialMediaTemplates } from '../utils/constants';
 

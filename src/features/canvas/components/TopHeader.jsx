@@ -2,9 +2,12 @@ import React, { useState } from 'react';
 import {
   ZoomIn, ZoomOut, Maximize, Play, Pause,
   Languages, User, LogOut, Settings, HelpCircle, Download,
-  UploadCloud, Link as LinkIcon, CheckCircle
+  UploadCloud, Link as LinkIcon, CheckCircle, WifiOff, RefreshCw,
+  FilePlus, FolderOpen, Save, Copy, Printer, Clock, ChevronDown,
+  FileText, Star, ExternalLink, ChevronRight, Check
 } from 'lucide-react';
 import ShareButton from '../../../components/common/ShareButton';
+import AddGuidesModal from './AddGuidesModal';
 
 /**
  * TopHeader Component
@@ -39,6 +42,11 @@ const TopHeader = ({
   currentLanguage,
   setCurrentLanguage,
   i18n,
+  showRulers,
+  setShowRulers,
+  setGuides,
+  showMargins,
+  setShowMargins,
   showLanguageMenu,
   setShowLanguageMenu,
   setShowLanguageHelp,
@@ -71,9 +79,14 @@ const TopHeader = ({
   canvasSize,
   isCreatorMode,
   saveStatus,
-  getCanvasDataURL
+  getCanvasDataURL,
+  isOnline,
+  isSyncing
 }) => {
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showFileMenu, setShowFileMenu] = useState(false);
+  const [showSettingsSubmenu, setShowSettingsSubmenu] = useState(false);
+  const [showAddGuidesModal, setShowAddGuidesModal] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [showPublishSuccess, setShowPublishSuccess] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState('');
@@ -140,17 +153,39 @@ const TopHeader = ({
             {saveStatus && saveStatus !== 'idle' && (
               <div className={`absolute -bottom-5 left-4 text-[10px] font-bold tracking-wider transition-opacity duration-300 ${saveStatus === 'error' ? 'text-red-500' : 'text-purple-500'
                 }`}>
-                {saveStatus === 'saving' && (
+                {isSyncing ? (
+                  <span className="flex items-center">
+                    <RefreshCw size={10} className="mr-1 animate-spin" />
+                    Syncing...
+                  </span>
+                ) : saveStatus === 'saving' ? (
                   <span className="flex items-center">
                     <span className="w-1.5 h-1.5 bg-purple-500 rounded-full mr-1 animate-pulse"></span>
                     Saving...
                   </span>
-                )}
-                {saveStatus === 'saved' && 'All changes saved'}
-                {saveStatus === 'error' && 'Save failed'}
+                ) : saveStatus === 'saved' ? (
+                  'All changes saved'
+                ) : saveStatus === 'error' ? (
+                  'Save failed'
+                ) : null}
               </div>
             )}
           </div>
+
+          {/* Connection Status Badge */}
+          {!isOnline && (
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-50 text-amber-600 rounded-full border border-amber-200 ml-2 animate-in fade-in slide-in-from-left-2">
+              <WifiOff size={14} />
+              <span className="text-[10px] font-black uppercase tracking-tighter">Offline</span>
+            </div>
+          )}
+
+          {isOnline && isSyncing && (
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-50 text-blue-600 rounded-full border border-blue-200 ml-2 animate-in fade-in">
+              <RefreshCw size={14} className="animate-spin" />
+              <span className="text-[10px] font-black uppercase tracking-tighter">Syncing</span>
+            </div>
+          )}
 
           {/* Desktop Zoom Controls */}
           <div className="hidden lg:flex items-center gap-1 ml-2 border-l border-gray-300 pl-2">
@@ -198,8 +233,273 @@ const TopHeader = ({
           </button>
         </div>
 
-        {/* Right Section: Language Selector, Share, Account */}
+        {/* Right Section: File, Language Selector, Share, Account */}
         <div className="flex items-center gap-1 md:gap-1.5 flex-shrink-0 ml-auto">
+
+          {/* ── File Menu ─────────────────────────────── */}
+          <div className="relative">
+            <button
+              onClick={() => setShowFileMenu(!showFileMenu)}
+              className="px-2.5 py-1.5 rounded bg-white/10 hover:bg-white/20 flex items-center gap-1.5 touch-manipulation transition-colors"
+              title="File"
+            >
+              <FileText size={15} className="flex-shrink-0" />
+              <span className="text-xs font-semibold hidden md:inline">File</span>
+              <ChevronDown size={12} className={`hidden md:block transition-transform duration-200 ${showFileMenu ? 'rotate-180' : ''}`} />
+            </button>
+
+            {showFileMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowFileMenu(false)} />
+                <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 animate-in fade-in zoom-in-95 duration-150">
+
+                  {/* Header */}
+                  <div className="px-4 py-3 bg-gradient-to-r from-purple-50 to-indigo-50 border-b border-gray-100 rounded-t-2xl">
+                    <p className="text-[10px] font-black text-purple-500 uppercase tracking-widest">File</p>
+                    <p className="text-sm font-bold text-gray-800 truncate mt-0.5">{projectName || 'Untitled Project'}</p>
+                  </div>
+
+                  <div className="p-2 space-y-0.5">
+
+                    {/* New Design */}
+                    <button
+                      onClick={() => { window.open('/main', '_blank'); setShowFileMenu(false); }}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors group text-left"
+                    >
+                      <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center group-hover:bg-purple-200 transition-colors">
+                        <FilePlus size={15} className="text-purple-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">New Design</p>
+                        <p className="text-[10px] text-gray-400">Open a fresh canvas in a new tab</p>
+                      </div>
+                      <ExternalLink size={12} className="ml-auto text-gray-300" />
+                    </button>
+
+                    {/* Open / Load */}
+                    <button
+                      onClick={() => { if (loadProject) loadProject(); setShowFileMenu(false); }}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors group text-left"
+                    >
+                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+                        <FolderOpen size={15} className="text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">Open</p>
+                        <p className="text-[10px] text-gray-400">Load a saved project</p>
+                      </div>
+                    </button>
+
+                    {/* Settings Menu with Submenu */}
+                    <div 
+                      className="relative w-full"
+                      onMouseEnter={() => setShowSettingsSubmenu(true)}
+                      onMouseLeave={() => {
+                        if (!showAddGuidesModal) setShowSettingsSubmenu(false);
+                      }}
+                    >
+                      <button
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors group text-left"
+                      >
+                        <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center group-hover:bg-slate-200 transition-colors">
+                          <Settings size={15} className="text-slate-600" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-gray-800">Settings</p>
+                        </div>
+                        <ChevronRight size={14} className="text-gray-400" />
+                      </button>
+
+                      {/* Canvas Settings Submenu - Popping out to the right */}
+                      {(showSettingsSubmenu || showAddGuidesModal) && !showAddGuidesModal && (
+                        <div className="absolute left-[calc(100%+8px)] top-0 w-64 bg-white rounded-2xl shadow-2xl border border-gray-100 z-[60] overflow-hidden animate-in fade-in zoom-in-95 duration-150 py-2">
+                          <button 
+                            onClick={() => {
+                              if (setShowRulers) setShowRulers(!showRulers);
+                            }}
+                            className="w-full flex items-center justify-between px-4 py-2 hover:bg-gray-50 transition-colors text-left group"
+                          >
+                            <span className="text-sm text-gray-700 font-medium group-hover:text-gray-900 flex-1">Show rulers and guides</span>
+                            <div className="flex items-center gap-2">
+                              {showRulers && <Check size={14} className="text-gray-800" />}
+                              <kbd className="text-[9px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded font-mono">Shift+R</kbd>
+                            </div>
+                          </button>
+                          <button 
+                            onClick={() => {
+                              setShowAddGuidesModal(true);
+                            }}
+                            className="w-full flex items-center justify-between px-4 py-2 hover:bg-gray-50 transition-colors text-left group"
+                          >
+                            <span className="text-sm text-gray-700 font-medium group-hover:text-gray-900">Add guides</span>
+                          </button>
+                          <button 
+                            onClick={() => {
+                              if (setGuides) setGuides([]);
+                            }}
+                            className="w-full flex items-center justify-between px-4 py-2 hover:bg-gray-50 transition-colors text-left group"
+                          >
+                            <span className="text-sm text-gray-700 font-medium group-hover:text-gray-900">Clear guides</span>
+                          </button>
+                          <button 
+                            onClick={() => {
+                              if (setShowMargins) setShowMargins(!showMargins);
+                            }}
+                            className="w-full flex items-center justify-start gap-2 px-4 py-2 hover:bg-gray-50 transition-colors text-left group"
+                          >
+                            <span className="text-sm text-gray-700 font-medium group-hover:text-gray-900 flex-1">Show margins</span>
+                            {showMargins && <Check size={14} className="text-gray-800" />}
+                          </button>
+                          <button className="w-full flex items-center justify-between px-4 py-2 hover:bg-gray-50 transition-colors text-left group">
+                            <span className="text-sm text-gray-700 font-medium group-hover:text-gray-900">Show print bleed</span>
+                          </button>
+                          <button className="w-full flex items-center justify-start gap-2 px-4 py-2 hover:bg-gray-50 transition-colors text-left group">
+                            <span className="text-sm text-gray-700 font-medium group-hover:text-gray-900 flex-1">Show comments</span>
+                            <Check size={14} className="text-gray-800" />
+                          </button>
+                          
+                          <div className="my-1 border-t border-gray-100" />
+                          
+                          <button className="w-full flex items-center justify-between px-4 py-2 hover:bg-gray-50 transition-colors text-left group">
+                            <span className="text-sm text-gray-700 font-medium group-hover:text-gray-900">Use English formulas</span>
+                          </button>
+                          <button className="w-full flex items-center justify-between px-4 py-2 hover:bg-gray-50 transition-colors text-left group">
+                            <span className="text-sm text-gray-700 font-medium group-hover:text-gray-900">Video playback quality</span>
+                          </button>
+                          <button className="w-full flex items-center justify-start gap-2 px-4 py-2 hover:bg-gray-50 transition-colors text-left group mt-1">
+                            <Languages size={14} className="text-gray-500" />
+                            <span className="text-sm text-gray-700 font-medium group-hover:text-gray-900">Locale settings</span>
+                          </button>
+                        </div>
+                      )}
+                      
+                      {showAddGuidesModal && (
+                        <AddGuidesModal
+                          onClose={() => setShowAddGuidesModal(false)}
+                          setGuides={setGuides}
+                          canvasSize={canvasSize}
+                          setShowRulers={setShowRulers}
+                        />
+                      )}
+                    </div>
+
+                    <div className="my-1 border-t border-gray-100" />
+
+                    {/* Save */}
+                    <button
+                      onClick={() => { if (onSaveProject) onSaveProject(); setShowFileMenu(false); }}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors group text-left"
+                    >
+                      <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-200 transition-colors">
+                        <Save size={15} className="text-green-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">Save</p>
+                        <p className="text-[10px] text-gray-400">Save your current project</p>
+                      </div>
+                      <kbd className="ml-auto text-[9px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded font-mono">Ctrl+S</kbd>
+                    </button>
+
+                    {/* Save a Copy */}
+                    <button
+                      onClick={() => {
+                        const copyName = `${projectName || 'Project'} (Copy)`;
+                        if (onSaveProject) onSaveProject(copyName);
+                        setShowFileMenu(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors group text-left"
+                    >
+                      <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center group-hover:bg-amber-200 transition-colors">
+                        <Copy size={15} className="text-amber-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">Save a Copy</p>
+                        <p className="text-[10px] text-gray-400">Duplicate this project</p>
+                      </div>
+                    </button>
+
+                    <div className="my-1 border-t border-gray-100" />
+
+                    {/* Rename */}
+                    <button
+                      onClick={() => {
+                        const newName = window.prompt('Rename project:', projectName);
+                        if (newName?.trim()) {
+                          setProjectName(newName.trim());
+                          setTimeout(() => { if (onSilentSave) onSilentSave(); }, 300);
+                        }
+                        setShowFileMenu(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors group text-left"
+                    >
+                      <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-gray-200 transition-colors">
+                        <FileText size={15} className="text-gray-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">Rename</p>
+                        <p className="text-[10px] text-gray-400">Change project name</p>
+                      </div>
+                    </button>
+
+                    {/* Version History */}
+                    <button
+                      onClick={() => { alert('Version history coming soon!'); setShowFileMenu(false); }}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors group text-left"
+                    >
+                      <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
+                        <Clock size={15} className="text-indigo-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-gray-800">Version History</p>
+                        <p className="text-[10px] text-gray-400">Browse past versions</p>
+                      </div>
+                      <span className="text-[9px] font-bold text-indigo-500 bg-indigo-50 px-1.5 py-0.5 rounded-full">Soon</span>
+                    </button>
+
+                    <div className="my-1 border-t border-gray-100" />
+
+                    {/* Print */}
+                    <button
+                      onClick={() => { window.print(); setShowFileMenu(false); }}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors group text-left"
+                    >
+                      <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-gray-200 transition-colors">
+                        <Printer size={15} className="text-gray-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">Print</p>
+                        <p className="text-[10px] text-gray-400">Send to printer</p>
+                      </div>
+                      <kbd className="ml-auto text-[9px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded font-mono">Ctrl+P</kbd>
+                    </button>
+
+                    {/* Star / Favourite */}
+                    <button
+                      onClick={() => { alert('Added to favourites!'); setShowFileMenu(false); }}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors group text-left"
+                    >
+                      <div className="w-8 h-8 bg-yellow-50 rounded-lg flex items-center justify-center group-hover:bg-yellow-100 transition-colors">
+                        <Star size={15} className="text-yellow-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">Add to Favourites</p>
+                        <p className="text-[10px] text-gray-400">Bookmark this project</p>
+                      </div>
+                    </button>
+
+                  </div>
+
+                  {/* Footer hint */}
+                  <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-100 rounded-b-2xl">
+                    <p className="text-[10px] text-gray-400 text-center">
+                      Auto-saved · {saveStatus === 'saved' ? '✓ All changes saved' : saveStatus === 'saving' ? '⏳ Saving...' : 'Ctrl+S to save'}
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
           {/* Language Selector */}
           <div className="relative">
             <button

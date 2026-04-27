@@ -14,8 +14,7 @@ import {
     Edit,
     X,
     Save,
-    Camera,
-    Image as ImageIcon
+    Camera
 } from 'lucide-react';
 import { editableTemplates } from '../config/editableTemplates';
 import { useAuth } from '../contexts/AuthContext';
@@ -83,7 +82,7 @@ const CreatorProfilePage = () => {
         } else {
             setCreatorTemplates(filtered);
         }
-    }, [profileId, isOwnProfile, currentUser, profileData.name]);
+    }, [profileId, isOwnProfile, currentUser, profileData]);
 
     const handleSaveProfile = () => {
         const allProfiles = JSON.parse(localStorage.getItem('creator_profiles') || '{}');

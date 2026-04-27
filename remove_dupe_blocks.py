@@ -22,8 +22,7 @@ if "else if (element.type === 'vector_path')" not in lines[start_idx]:
 if "else if (element.type === 'image')" not in lines[end_idx]:
     print("Error: End line (start of next block) does not match expected content.")
     exit(1)
-
-new_lines = lines[:start_idx] + lines[end_idx:]
+new_lines = [line for i, line in enumerate(lines) if i < start_idx or i >= end_idx]
 
 with open(path, 'w', encoding='utf-8') as f:
     f.writelines(new_lines)
