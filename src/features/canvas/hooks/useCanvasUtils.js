@@ -32,13 +32,15 @@ export const useCanvasUtils = ({
   setZoomLevel,
   isPlaying,
   setIsPlaying,
+  setCurrentTime,
+  isVideoMode,
   setShowZoomIndicator,
   zoomIndicatorTimeoutRef
 }) => {
   // Add new page
   const addNewPage = useCallback(() => {
     const newPageId = `page-${pages.length + 1}`;
-    setPages([...pages, { id: newPageId, name: `Page ${pages.length + 1}`, elements: [], notes: '' }]);
+    setPages([...pages, { id: newPageId, name: `Page ${pages.length + 1}`, elements: [], notes: '', duration: 5.0 }]);
     setCurrentPage(newPageId);
     setSelectedElement(null);
     setSelectedElements(new Set());
@@ -115,6 +117,30 @@ export const useCanvasUtils = ({
 
     setPages(newPages);
   }, [pages, setPages]);
+
+  // Update page duration and sync element durations
+  const updatePageDuration = useCallback((pageId, newDuration) => {
+    setPages(prevPages => prevPages.map(page => {
+      if (page.id !== pageId) return page;
+
+      const oldDuration = page.duration || 5.0;
+      const updatedElements = (page.elements || []).map(el => {
+        // If the element's duration matches the old page duration, 
+        // it means it was spanning the full page. Update it to match the new duration.
+        // We use a small epsilon (0.01) for float comparison
+        if (Math.abs((el.duration || 5.0) - oldDuration) < 0.01) {
+          return { ...el, duration: newDuration };
+        }
+        return el;
+      });
+
+      return { 
+        ...page, 
+        duration: newDuration,
+        elements: updatedElements
+      };
+    }));
+  }, [setPages]);
 
   // Split page at current time
   const splitPage = useCallback((globalTime) => {
@@ -204,58 +230,34 @@ export const useCanvasUtils = ({
   }, [pages, setPages]);
 
   // Play animations
+  // ─ Video mode:       reset timeline to 0 and start the clock
+  // ─ Normal post mode: bump lastApplied on all animated elements so
+  //                     each CanvasElement's isPreviewing fires (works every click)
   const playAnimations = useCallback(() => {
-    setIsPlaying(true);
-    const currentElements = getCurrentPageElements();
+    if (isVideoMode) {
+      setCurrentTime(0);
+      setIsPlaying(true);
+    } else {
+      // Bump lastApplied timestamp → triggers isPreviewing in EVERY animated element
+      const now = Date.now();
+      setPages(prevPages =>
+        prevPages.map(page => ({
+          ...page,
+          elements: (page.elements || []).map(el =>
+            el.animation?.type
+              ? { ...el, animation: { ...el.animation, lastApplied: now } }
+              : el
+          )
+        }))
+      );
+    }
+  }, [isVideoMode, setIsPlaying, setCurrentTime, setPages]);
 
-    // Reset animations first
-    currentElements.forEach(element => {
-      const elementDOM = document.getElementById(`element-${element.id}`);
-      if (elementDOM) {
-        elementDOM.style.animation = 'none';
-        void elementDOM.offsetWidth; // Force reflow
-      }
-    });
-
-    // Apply animations
-    currentElements.forEach((element, index) => {
-      if (element.animation) {
-        const elementDOM = document.getElementById(`element-${element.id}`);
-        if (elementDOM) {
-          const anim = typeof element.animation === 'object' ? element.animation : { type: element.animation, duration: 1, delay: 0 };
-          let animName = anim.type;
-
-          // Safety mapping to match CanvasElement logic
-          // Safety mapping to match CanvasElement logic (Use wipe for everything to avoid reflows)
-          if (animName === 'typewriter') {
-            animName = 'wipe';
-          }
-
-          const duration = anim.duration || 1;
-          const delay = (anim.delay || 0); // Use explicit delay set by AnimationPane
-
-          setTimeout(() => {
-            elementDOM.style.animation = `${animName} ${duration}s ease-out forwards`;
-          }, delay * 1000);
-        }
-      }
-    });
-
-    // Auto stop after max duration (approx)
-    setTimeout(() => setIsPlaying(false), 5000);
-  }, [getCurrentPageElements, setIsPlaying]);
-
-  // Reset animations
+  // Reset animations — stop playback and return to t=0
   const resetAnimations = useCallback(() => {
-    const currentElements = getCurrentPageElements();
-    currentElements.forEach(element => {
-      const elementDOM = document.getElementById(`element-${element.id}`);
-      if (elementDOM) {
-        elementDOM.style.animation = 'none';
-      }
-    });
     setIsPlaying(false);
-  }, [getCurrentPageElements, setIsPlaying]);
+    setCurrentTime(0); // Restore all elements to visible editing state
+  }, [setIsPlaying, setCurrentTime]);
 
   // Zoom in/out
   const zoom = useCallback((direction) => {
@@ -297,6 +299,7 @@ export const useCanvasUtils = ({
     movePage,
     reorderPage,
     splitPage,
+    updatePageDuration,
     setPageTransition,
 
     // Animation control

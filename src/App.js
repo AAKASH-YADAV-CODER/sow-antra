@@ -1,4 +1,5 @@
-import React, { lazy, Suspense } from "react";
+import React, { Suspense } from "react";
+import lazyWithRetry from "./utils/lazyWithRetry";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./features/auth/components/ProtectedRoute";
@@ -10,14 +11,14 @@ import CreatorProfilePage from "./pages/CreatorProfilePage.jsx";
 
 console.log('--- Sowntra MP v1.1 - Refined Pen Tool Loaded ---');
 
-// Lazy load route components for better 
-const SignupPage = lazy(() => import("./features/auth/components/SignupPage"));
-const HomePage = lazy(() => import("./pages/HomePage"));
-const MainPage = lazy(() => import("./pages/MainPage"));
-const WhiteboardPage = lazy(() => import("./pages/WhiteboardPage"));
-const InviteAcceptPage = lazy(() => import("./pages/InviteAcceptPage"));
-const BrandKitPage = lazy(() => import("./pages/BrandKitPage"));
-const BrandKitDetailPage = lazy(() => import("./pages/BrandKitDetailPage"));
+// Lazy load route components with retry logic to handle ChunkLoadError
+const SignupPage = lazyWithRetry(() => import("./features/auth/components/SignupPage"));
+const HomePage = lazyWithRetry(() => import("./pages/HomePage"));
+const MainPage = lazyWithRetry(() => import("./pages/MainPage"));
+const WhiteboardPage = lazyWithRetry(() => import("./pages/WhiteboardPage"));
+const InviteAcceptPage = lazyWithRetry(() => import("./pages/InviteAcceptPage"));
+const BrandKitPage = lazyWithRetry(() => import("./pages/BrandKitPage"));
+const BrandKitDetailPage = lazyWithRetry(() => import("./pages/BrandKitDetailPage"));
 
 function App() {
   return (

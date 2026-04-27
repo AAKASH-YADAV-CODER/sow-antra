@@ -5,6 +5,7 @@ import NotesPanel from './NotesPanel';
 import TimerModal from './modals/TimerModal';
 import GridView from './GridView';
 import PagesStrip from './PagesStrip';
+import { CanvasRulers } from './CanvasRulers';
 
 import useFontLoader from '../hooks/useFontLoader';
 
@@ -25,6 +26,7 @@ const CanvasWorkspace = ({
   zoomLevel,
   canvasOffset,
   handleCanvasMouseDown,
+  handlePointerUp,
   handleCanvasMouseEnter,
   handleCanvasMouseLeave,
   canvasHighlighted,
@@ -43,8 +45,6 @@ const CanvasWorkspace = ({
   showGrid,
   getCurrentPageElements,
   renderElement,
-  renderDrawingPath,
-  drawingPath,
 
   // Alignment lines
   showAlignmentLines,
@@ -84,7 +84,14 @@ const CanvasWorkspace = ({
   musicTracks,
   isMusicMuted,
   setIsMusicMuted,
-  measurements = [] // NEW: Destructure with default
+  measurements = [],
+  currentTime = 0,
+  isPlaying = false,
+  isVideoMode = false,
+  showRulers = false,
+  guides = [],
+  setGuides,
+  showMargins = false
 }) => {
   // Use font loader hook to dynamic load fonts
   useFontLoader(pages);
@@ -124,18 +131,84 @@ const CanvasWorkspace = ({
     ));
   };
 
+  const [draggingGuide, setDraggingGuide] = useState(null);
+
+  const handleGuideMouseDown = React.useCallback((e, guide) => {
+    e.stopPropagation();
+    // Use pointer capture to ensure we follow the guide even if stylus moves fast
+    if (e.target && 'setPointerCapture' in e.target) {
+      e.target.setPointerCapture(e.pointerId);
+    }
+    setDraggingGuide(guide.id);
+  }, []);
+
+  const handleGuideMouseMove = React.useCallback((e) => {
+    if (!draggingGuide) return;
+    
+    // Convert screen coordinates to canvas space
+    const canvasRect = canvasRef.current?.getBoundingClientRect();
+    if (!canvasRect) return;
+
+    const guide = guides.find(g => g.id === draggingGuide);
+    if (!guide) return;
+
+    let newPosition;
+    if (guide.axis === 'y') {
+      // Horizontal guide, driven by Y movement
+      const y = e.clientY - canvasRect.top;
+      newPosition = y / zoomLevel;
+    } else {
+      // Vertical guide, driven by X movement
+      const x = e.clientX - canvasRect.left;
+      newPosition = x / zoomLevel;
+    }
+
+    setGuides(prev => prev.map(g => g.id === draggingGuide ? { ...g, position: newPosition } : g));
+  }, [draggingGuide, guides, zoomLevel, canvasRef, setGuides]);
+
+  const handleGuideMouseUp = React.useCallback(() => {
+    if (draggingGuide) {
+      setDraggingGuide(null);
+    }
+  }, [draggingGuide]);
+
+  // Add global pointer up listener for guide dragging (using PointerEvents for consistency)
+  React.useEffect(() => {
+    if (draggingGuide) {
+      window.addEventListener('pointermove', handleGuideMouseMove);
+      window.addEventListener('pointerup', handleGuideMouseUp);
+      return () => {
+        window.removeEventListener('pointermove', handleGuideMouseMove);
+        window.removeEventListener('pointerup', handleGuideMouseUp);
+      };
+    }
+  }, [draggingGuide, handleGuideMouseMove, handleGuideMouseUp]);
+
+
   const currentPageData = pages.find(p => p.id === currentPage);
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-[#ebedef] relative">
+      <CanvasRulers 
+        zoomLevel={zoomLevel} 
+        canvasOffset={canvasOffset}
+        canvasSize={canvasSize}
+        scrollerRef={canvasContainerRef}
+        showRulers={showRulers}
+        onAddGuide={(guideParams) => {
+          const newId = `guide-${Date.now()}`;
+          setGuides(prev => [...prev, { id: newId, ...guideParams }]);
+          setDraggingGuide(newId);
+        }}
+      />
       <div
         className={`canvas-workspace-scroller flex-1 overflow-y-auto overflow-x-hidden px-4 pt-24 ${showPagesStrip ? 'pb-40' : 'pb-10'}`}
         ref={canvasContainerRef}
-        onMouseDown={handleContainerMouseDown}
+        onPointerDown={handleContainerMouseDown}
       >
         {/* Wrapper to enforce correct scroll height based on zoom */}
         <div
           style={{
-            height: showPagesStrip
+            height: (showPagesStrip || isVideoMode)
               ? `${(canvasSize.height + 40) * zoomLevel}px`
               : `${((pages.length * canvasSize.height + Math.max(0, pages.length - 1) * 16 + 40) * zoomLevel)}px`,
             width: '100%',
@@ -150,23 +223,27 @@ const CanvasWorkspace = ({
               transformOrigin: 'top center',
               paddingTop: '20px',
               paddingBottom: '20px',
-              gap: showPagesStrip ? '0' : `${60 / zoomLevel}px` // Dynamic gap to prevent header overlap when zoomed out
+              gap: (showPagesStrip || isVideoMode) ? '0' : `${60 / zoomLevel}px` // Dynamic gap to prevent header overlap when zoomed out
             }}
           >
-            {(showPagesStrip ? pages.filter(p => p.id === currentPage) : pages).map((page) => {
-              const index = pages.findIndex(p => p.id === page.id); // Get true index from original array
+            {(isVideoMode 
+              ? pages.filter(p => p.id === currentPage) 
+              : (showPagesStrip ? pages.filter(p => p.id === currentPage) : pages)
+            ).map((page) => {
+              const index = pages.findIndex(p => p.id === page.id);
               const isCurrentPage = page.id === currentPage;
 
               return (
                 <div
-                  key={page.id}
+                  key={isVideoMode ? 'video-viewport' : page.id}
                   className="relative flex flex-col items-center page-container"
                   style={{
                     width: '100%',
                     perspective: '1000px'
                   }}
                 >
-                  {/* Page Number Indicator (Canva style) */}
+                  {/* Page Number Indicator (Canva style) — HIDDEN in Video Mode */}
+                  {!isVideoMode && (
                   <div
                     className="flex items-center justify-between group/header"
                     style={{
@@ -253,31 +330,33 @@ const CanvasWorkspace = ({
                       </button>
                     </div>
                   </div>
+                  )}
 
-                  <div
-                    className={`page-paper bg-white shadow-xl transition-all duration-200 ${isCurrentPage ? 'ring-[3px] ring-purple-500 ring-offset-4' : 'hover:ring-2 hover:ring-purple-200'}`}
-                    data-page-id={page.id}
-                    style={{
-                      width: `${canvasSize.width}px`,
-                      height: `${canvasSize.height}px`,
-                      position: 'relative',
-                      background: page.backgroundGradient
-                        ? getBackgroundStyle({ fillType: 'gradient', gradient: page.backgroundGradient })
-                        : (page.backgroundColor || 'white'),
-                      boxShadow: isCurrentPage ? '0 25px 60px rgba(0, 0, 0, 0.2)' : '0 10px 40px rgba(0, 0, 0, 0.1)',
-                      touchAction: 'none',
-                      overflow: 'hidden',
-                      outline: (isCurrentPage && canvasHighlighted) ? `3px solid #8b3dffaa` : 'none',
-                      outlineOffset: `-3px`,
-                      flexShrink: 0,
-                      cursor: 'default'
-                    }}
-                    onMouseDown={(e) => {
-                      e.stopPropagation();
+                  <div style={{ position: 'relative', width: canvasSize.width, height: canvasSize.height, flexShrink: 0 }}>
+                    <div
+                      className={`page-paper bg-white shadow-xl transition-all duration-200 ${isCurrentPage ? 'ring-[3px] ring-purple-500 ring-offset-4' : 'hover:ring-2 hover:ring-purple-200'}`}
+                      data-page-id={page.id}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        position: 'relative',
+                        background: page.backgroundGradient
+                          ? getBackgroundStyle({ fillType: 'gradient', gradient: page.backgroundGradient })
+                          : (page.backgroundColor || 'white'),
+                        boxShadow: isCurrentPage ? '0 25px 60px rgba(0, 0, 0, 0.2)' : '0 10px 40px rgba(0, 0, 0, 0.1)',
+                        touchAction: 'none',
+                        overflow: 'hidden',
+                        outline: (isCurrentPage && canvasHighlighted) ? `3px solid #8b3dffaa` : 'none',
+                        outlineOffset: `-3px`,
+                        cursor: 'default'
+                      }}
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
                       if (setCurrentPage && currentPage !== page.id) setCurrentPage(page.id);
                       if (handleCanvasMouseDown) handleCanvasMouseDown(e, page.id);
                     }}
-                    onMouseMove={handleMouseMoveCallback}
+                    onPointerMove={handleMouseMoveCallback}
+                    onPointerUp={handlePointerUp}
                     onMouseEnter={handleCanvasMouseEnter}
                     onMouseLeave={handleCanvasMouseLeave}
                     onWheel={handleWheel}
@@ -301,13 +380,29 @@ const CanvasWorkspace = ({
                       />
                     )}
 
+                    {/* Margins */}
+                    {showMargins && isCurrentPage && (
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '48px',
+                          left: '48px',
+                          right: '48px',
+                          bottom: '48px',
+                          border: '1px dashed #718096',
+                          pointerEvents: 'none',
+                          zIndex: 9999
+                        }}
+                      />
+                    )}
+
+
                     {/* Render Elements for this page */}
-                    {(page.elements || [])
-                      .filter(el => !el.groupId)
-                      .map(el => renderElement(el, page.id))}
+                    {(isCurrentPage ? getCurrentPageElements() : (page.elements || []))
+                      .filter(el => !el.groupId && el.type !== 'audio')
+                      .map(el => renderElement(el, page.id, { currentTime, isPlaying, pages }))}
 
                     {/* Render Drawing Path (only on active page) */}
-                    {isCurrentPage && renderDrawingPath(drawingPath)}
 
                     {/* Alignment Lines (only on active page) */}
                     {isCurrentPage && showAlignmentLines && (
@@ -409,13 +504,61 @@ const CanvasWorkspace = ({
                       </React.Fragment>
                     ))}
 
+
+                    </div>
+                    {/* End of page-paper */}
+
+                    {/* Infinitely spanning Guides Overlay */}
+                    <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 10000, overflow: 'visible' }}>
+                      {guides.map((guide) => (
+                        <div
+                          key={guide.id}
+                          onPointerDown={(e) => handleGuideMouseDown(e, guide)}
+                          className="group"
+                          style={{
+                            position: 'absolute',
+                            left: guide.axis === 'x' ? guide.position - 5 : 0,
+                            top: guide.axis === 'y' ? guide.position - 5 : 0,
+                            width: guide.axis === 'y' ? '100%' : 10,
+                            height: guide.axis === 'x' ? '100%' : 10,
+                            cursor: guide.axis === 'y' ? 'ns-resize' : 'ew-resize',
+                            pointerEvents: 'auto',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          {/* Actual visible line */}
+                          <div style={{
+                            width: guide.axis === 'y' ? '100%' : `${Math.max(1, 1 / zoomLevel)}px`,
+                            height: guide.axis === 'x' ? '100%' : `${Math.max(1, 1 / zoomLevel)}px`,
+                            backgroundColor: '#ff00ff',
+                            boxShadow: guide.axis === 'y' ? '10000px 0 0 0 #ff00ff, -10000px 0 0 0 #ff00ff' : '0 10000px 0 0 #ff00ff, 0 -10000px 0 0 #ff00ff'
+                          }} />
+                          
+                          <div 
+                            className={`absolute bg-[#ff00ff] text-white text-[10px] px-1.5 py-0.5 rounded font-bold transition-opacity shadow-sm ${draggingGuide === guide.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`} 
+                            style={{
+                              left: guide.axis === 'x' ? '10px' : '50%',
+                              top: guide.axis === 'y' ? '10px' : '50%',
+                              pointerEvents: 'none',
+                              transform: `scale(${1 / zoomLevel}) translate(-50%, -50%)`,
+                              transformOrigin: 'top left'
+                            }}
+                          >
+                            {Math.round(guide.position)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
                   </div>
                 </div>
               );
             })}
 
-            {/* Add Page Button Placeholder */}
-            {!showPagesStrip && (
+            {/* Add Page Button Placeholder — HIDDEN in Video Mode */}
+            {(!showPagesStrip && !isVideoMode) && (
               <div
                 className="flex flex-col items-center mt-8"
                 style={{
@@ -441,7 +584,8 @@ const CanvasWorkspace = ({
         </div>
       </div>
 
-      {/* Bottom Status Bar (Canva style) */}
+      {/* Bottom Status Bar (Canva style) — HIDDEN IN VIDEO MODE */}
+      {!isVideoMode && (
       <div className="h-10 border-t border-gray-200 bg-white flex items-center justify-between px-4 z-[1001]">
         <div className="flex items-center gap-4">
           <button
@@ -548,6 +692,7 @@ const CanvasWorkspace = ({
           </div>
         </div>
       </div>
+      )}
 
       {/* Overlays and Panels */}
       <NotesPanel

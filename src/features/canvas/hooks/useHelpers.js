@@ -48,7 +48,12 @@ const useHelpers = ({
   frameEditing,
   setFrameEditing,
   penCursorPos,
-  setCurrentPage
+  setCurrentPage,
+  isTimelineImport,
+  pages,
+  setPages,
+  canvasSize,
+  currentPage
 }) => {
 
   // Wrapper for getEffectCSS with all effect types
@@ -61,71 +66,147 @@ const useHelpers = ({
     return getCanvasEffects(element, imageEffects);
   }, [imageEffects]);
 
-  // Handle image upload from file input
+  // Private helper to avoid duplication in handleImageUpload
+  const processUploadedAsset = useCallback(async (file, src, assetId, width, height, type) => {
+    // 1. Determine if we should use the current page or create a new one
+    const currentPageData = pages.find(p => p.id === currentPage);
+    const isPageEmpty = !currentPageData || currentPageData.elements.length === 0;
+
+    if (isPageEmpty && currentPageData) {
+      // Fill current empty page
+      const newElement = {
+        id: `el-${Math.random().toString(36).substr(2, 9)}`,
+        type,
+        src,
+        x: 0,
+        y: 0,
+        width: canvasSize.width,
+        height: canvasSize.height,
+        fitToCanvas: true,
+        label: 'Background',
+        startTime: 0,
+        duration: currentPageData.duration || 5.0
+      };
+
+      setPages(prev => prev.map(p => 
+        p.id === currentPage ? { ...p, elements: [newElement] } : p
+      ));
+    } else {
+      // Create a new page after the current one
+      const newPageId = `page-${Date.now()}`;
+      const newElement = {
+        id: `el-${Math.random().toString(36).substr(2, 9)}`,
+        type,
+        src,
+        x: 0,
+        y: 0,
+        width: canvasSize.width,
+        height: canvasSize.height,
+        fitToCanvas: true,
+        label: 'Background',
+        startTime: 0,
+        duration: 5.0
+      };
+
+      const newPage = {
+        id: newPageId,
+        name: `Scene ${pages.length + 1}`,
+        elements: [newElement],
+        duration: 5.0,
+        backgroundColor: '#ffffff'
+      };
+
+      // Insert after current page
+      const currentIndex = pages.findIndex(p => p.id === currentPage);
+      const newPages = [...pages];
+      newPages.splice(currentIndex + 1, 0, newPage);
+      
+      setPages(newPages);
+      setCurrentPage(newPageId);
+    }
+
+    // 2. Save asset to IndexedDB
+    try {
+      const { storage } = await import('../../../utils/storage');
+      const newAsset = {
+        id: assetId,
+        src,
+        name: file.name,
+        type,
+        width,
+        height,
+        createdAt: Date.now(),
+        folderId: null
+      };
+      await storage.addAsset(newAsset);
+      if (setUploads) setUploads(prev => [newAsset, ...prev]);
+    } catch (error) {
+      console.error("Failed to save upload:", error);
+    }
+  }, [pages, setPages, currentPage, setCurrentPage, canvasSize, setUploads]);
+
+  // Handle image/video upload from file input
   const handleImageUpload = useCallback(async (event) => {
     const file = event.target.files[0];
     if (file) {
-      // Create a unique ID for the asset
       const assetId = `asset-${Date.now()}`;
-
       const reader = new FileReader();
+
       reader.onload = async (e) => {
-        const src = e.target.result; // Base64 string for immediate display
-
-        // Detect natural dimensions
-        const img = new Image();
-        img.onload = async () => {
-          const naturalWidth = img.naturalWidth;
-          const naturalHeight = img.naturalHeight;
-          const aspectRatio = naturalWidth / naturalHeight;
-
-          // Default size logic
-          let width = 200;
-          let height = 200;
-
-          if (aspectRatio > 1) {
-            width = 400;
-            height = 400 / aspectRatio;
-          } else {
-            height = 400;
-            width = 400 * aspectRatio;
-          }
-
-          // 1. Add to Canvas
-          addElement('image', {
-            src,
-            width,
-            height,
-            crop: { t: 0, b: 0, l: 0, r: 0 }
-          });
-
-          // 2. Save to IndexedDB (Persistent Storage)
-          try {
-            const { storage } = await import('../../../utils/storage');
-            const newAsset = {
-              id: assetId,
-              src, // Storing base64 for now. For huge files, we should store Blob, but let's stick to base64 for ease of use with <img> tags.
-              name: file.name,
-              type: file.type.startsWith('video/') ? 'video' : 'image',
-              width: naturalWidth,
-              height: naturalHeight,
-              createdAt: Date.now(),
-              folderId: null // Root by default
-            };
-
-            await storage.addAsset(newAsset);
-
-            // 3. Update UI State if provided
-            if (setUploads) {
-              setUploads(prev => [newAsset, ...prev]);
-            }
-          } catch (error) {
-            console.error("Failed to save upload:", error);
-          }
-        };
-        img.src = src;
+        const src = e.target.result;
+        
+        // Handle Video separately as it doesn't need an Image object to get dimensions
+        if (file.type.startsWith('video/')) {
+          const video = document.createElement('video');
+          video.src = src;
+          video.onloadedmetadata = async () => {
+            const naturalWidth = video.videoWidth;
+            const naturalHeight = video.videoHeight;
+            await processUploadedAsset(file, src, assetId, naturalWidth, naturalHeight, 'video');
+          };
+        } else {
+          // Handle Image
+          const img = new Image();
+          img.onload = async () => {
+            const naturalWidth = img.naturalWidth;
+            const naturalHeight = img.naturalHeight;
+            await processUploadedAsset(file, src, assetId, naturalWidth, naturalHeight, 'image');
+          };
+          img.src = src;
+        }
       };
       reader.readAsDataURL(file);
+    }
+  }, [processUploadedAsset]);
+
+  // NEW: Handle Audio upload from file input
+    const handleAudioUpload = useCallback(async (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const assetId = `asset-${Date.now()}`;
+      const src = URL.createObjectURL(file);
+      
+      // Add as an audio element to the current page (global audio handling will pick it up)
+      const audioName = file.name || 'Uploaded Audio';
+      addElement('audio', { name: audioName, src });
+
+      // Save to IndexedDB (Uploads panel) - we'll store the object URL for this session
+      // For persistent storage, the app usually handles it via an API, but here we keep the URL.
+      try {
+        const { storage } = await import('../../../utils/storage');
+        const newAsset = {
+          id: assetId,
+          src,
+          name: audioName,
+          type: 'audio',
+          createdAt: Date.now(),
+          folderId: null
+        };
+        await storage.addAsset(newAsset);
+        if (setUploads) setUploads(prev => [newAsset, ...prev]);
+      } catch (error) {
+        console.error("Failed to save audio upload:", error);
+      }
     }
   }, [addElement, setUploads]);
 
@@ -149,7 +230,18 @@ const useHelpers = ({
   }, [setCanvasHighlighted]);
 
   // Render element using CanvasElement component
-  const renderElement = useCallback((element, pageId) => {
+  const renderElement = useCallback((element, pageId, syncData = {}) => {
+    const { currentTime = 0, isPlaying = false, pages = [] } = syncData;
+
+    // Calculate the start time of this page relative to the whole video
+    let pageStartTime = 0;
+    if (pages.length > 0 && pageId) {
+      for (const p of pages) {
+        if (p.id === pageId) break;
+        pageStartTime += (p.duration || 5.0);
+      }
+    }
+
     // Intercept handlers to update active page
     const wrappedHandleMouseDown = (e, id, action, direction) => {
       if (setCurrentPage && pageId) setCurrentPage(pageId);
@@ -161,10 +253,14 @@ const useHelpers = ({
       handleSelectElement(e, id);
     };
 
+    if (element.type === 'audio') return null;
+
     return (
       <CanvasElement
         key={element.id}
         element={element}
+        currentTime={currentTime}
+        isPlaying={isPlaying}
         selectedElements={selectedElements}
         textEditing={textEditing}
         lockedElements={lockedElements}
@@ -190,6 +286,7 @@ const useHelpers = ({
         frameEditing={frameEditing}
         setFrameEditing={setFrameEditing}
         penCursorPos={penCursorPos}
+        pageStartTime={pageStartTime}
       />
     );
   }, [
@@ -221,46 +318,16 @@ const useHelpers = ({
     penCursorPos
   ]);
 
-  // Render drawing path in progress
-  const renderDrawingPath = useCallback((drawingPath) => {
-    if (drawingPath.length < 2) return null;
-
-    let pathData = 'M ' + drawingPath[0].x + ' ' + drawingPath[0].y;
-    for (let i = 1; i < drawingPath.length; i++) {
-      pathData += ' L ' + drawingPath[i].x + ' ' + drawingPath[i].y;
-    }
-
-    return (
-      <svg
-        style={{
-          position: 'absolute',
-          left: 0,
-          top: 0,
-          width: '100%',
-          height: '100%',
-          pointerEvents: 'none',
-          zIndex: 9999
-        }}
-      >
-        <path
-          d={pathData}
-          fill="none"
-          stroke="#000"
-          strokeWidth="2"
-        />
-      </svg>
-    );
-  }, []);
 
   return {
     getEffectCSSWrapper,
     getCanvasEffectsWrapper,
     handleImageUpload,
+    handleAudioUpload,
     handleLogout,
     handleCanvasMouseEnter,
     handleCanvasMouseLeave,
-    renderElement,
-    renderDrawingPath
+    renderElement
   };
 };
 

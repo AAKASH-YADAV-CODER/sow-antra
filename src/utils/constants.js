@@ -7,7 +7,7 @@ import {
 
 // Font families with Indian language support
 // Google Fonts Collection (500+ popular fonts)
-export const fontFamilies = [
+export const fontFamilies = [...new Set([
   // ... Sans Serif ...
   'Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Poppins', 'Oswald', 'Source Sans Pro', 'Raleway', 'Nunito', 'PT Sans',
   'Noto Sans', 'Ubuntu', 'Mukta', 'Roboto Condensed', 'Rubik', 'Work Sans', 'Kanit', 'Fira Sans', 'Quicksand', 'Hind',
@@ -69,7 +69,7 @@ export const fontFamilies = [
   'Shojumaru', 'Sigmar One', 'Simonetta', 'Sirin Stencil', 'Six Caps', 'Skranji', 'Slabo 13px', 'Slackey', 'Smokum', 'Smythe',
   'Sniglet', 'Snowburst One', 'Sofadi One', 'Sofia', 'Sonsie One', 'Sorts Mill Goudy', 'Special Elite', 'Spicy Rice', 'Spirax', 'Squada One',
   'Stalemate', 'Stalinist One', 'Stardos Stencil', 'Stint Ultra Condensed', 'Stint Ultra Expanded', 'Stoke', 'Stolzl', 'Sue Ellen Francisco', 'Sunshiney', 'Supermercado One'
-].sort();
+])].sort();
 
 // Supported languages with their scripts
 export const supportedLanguages = {
@@ -634,3 +634,6 @@ export const filterOptions = {
 
 // Generate unique ID
 export const generateId = () => Math.random().toString(36).substr(2, 9);
+
+// Video Editor Constants
+export const PIXELS_PER_SECOND = 40;

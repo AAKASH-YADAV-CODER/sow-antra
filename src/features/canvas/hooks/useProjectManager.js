@@ -1,5 +1,7 @@
 import { useCallback } from 'react';
 import { projectAPI } from '../../../services/api';
+import { sanitizeProjectData } from '../../../utils/helpers';
+import { storage } from '../../../utils/storage';
 
 /**
  * Custom hook for managing project save/load operations
@@ -83,23 +85,37 @@ const useProjectManager = ({
         projectData.id = projectId;
       }
 
-      // Save to cloud
-      let response;
-      if (projectId) {
-        response = await projectAPI.updateProject(projectId, projectData);
-      } else {
-        response = await projectAPI.saveProject(projectData);
+      // Save to cloud if online
+      let response = null;
+      const sanitizedData = sanitizeProjectData(projectData);
+      
+      // ALWAYS save to Local IndexedDB first for robust offline support
+      try {
+        await storage.saveProject(sanitizedData);
+      } catch (localError) {
+        console.warn('Failed to save project to local IndexedDB:', localError);
       }
 
-      if (!isSilent) {
-        alert(projectId ? 'Project updated successfully!' : 'Project saved successfully!');
+      if (navigator.onLine) {
+        if (projectId) {
+          response = await projectAPI.updateProject(projectId, sanitizedData);
+        } else {
+          response = await projectAPI.saveProject(sanitizedData);
+        }
+
+        if (!isSilent) {
+          alert(projectId ? 'Project updated successfully!' : 'Project saved successfully!');
+        }
+      } else if (!isSilent) {
+        console.log('User is offline, project saved locally only.');
+        // We'll show a less intrusive notification or badge in the UI instead of alert
       }
 
       return response; // Return response so caller can get new ID if needed
     } catch (error) {
       if (!isSilent) {
         console.error('Error saving project:', error);
-        alert('Error saving project to cloud. Please try again.');
+        alert('Error saving project to cloud. Your changes are still saved locally.');
       } else {
         console.warn('Silent save failed:', error);
       }

@@ -146,10 +146,8 @@ export const useCanvasInteraction = ({
   const [isResizing, setIsResizing] = useState(false);
   const [isRotating, setIsRotating] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
-  const [isDrawing, setIsDrawing] = useState(false);
   const [isDraggingNewAnchor, setIsDraggingNewAnchor] = useState(false);
   const [isMovingFrameContent, setIsMovingFrameContent] = useState(false);
-  const [drawingPath, setDrawingPath] = useState([]);
   const [dragStart, setDragStart] = useState({
     x: 0,
     y: 0,
@@ -440,54 +438,6 @@ export const useCanvasInteraction = ({
     }
   }, [selectedElements, selectedElement, lockedElements, getCurrentPageElements, setSelectedElement, setSelectedElements]);
 
-  // Handle drawing with pen tool
-  const handleDrawing = useCallback((e) => {
-    if (currentTool !== 'pen' || !isDrawing) return;
-
-    const pageElement = e.target.closest('.page-paper');
-    if (!pageElement) return;
-
-    const rect = pageElement.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / zoomLevel;
-    const y = (e.clientY - rect.top) / zoomLevel;
-
-    setDrawingPath(prev => [...prev, { x, y }]);
-  }, [currentTool, isDrawing, zoomLevel]);
-
-  // Finish drawing and create a path element
-  const finishDrawing = useCallback(() => {
-    activePenElementIdRef.current = null;
-    if (currentTool !== 'pen' || drawingPath.length === 0) {
-      setIsDrawing(false);
-      return;
-    }
-
-    // Calculate bounding box
-    const minX = Math.min(...drawingPath.map(p => p.x));
-    const minY = Math.min(...drawingPath.map(p => p.y));
-    const maxX = Math.max(...drawingPath.map(p => p.x));
-    const maxY = Math.max(...drawingPath.map(p => p.y));
-
-    const width = Math.max(10, maxX - minX);
-    const height = Math.max(10, maxY - minY);
-
-    // Normalize path coordinates to be relative to the bounding box top-left
-    const normalizedPath = drawingPath.map(p => ({
-      x: p.x - minX,
-      y: p.y - minY
-    }));
-
-    addElement('drawing', {
-      x: minX,
-      y: minY,
-      width,
-      height,
-      path: normalizedPath
-    });
-
-    setDrawingPath([]);
-    setIsDrawing(false);
-  }, [currentTool, drawingPath, addElement]);
 
   // Handle Pen Tool Click (Bezier Path Creation)
   const handlePenInteraction = useCallback((e, x, y) => {
@@ -499,6 +449,11 @@ export const useCanvasInteraction = ({
     let targetId = activePenElementIdRef.current || selectedElement;
     console.log('Current targetId for pen:', targetId);
     let targetElement = currentElements.find(el => el.id === targetId && el.type === 'vector_path');
+    
+    // Safety: ensure selectedElement is in sync
+    if (targetId && !targetElement && selectedElement === targetId) {
+       targetElement = currentElements.find(el => el.id === targetId && el.type === 'vector_path');
+    }
 
     if (targetElement && targetElement.bezierAnchors && targetElement.bezierAnchors.length > 0) {
       // Check for auto-join (clicking near the first point)
@@ -558,6 +513,10 @@ export const useCanvasInteraction = ({
         height: newHeight,
         bezierAnchors: newLocalAnchors
       });
+      
+      // Force selection state to keep filters/overlays active
+      setSelectedElement(targetId);
+      setSelectedElements(new Set([targetId]));
 
     } else {
       // Create new Vector Path
@@ -584,13 +543,16 @@ export const useCanvasInteraction = ({
       if (newId) {
         setIsDraggingNewAnchor(true);
         activePenElementIdRef.current = newId;
+        // Selection is crucial for showing handles/anchors via VectorOverlay
+        setSelectedElement(newId);
+        setSelectedElements(new Set([newId]));
       }
 
       // We need to select it immediately to continue drawing
       // addElement usually selects the new element.
     }
 
-  }, [currentTool, selectedElement, getCurrentPageElements, updateElement, addElement, setIsDraggingNewAnchor]);
+  }, [currentTool, selectedElement, getCurrentPageElements, updateElement, addElement, setIsDraggingNewAnchor, setSelectedElement, setSelectedElements]);
 
   // Enhanced mouse down handler with resize direction
   const handleMouseDown = useCallback((e, elementId, action = 'drag', direction = '') => {
@@ -603,9 +565,26 @@ export const useCanvasInteraction = ({
     const clientX = (e.clientX - rect.left) / zoomLevel;
     const clientY = (e.clientY - rect.top) / zoomLevel;
 
+    // Set capture for pointer events to ensure move/up are received even if leaving element
+    if (e.target.setPointerCapture) {
+      e.target.setPointerCapture(e.pointerId);
+    }
+
     // PEN TOOL INTERACTION
     if (currentTool === 'pen') {
       console.log('Pen Tool Clicked at:', clientX, clientY);
+      
+      // If clicking an existing vector_path, select it instead of adding a point
+      // unless we are already drawing a path.
+      if (!activePenElementIdRef.current && elementId) {
+        const currentElements = getCurrentPageElements();
+        const element = currentElements.find(el => el.id === elementId);
+        if (element && element.type === 'vector_path') {
+          handleSelectElement(e, elementId);
+          return;
+        }
+      }
+
       handlePenInteraction(e, clientX, clientY);
       return;
     }
@@ -733,9 +712,8 @@ export const useCanvasInteraction = ({
       const mouseY = (e.clientY - rect.top) / zoomLevel;
       setPenCursorPos({ x: mouseX, y: mouseY });
 
-      if (isDrawing) {
-        handleDrawing(e);
-        return;
+      if (isDraggingNewAnchor) {
+        // ... (no-op, handles cursor pos update below)
       }
     } else if (penCursorPos !== null) {
       setPenCursorPos(null);
@@ -843,8 +821,8 @@ export const useCanvasInteraction = ({
         const deltaX = mouseX - dragStart.x;
         const deltaY = mouseY - dragStart.y;
 
-        let newX = dragStart.elementX + deltaX;
-        let newY = dragStart.elementY + deltaY;
+        let newX = Math.round(dragStart.elementX + deltaX);
+        let newY = Math.round(dragStart.elementY + deltaY);
 
         if (snapToGrid) {
           newX = Math.round(newX / 10) * 10;
@@ -1129,13 +1107,19 @@ export const useCanvasInteraction = ({
         }
 
         if (element.type === 'group') {
-          const scaleX = newWidth / dragStart.elementWidth;
-          const scaleY = newHeight / dragStart.elementHeight;
+          const rawScaleX = newWidth / dragStart.elementWidth;
+          const rawScaleY = newHeight / dragStart.elementHeight;
+          // Guard against NaN/Infinity if group has zero size
+          const scaleX = Number.isFinite(rawScaleX) && rawScaleX > 0 ? rawScaleX : 1;
+          const scaleY = Number.isFinite(rawScaleY) && rawScaleY > 0 ? rawScaleY : 1;
           const scaleFactor = Math.min(scaleX, scaleY);
+          // Guard: if initialChildren wasn't captured, abort resize
+          const children = dragStart.initialChildren;
+          if (!Array.isArray(children)) return;
 
           setCurrentPageElements(prevElements => prevElements.map(el => {
             if (el.groupId === selectedElement) {
-              const initialChild = dragStart.initialChildren.find(c => c.id === el.id);
+              const initialChild = children.find(c => c.id === el.id);
               if (!initialChild) return el;
 
               const relX = initialChild.relativeX !== undefined
@@ -1149,8 +1133,11 @@ export const useCanvasInteraction = ({
                 ...el,
                 x: newX + relX * scaleX,
                 y: newY + relY * scaleY,
-                width: initialChild.width * scaleX,
-                height: initialChild.height * scaleY
+                width: Math.max(5, initialChild.width * scaleX),
+                height: Math.max(5, initialChild.height * scaleY),
+                // Update relativeX/Y so next drag uses correct offsets
+                relativeX: relX * scaleX,
+                relativeY: relY * scaleY,
               };
 
               // Scale common properties
@@ -1235,18 +1222,21 @@ export const useCanvasInteraction = ({
       } else if (isRotating) {
         const centerX = element.x + element.width / 2;
         const centerY = element.y + element.height / 2;
-        const angle = Math.atan2(mouseY - centerY, mouseX - centerX) * 180 / Math.PI;
-        updateElement(selectedElement, { rotation: angle }, false);
+        // Current angle from element center → mouse position
+        const currentAngle = Math.atan2(mouseY - centerY, mouseX - centerX) * 180 / Math.PI;
+        // Delta from the angle at the moment the user grabbed the handle
+        const deltaAngle = currentAngle - (dragStart.initialAngle || 0);
+        // Apply delta on top of the element's original rotation — no sudden jump
+        let newRotation = (dragStart.elementRotation || 0) + deltaAngle;
+        // Optional: snap to 15° increments when Shift is held (not needed now, but future-proof)
+        updateElement(selectedElement, { rotation: newRotation }, false);
       }
     });
 
-  }, [selectedElement, isDragging, isResizing, isRotating, isPanning, dragStart, getCurrentPageElements, calculateAlignmentLines, zoomLevel, canvasOffset, selectedElements, snapToGrid, updateElement, currentTool, isDrawing, handleDrawing, lockedElements, setCurrentPageElements, setCanvasOffset, canvasRef, isDraggingNewAnchor, isMovingFrameContent, frameEditing, penCursorPos]);
+  }, [selectedElement, isDragging, isResizing, isRotating, isPanning, dragStart, getCurrentPageElements, calculateAlignmentLines, calculateMeasurements, zoomLevel, canvasOffset, selectedElements, snapToGrid, updateElement, currentTool, lockedElements, setCurrentPageElements, setCanvasOffset, canvasRef, isDraggingNewAnchor, isMovingFrameContent, frameEditing, penCursorPos]);
 
   // Handle mouse up
   const handleMouseUp = useCallback(() => {
-    if (currentTool === 'pen' && isDrawing) {
-      finishDrawing();
-    }
 
     if (isDraggingNewAnchor) {
       // Re-normalize the vector path bounding box after dragging handles
@@ -1392,7 +1382,7 @@ export const useCanvasInteraction = ({
     setShowAlignmentLines(false);
     setAlignmentLines({ vertical: [], horizontal: [] });
     snapTargetsRef.current = []; // Clear cache
-  }, [currentTool, isDrawing, finishDrawing, isDragging, selectedElement, selectedElements, getCurrentPageElements, setCurrentPageElements, saveToHistory, setSelectedElement, setSelectedElements, isResizing, isRotating, canvasSize, isDraggingNewAnchor, isMovingFrameContent, updateElement]);
+  }, [isDragging, selectedElement, selectedElements, getCurrentPageElements, setCurrentPageElements, saveToHistory, setSelectedElement, setSelectedElements, isResizing, isRotating, canvasSize, isDraggingNewAnchor, isMovingFrameContent, updateElement]);
 
   // Canvas panning
   const handleCanvasMouseDown = useCallback((e, pageId = null) => {
@@ -1422,7 +1412,7 @@ export const useCanvasInteraction = ({
     // Use the explicitly passed pageId or fall back to finding it in the DOM
     const actualPageId = pageId || e.target.closest('.page-paper')?.getAttribute('data-page-id');
 
-    if (e.target.classList.contains('page-paper')) {
+    if (actualPageId) {
       setSelectedElement(actualPageId || currentPage); // Select the page instead of null
       setSelectedElements(new Set()); // Clear element selection
       setTextEditing(null);
@@ -1535,6 +1525,11 @@ export const useCanvasInteraction = ({
         });
       } else if (action === 'rotate') {
         setIsRotating(true);
+        // Compute the angle from the element center to where the user clicked.
+        // This is used as a baseline so we apply a DELTA on mousemove — preventing the jump.
+        const cx = targetRect.x + targetRect.width / 2;
+        const cy = targetRect.y + targetRect.height / 2;
+        const initialAngle = Math.atan2(mouseY - cy, mouseX - cx) * 180 / Math.PI;
         setDragStart({
           x: mouseX,
           y: mouseY,
@@ -1542,7 +1537,8 @@ export const useCanvasInteraction = ({
           elementY: targetRect.y,
           elementWidth: targetRect.width,
           elementHeight: targetRect.height,
-          elementRotation: targetRect.rotation
+          elementRotation: targetRect.rotation || 0,
+          initialAngle  // baseline angle at moment of grab
         });
       }
     };
@@ -1609,7 +1605,7 @@ export const useCanvasInteraction = ({
             <div
               key={index}
               style={handleStyle}
-              onMouseDown={(e) => handleMouseDownLocal(e, 'resize', handle.type)}
+              onPointerDown={(e) => handleMouseDownLocal(e, 'resize', handle.type)}
             />
           );
 
@@ -1621,38 +1617,58 @@ export const useCanvasInteraction = ({
         */}
         {!isGhost && (
           <>
+            {/* Connection line going DOWN from element bottom center */}
+            <svg
+              style={{
+                position: 'absolute',
+                top: rectH + padding,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: 2 * visualScale,
+                height: 22 * visualScale,
+                pointerEvents: 'none'
+              }}
+            >
+              <line x1={visualScale} y1="0" x2={visualScale} y2={22 * visualScale} stroke="#8b5cf6" strokeWidth={1.5 * visualScale} />
+            </svg>
+
+            {/* Rotate handle BELOW the element — Canva style */}
             <div
               style={{
                 position: 'absolute',
-                top: -(25 * visualScale) - (handleSize / 2),
+                top: rectH + padding + (22 * visualScale),
                 left: '50%',
                 transform: 'translateX(-50%)',
                 width: handleSize,
                 height: handleSize,
                 backgroundColor: '#ffffff',
-                border: `${handleBorder}px solid #ef4444`,
+                border: `${handleBorder}px solid #8b5cf6`,
                 borderRadius: '50%',
                 cursor: 'grab',
                 pointerEvents: 'auto',
-                boxShadow: `0 ${1 * visualScale}px ${3 * visualScale}px rgba(0,0,0,0.3)`
+                boxShadow: `0 ${2 * visualScale}px ${6 * visualScale}px rgba(139,92,246,0.35)`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
-              onMouseDown={(e) => handleMouseDownLocal(e, 'rotate')}
-            />
-
-            {/* Connection line to rotate handle */}
-            <svg
-              style={{
-                position: 'absolute',
-                top: -(25 * visualScale),
-                left: '50%',
-                transform: 'translateX(-50%)',
-                width: 2 * visualScale,
-                height: 25 * visualScale,
-                pointerEvents: 'none'
-              }}
+              onPointerDown={(e) => handleMouseDownLocal(e, 'rotate')}
             >
-              <line x1={visualScale} y1="0" x2={visualScale} y2={25 * visualScale} stroke="#ef4444" strokeWidth={2 * visualScale} />
-            </svg>
+              {/* Curved arrow rotate icon (SVG) */}
+              <svg
+                width={handleSize * 0.6}
+                height={handleSize * 0.6}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#8b5cf6"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ pointerEvents: 'none' }}
+              >
+                <path d="M12 2a10 10 0 1 0 9.39 6.5" />
+                <polyline points="21 2 21 8 15 8" />
+              </svg>
+            </div>
           </>
         )}
       </div>
@@ -1685,8 +1701,6 @@ export const useCanvasInteraction = ({
     isResizing,
     isRotating,
     isPanning,
-    isDrawing,
-    drawingPath,
     showAlignmentLines,
     alignmentLines,
     measurements, // Export measurements
@@ -1700,14 +1714,10 @@ export const useCanvasInteraction = ({
     handleSelectElement,
     handleTextEdit,
     handleWheel,
-    handleDrawing,
-    finishDrawing,
     calculateAlignmentLines,
     renderSelectionHandles,
 
     // State setters (for external control if needed)
-    setIsDrawing,
-    setDrawingPath,
     handlePenInteraction // Export this too just in case
   };
 };

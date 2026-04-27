@@ -29,7 +29,7 @@ export const getBackgroundStyle = (element) => {
   }
 
   const validColors = grad.colors.filter(color =>
-    color && typeof color === 'string' && /^#([0-9A-F]{3}){1,2}$/i.test(color)
+    color && typeof color === 'string'
   );
 
   if (validColors.length === 0) {
@@ -87,7 +87,7 @@ export const getCanvasGradient = (ctx, element) => {
   }
 
   const validColors = grad.colors.filter(color =>
-    color && typeof color === 'string' && /^#([0-9A-F]{3}){1,2}$/i.test(color)
+    color && typeof color === 'string'
   );
 
   if (validColors.length === 0) {
@@ -447,4 +447,29 @@ export const getResponsiveCanvasSize = (baseWidth, baseHeight) => {
 export const getCanvasBlendMode = (blendMode) => {
   if (!blendMode || blendMode === 'normal') return 'source-over';
   return blendMode; // Most blend modes map 1:1 (multiply, screen, etc.)
+};
+/**
+ * Sanitizes project data for saving to backend.
+ * Removes transient/UI-only properties that might break server-side validation.
+ */
+export const sanitizeProjectData = (data) => {
+  if (!data) return data;
+  
+  // Clone to avoid mutating state
+  const sanitized = JSON.parse(JSON.stringify(data));
+  
+  if (sanitized.pages && Array.isArray(sanitized.pages)) {
+    sanitized.pages = sanitized.pages.map(page => {
+      if (page.elements && Array.isArray(page.elements)) {
+        page.elements = page.elements.map(el => {
+          // List of properties to strip before saving to DB
+          const { name, ...rest } = el;
+          return rest;
+        });
+      }
+      return page;
+    });
+  }
+  
+  return sanitized;
 };

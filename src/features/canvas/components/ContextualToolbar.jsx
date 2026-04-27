@@ -73,7 +73,6 @@ const ContextualToolbar = ({
     const { loadFont } = useFontLoader(); // Helper to load on demand
 
     const updateElement = (id, updates) => {
-        console.log("ContextualToolbar: updateElement called", id, updates);
         originalUpdateElement(id, updates);
     };
 
@@ -289,7 +288,7 @@ const ContextualToolbar = ({
         </>
     );
 
-    // Hide if nothing is selected (User request: "show aagathu")
+    // Hide if nothing is selected (User request: only show on page click, hide on outside click)
     if (!selectedElement) {
         return null;
     }

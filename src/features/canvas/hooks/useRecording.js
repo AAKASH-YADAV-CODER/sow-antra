@@ -265,7 +265,7 @@ export const useRecording = ({
         recordingIntervalRef.current = null;
       }
     }
-  }, [recording, canvasSize, drawElementToCanvas, recordingDuration, videoQuality, checkRecordingCompatibility, preloadImages, videoFormat, getCurrentPageElements]);
+  }, [recording, canvasSize, drawElementToCanvas, recordingDuration, videoQuality, checkRecordingCompatibility, preloadImages, videoFormat, getCurrentPageElements, canvasBackgroundColor]);
 
   // Stop recording
   const stopRecording = useCallback(() => {

@@ -1,131 +1,165 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { ZoomIn, ZoomOut } from 'lucide-react';
-import TimelineTracks from './TimelineTracks';
-import PlaybackControls from './PlaybackControls';
-import TimeRuler from './TimeRuler';
-import '../../../../styles/VideoTimeline.css'; // We'll need to create this
+import React, { useState, useMemo } from 'react';
+import { Timeline } from './Timeline';
+
+// ── Helper: natural track ID for an element based on its type ─────────────
+const getDefaultTrackId = (el) => {
+    if (el.type === 'text') return 'text-track';
+    if (el.type === 'image') {
+        // If it's a "Main" image (Background/Fit), it belongs to the media/scene track
+        if (el.label === 'Background' || el.fitToCanvas) return 'media-track';
+        return 'image-track';
+    }
+    if (el.type === 'video') return 'media-track';
+    if (el.type === 'audio') return 'audio-track';
+    return 'element-track';
+};
+
+// Resolve the track an element is currently assigned to.
+// el.trackId (manual override from drag) takes priority over the natural default.
+const getAssignedTrackId = (el) => el.trackId || getDefaultTrackId(el);
 
 const VideoTimeline = ({
     pages,
     currentPage,
     setCurrentPage,
-    currentDetails, // { elements, duration, etc }
+    currentDetails,
     onUpdateElement,
     onUpdatePageDuration,
     currentTime,
     setCurrentTime,
     isPlaying,
     setIsPlaying,
-    duration, // Total duration of current scene/page
+    duration,
     selectedElement,
     setSelectedElement,
-    audioTracks,
-    updateAudioTrack
+    audioTracks = [],
+    updateAudioTrack,
+    onAddClip,
+    onClipDoubleClick,
+    onAddPage,
+    onDeletePage,
+    onDuplicatePage,
+    onDeleteClip,
+    onSplit
 }) => {
-    const [zoomLevel, setZoomLevel] = useState(1); // Pixels per second
-    const scrollRef = useRef(null);
+    const [trackOrder, setTrackOrder] = useState(['text-track', 'element-track', 'image-track', 'media-track', 'audio-track']);
 
-    // Playback Loop
-    useEffect(() => {
-        let animationFrame;
-        if (isPlaying) {
-            const startTime = Date.now() - (currentTime * 1000);
+    // ── Build master track data (aggregating ALL pages) ────────────────────
+    const tracks = useMemo(() => {
+        let currentPageOffset = 0;
+        const allClips = {
+            'text-track': [],
+            'element-track': [],
+            'image-track': [],
+            'media-track': [],
+            'audio-track': []
+        };
 
-            const loop = () => {
-                const now = Date.now();
-                const newTime = (now - startTime) / 1000;
+        pages.forEach(page => {
+            const elements = page.elements || [];
+            const pageOffset = currentPageOffset;
+            
+            elements.forEach(el => {
+                const trackId = getAssignedTrackId(el);
+                if (!allClips[trackId]) return;
 
-                if (newTime >= duration) {
-                    setCurrentTime(0); // Loop logic for now
-                    // OR: setIsPlaying(false); setCurrentTime(duration);
-                } else {
-                    setCurrentTime(newTime);
-                    animationFrame = requestAnimationFrame(loop);
-                }
-            };
+                const isText = el.type === 'text';
+                const isVideo = el.type === 'video';
+                const isImage = el.type === 'image';
+                const isAudio = el.type === 'audio';
 
-            animationFrame = requestAnimationFrame(loop);
-        }
-        return () => cancelAnimationFrame(animationFrame);
-    }, [isPlaying, duration, currentTime, setCurrentTime]);
+                const truncate = (str, n) => {
+                    if (!str) return '';
+                    return str.length > n ? str.substr(0, n - 1) + "..." : str;
+                };
 
-    const handleSeek = (time) => {
-        setCurrentTime(Math.max(0, Math.min(time, duration)));
+                const clip = {
+                    id: el.id,
+                    pageId: page.id, // Keep track of parent page
+                    type: isText ? 'text' : (isAudio ? 'audio' : (isVideo || isImage ? el.type : 'element')),
+                    startTime: (el.startTime || 0) + pageOffset,
+                    duration: el.duration || 5.0,
+                    label: isText ? truncate(el.content || 'Text', 15) : (el.name || (isAudio ? 'Audio' : 'Element')),
+                    content: el.content,
+                    src: el.src,
+                    thumbnail: el.thumbnail || el.src,
+                    color: isText ? 'bg-amber-500'
+                         : isVideo ? 'bg-indigo-600'
+                         : isImage ? 'bg-blue-500'
+                         : isAudio ? 'bg-emerald-500'
+                         : 'bg-pink-500'
+                };
+
+                allClips[trackId].push(clip);
+            });
+
+            currentPageOffset += (page.duration || 5);
+        });
+
+        const baseTracks = [
+            { id: 'text-track',    type: 'text',    clips: allClips['text-track']    },
+            { id: 'element-track', type: 'element',  clips: allClips['element-track'] },
+            { id: 'image-track',   type: 'image',    clips: allClips['image-track']   },
+            { id: 'media-track',   type: 'media',    clips: allClips['media-track']   },
+            { id: 'audio-track',   type: 'audio',    clips: allClips['audio-track']   }
+        ];
+
+        return baseTracks.sort((a, b) => trackOrder.indexOf(a.id) - trackOrder.indexOf(b.id));
+    }, [pages, trackOrder]);
+
+    const totalDuration = useMemo(() => {
+        return pages.reduce((sum, p) => sum + (p.duration || 5), 0);
+    }, [pages]);
+
+    const pagesWithCalculatedTimes = useMemo(() => {
+        let currentStart = 0;
+        return pages.map(page => {
+            const start = currentStart;
+            currentStart += (page.duration || 5);
+            return { ...page, startTime: start };
+        });
+    }, [pages]);
+
+    // ── Global Trim / Move handlers ───────────────────────────────────────
+    const handleTrimChange = (id, globalStartTime, duration) => {
+        // We pass the global start time to onUpdateElement, and it will handle local mapping
+        onUpdateElement(id, { startTime: globalStartTime, duration });
+    };
+
+    const handleClipMove = (id, newTrackId, globalStartTime) => {
+        // We pass the global start time and new track to onUpdateElement
+        onUpdateElement(id, { startTime: globalStartTime, trackId: newTrackId });
     };
 
     return (
-        <div className="video-timeline-container flex flex-col h-full bg-[#18191b] text-white border-t border-[#2a2b2e]">
-
-            {/* Top Bar: Playback Controls & Tools */}
-            <div className="h-10 flex items-center justify-between px-4 border-b border-[#2a2b2e] bg-[#1e1f22]">
-                <div className="flex items-center gap-4">
-                    <PlaybackControls
-                        isPlaying={isPlaying}
-                        setIsPlaying={setIsPlaying}
-                        currentTime={currentTime}
-                        duration={duration}
-                        onSeek={handleSeek}
-                    />
-
-                    <div className="flex items-center gap-2 text-xs text-gray-400 border-l border-gray-700 pl-4">
-                        <span>Duration:</span>
-                        <input
-                            type="number"
-                            className="w-12 bg-[#2a2b2e] border border-gray-600 rounded px-1 text-white text-center focus:outline-none focus:border-blue-500"
-                            value={duration}
-                            onChange={(e) => onUpdatePageDuration(Number(e.target.value))}
-                            min={1}
-                            max={60}
-                        />
-                        <span>s</span>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                    <button onClick={() => setZoomLevel(z => Math.max(0.5, z - 0.1))} className="p-1 hover:bg-[#2a2b2e] rounded"><ZoomOut size={16} /></button>
-                    <span className="text-xs text-gray-400">Zoom</span>
-                    <button onClick={() => setZoomLevel(z => Math.min(5, z + 0.1))} className="p-1 hover:bg-[#2a2b2e] rounded"><ZoomIn size={16} /></button>
-                </div>
-            </div>
-
-            {/* Main Timeline Area */}
-            <div className="flex-1 flex overflow-hidden relative">
-
-                {/* Track Headers (Left) */}
-                <div className="w-48 bg-[#1e1f22] border-r border-[#2a2b2e] flex flex-col z-20">
-                    <div className="h-8 border-b border-[#2a2b2e] flex items-center px-4 font-xs text-gray-500 text-xs font-semibold">Timeline</div>
-                    <div className="flex-1">
-                        {/* Headers will go here */}
-                    </div>
-                </div>
-
-                {/* Scrollable Tracks Area */}
-                <div className="flex-1 overflow-auto relative custom-scrollbar" ref={scrollRef}>
-                    <TimeRuler
-                        duration={duration}
-                        zoomLevel={zoomLevel}
-                        currentTime={currentTime}
-                        onSeek={handleSeek}
-                    />
-
-                    <TimelineTracks
-                        elements={currentDetails.elements}
-                        duration={duration}
-                        zoomLevel={zoomLevel}
-                        onUpdateElement={onUpdateElement}
-                        selectedElement={selectedElement}
-                        setSelectedElement={setSelectedElement}
-                    />
-
-                    {/* Playhead Line */}
-                    <div
-                        className="absolute top-0 bottom-0 w-[1px] bg-blue-500 z-30 pointer-events-none"
-                        style={{ left: `${currentTime * 100 * zoomLevel}px` }}
-                    >
-                        <div className="w-3 h-3 bg-blue-500 rounded-full -ml-[5px] -mt-1.5 shadow-sm"></div>
-                    </div>
-                </div>
-            </div>
+        <div className="flex flex-col bg-white border-t border-gray-200 shadow-2xl z-50">
+            <Timeline
+                pages={pagesWithCalculatedTimes}
+                totalDuration={totalDuration}
+                currentPage={currentPage}
+                setCurrentPage={setCurrentPage}
+                onAddPage={onAddPage}
+                onDeletePage={onDeletePage}
+                onDuplicatePage={onDuplicatePage}
+                tracks={tracks}
+                onReorderTracks={(newTracks) => setTrackOrder(newTracks.map(t => t.id))}
+                duration={duration}
+                currentTime={currentTime}
+                onTimeChange={setCurrentTime}
+                isPlaying={isPlaying}
+                onTogglePlay={() => setIsPlaying(!isPlaying)}
+                height={350} 
+                onResizeStart={() => {}}
+                selectedClipId={selectedElement}
+                onClipSelect={setSelectedElement}
+                onClipDoubleClick={onClipDoubleClick}
+                onTrimChange={handleTrimChange}
+                onClipMove={handleClipMove}
+                onAddClip={(trackId, type, action) => onAddClip?.(trackId, type, action)}
+                onUpdatePageDuration={onUpdatePageDuration}
+                onDeleteClip={onDeleteClip}
+                onSplit={onSplit}
+            />
         </div>
     );
 };
