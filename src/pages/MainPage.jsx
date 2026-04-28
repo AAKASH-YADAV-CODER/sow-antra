@@ -50,7 +50,6 @@ import useKeyboardShortcuts from '../features/canvas/hooks/useKeyboardShortcuts'
 import useHelpers from '../features/canvas/hooks/useHelpers';
 import useCollaboration from '../features/canvas/hooks/useCollaboration';
 import useOnlineStatus from '../hooks/useOnlineStatus';
-import { storage } from '../utils/storage';
 // UI Helper Components
 import CollaborationPresence from '../features/collaboration/components/CollaborationPresence';
 import ContentPlannerModal from '../features/canvas/components/modals/ContentPlannerModal';
@@ -150,9 +149,7 @@ const Sowntra = () => {
 
   const [isProcessingBG, setIsProcessingBG] = useState(false);
   const [bgProcessingStatus, setBgProcessingStatus] = useState('');
-  const [saveStatus, setSaveStatus] = useState('idle'); // 'idle', 'saving', 'saved', 'error'
   const isOnline = useOnlineStatus();
-  const [isSyncing, setIsSyncing] = useState(false);
 
   // Video Editor State
   const [isVideoMode, setIsVideoMode] = useState(false);
@@ -298,7 +295,6 @@ const Sowntra = () => {
   // Custom Hooks - Project Management (Save/Load)
   const {
     handleSaveClick,
-    saveProject,
     confirmSave,
     loadProject,
     handleProjectFileLoad
@@ -331,42 +327,7 @@ const Sowntra = () => {
     projectId: currentProjectId // Pass currentProjectId to hook
   });
 
-  // Silent save wrapper for background tasks
-  const handleSilentSave = useCallback(async () => {
-    // CRITICAL SAFEGUARD: Never save if pages are missing (prevent accidental data loss)
-    if (!pages || pages.length === 0) {
-      console.warn('Silent save blocked: No pages found. This prevents overwriting valid cloud data with an empty state.');
-      return;
-    }
-
-    setSaveStatus('saving');
-    try {
-      // Capture design snapshot before saving
-      let thumbnail = null;
-      try {
-        // Use heavily compressed jpeg at 320px width for silent saves to avoid 1MB/5MB payload limits on the backend API
-        thumbnail = await getCanvasDataURL('jpeg', 320);
-      } catch (snapshotError) {
-        console.warn('Failed to capture silent-save snapshot:', snapshotError);
-      }
-
-      const response = await saveProject({ title: projectName, thumbnail }, true);
-      setSaveStatus('saved');
-
-      // Robust ID capture
-      const newId = response?.data?.id ||
-        response?.data?.project?.id ||
-        response?.data?.data?.id ||
-        response?.data?._id;
-
-      if (!currentProjectId && newId) {
-        navigate(`?project=${newId}`, { replace: true });
-      }
-    } catch (error) {
-      console.error('Silent save failed:', error);
-      setSaveStatus('error');
-    }
-  }, [saveProject, currentProjectId, navigate, getCanvasDataURL, projectName, pages]);
+  // handleSilentSave removed to disable auto-sync
 
   // Comment click handler (declared before useHelpers which references it)
   const handleCommentClick = useCallback((el) => {
@@ -714,25 +675,7 @@ const Sowntra = () => {
         return; 
       }
 
-      // 1. Try to load from Local Storage (IndexedDB) first for speed and offline access
-      try {
-        const localProject = await storage.getProject(currentProjectId);
-        if (localProject) {
-          console.log('Loaded project from local storage');
-          if (localProject.pages) setPages(localProject.pages);
-          if (localProject.currentPage) setCurrentPage(localProject.currentPage);
-          if (localProject.canvasSize) setCanvasSize(localProject.canvasSize);
-          if (localProject.projectName) setProjectName(localProject.projectName);
-          if (localProject.currentLanguage) setCurrentLanguage(localProject.currentLanguage);
-          if (localProject.textDirection) setTextDirection(localProject.textDirection);
-          
-          setTimeout(() => centerCanvas(), 100);
-        }
-      } catch (err) {
-        console.warn('Failed to load from local storage:', err);
-      }
-
-      // 2. If online, try to fetch the absolute latest from the cloud
+      // Load directly from the cloud
       if (isOnline && currentUser) {
         try {
           const { auth } = await import('../config/firebase');
@@ -760,9 +703,6 @@ const Sowntra = () => {
             const fetchedTitle = fetchedData.title || fetchedData.projectName || fetchedData.name;
             if (fetchedTitle) setProjectName(fetchedTitle);
             
-            // Save this latest version to local too
-            storage.saveProject({ id: currentProjectId, ...fetchedData });
-            
             setTimeout(() => centerCanvas(), 200);
           }
         } catch (error) {
@@ -774,32 +714,7 @@ const Sowntra = () => {
     loadProject();
   }, [currentProjectId, currentUser, isOnline, centerCanvas]);
 
-  // Handle automatic syncing when changes occur (debounced)
-  useEffect(() => {
-    // Only sync if online, we have a project, and we actually have pages to save
-    if (isOnline && currentProjectId && pages && pages.length > 0) {
-      
-      // Debounce the sync to prevent flickering during active editing
-      // and to avoid infinite save loops
-      const syncTimer = setTimeout(() => {
-        const syncProject = async () => {
-          setIsSyncing(true);
-          try {
-            // Trigger a silent save to push the latest local state to cloud
-            await handleSilentSave();
-          } catch (err) {
-            console.error('Auto-sync failed:', err);
-          } finally {
-            setIsSyncing(false);
-          }
-        };
-        
-        syncProject();
-      }, 3000); // 3-second debounce (Wait for user to stop editing for 3 seconds)
-      
-      return () => clearTimeout(syncTimer);
-    }
-  }, [isOnline, currentProjectId, handleSilentSave, pages]);
+  // Auto-sync removed as per user request
 
   // Load transliteration data
   useEffect(() => {
@@ -1227,33 +1142,6 @@ const Sowntra = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentLanguage, currentPage]);
 
-  // Debounced Auto-save to backend
-  useEffect(() => {
-    // Only auto-save if there are elements or a non-default name
-    if (pages.some(p => p.elements.length > 0) || (projectName && projectName !== 'Untitled project')) {
-      const timeoutId = setTimeout(async () => {
-        handleSilentSave();
-      }, 1500); // 1.5s idle debounce for heavier saving (including thumbnail)
-      return () => clearTimeout(timeoutId);
-    }
-  }, [pages, projectName, handleSilentSave]);
-
-  // Handle page leave - vital for ensuring last changes aren't lost
-  useEffect(() => {
-    const handleBeforeUnload = (e) => {
-      // Trigger a silent save
-      handleSilentSave();
-
-      // Standard message for some browsers
-      if (saveStatus === 'saving') {
-        e.preventDefault();
-        e.returnValue = '';
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [handleSilentSave, saveStatus]);
 
   // Custom Hooks - Clipboard
   const {
@@ -1453,17 +1341,17 @@ const Sowntra = () => {
           recordingDuration={recordingDuration}
           setRecordingDuration={setRecordingDuration}
           onSaveProject={handleSaveClick}
-          onSilentSave={handleSilentSave}
+          onSilentSave={() => {}}
           loadProject={loadProject}
           projectName={projectName}
           setProjectName={setProjectName}
           pages={pages}
           canvasSize={canvasSize}
           isCreatorMode={searchParams.get('isCreatorMode') === 'true'}
-          saveStatus={saveStatus}
+          saveStatus={'idle'}
           getCanvasDataURL={getCanvasDataURL}
           isOnline={isOnline}
-          isSyncing={isSyncing}
+          isSyncing={false}
         />
 
 

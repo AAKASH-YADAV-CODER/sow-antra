@@ -1,7 +1,6 @@
 import { useCallback } from 'react';
 import { projectAPI } from '../../../services/api';
 import { sanitizeProjectData } from '../../../utils/helpers';
-import { storage } from '../../../utils/storage';
 
 /**
  * Custom hook for managing project save/load operations
@@ -89,12 +88,7 @@ const useProjectManager = ({
       let response = null;
       const sanitizedData = sanitizeProjectData(projectData);
       
-      // ALWAYS save to Local IndexedDB first for robust offline support
-      try {
-        await storage.saveProject(sanitizedData);
-      } catch (localError) {
-        console.warn('Failed to save project to local IndexedDB:', localError);
-      }
+      // Local IndexedDB saving removed to prevent offline mode crashes
 
       if (navigator.onLine) {
         if (projectId) {
