@@ -2,7 +2,7 @@
   "name": "sowntra-mp",
   "version": "0.1.0",
   "private": true,
-  "proxy": "https://api.sowntra.com",
+  "proxy": "http://localhost:4001",
   "dependencies": {
     "@imgly/background-removal": "^1.7.0",
     "@react-three/drei": "^9.122.0",

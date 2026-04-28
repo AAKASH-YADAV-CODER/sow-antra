@@ -1079,25 +1079,35 @@ const CanvasElement = ({
     const clipPathId = `star-clip-${element.id}`;
     const points = element.points || 5;
 
-    // Calculate star points to fill the entire bounding box
-    const padding = 0.02; // Small padding to prevent clipping
-    const outerRadius = 0.5 - padding;
-    // Use innerRadius from props (normalized 0-1 relative to radius?) 
-    // Usually innerRadius in props is 0-1 relative to outerRadius.
-    // Library uses 0.4 for star, 0.7 for sun.
-    const innerRadius = outerRadius * (element.innerRadius || 0.4);
-    const centerX = 0.5;
-    const centerY = 0.5;
+    const strokeW = element.strokeWidth || 0;
+    const innerRadiusRatio = element.innerRadius || 0.4;
+    
+    // Calculate raw points
+    const rawPoints = [];
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
 
-    let clipPathPoints = '';
     for (let i = 0; i < points * 2; i++) {
-      const radius = i % 2 === 0 ? outerRadius : innerRadius;
+      const r = i % 2 === 0 ? 1 : innerRadiusRatio;
       const angle = (Math.PI * 2 * i) / (points * 2) - Math.PI / 2;
-      const x = centerX + radius * Math.cos(angle);
-      const y = centerY + radius * Math.sin(angle);
-      clipPathPoints += x + ',' + y + ' ';
+      const x = r * Math.cos(angle);
+      const y = r * Math.sin(angle);
+      rawPoints.push({ x, y });
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
     }
 
+    const rangeX = maxX - minX;
+    const rangeY = maxY - minY;
+    
+    // Generate clipPath points (normalized 0..1)
+    let clipPathPoints = '';
+    rawPoints.forEach((pt) => {
+      const nx = (pt.x - minX) / rangeX;
+      const ny = (pt.y - minY) / rangeY;
+      clipPathPoints += nx + ',' + ny + ' ';
+    });
 
     const fillStyle = {
       position: 'absolute',
@@ -1112,21 +1122,18 @@ const CanvasElement = ({
     };
 
     // Create SVG path for stroke (matching clipPath proportions)
-    const paddingPx = Math.min(element.width, element.height) * 0.02;
-    const maxRadius = Math.min(element.width, element.height) / 2;
-    const outerRadiusPx = maxRadius - paddingPx;
-    const innerRadiusPx = outerRadiusPx * (element.innerRadius || 0.4); // Same proportion as clipPath
-    const centerXPx = element.width / 2;
-    const centerYPx = element.height / 2;
+    const pad = strokeW / 2;
+    const innerW = Math.max(0, element.width - strokeW);
+    const innerH = Math.max(0, element.height - strokeW);
 
     let strokePath = '';
-    for (let i = 0; i < points * 2; i++) {
-      const radius = i % 2 === 0 ? outerRadiusPx : innerRadiusPx;
-      const angle = (Math.PI * 2 * i) / (points * 2) - Math.PI / 2;
-      const x = centerXPx + radius * Math.cos(angle);
-      const y = centerYPx + radius * Math.sin(angle);
-      strokePath += (i === 0 ? 'M' : 'L') + x + ',' + y;
-    }
+    rawPoints.forEach((pt, i) => {
+      const nx = (pt.x - minX) / rangeX;
+      const ny = (pt.y - minY) / rangeY;
+      const px = pad + nx * innerW;
+      const py = pad + ny * innerH;
+      strokePath += (i === 0 ? 'M' : 'L') + px + ',' + py;
+    });
     strokePath += 'Z';
 
     content = (
@@ -1148,13 +1155,15 @@ const CanvasElement = ({
             className={`${styles.shapeElement || ''}`}
             style={{ ...innerStyle, width: element.width, height: element.height }}
           >
-            {/* Fill layer */}
-            <div
-              className={element.fillType === 'gradient' ? 'gradient-fix' : ''}
-              style={fillStyle}
-            />
+            {/* Fill layer (Only for gradient) */}
+            {element.fillType === 'gradient' && (
+              <div
+                className="gradient-fix"
+                style={fillStyle}
+              />
+            )}
 
-            {/* Stroke layer using SVG */}
+            {/* Stroke and Solid Fill layer using SVG */}
             <svg
               width="100%"
               height="100%"
@@ -1162,14 +1171,16 @@ const CanvasElement = ({
               viewBox={`0 0 ${element.width} ${element.height}`}
               preserveAspectRatio="none"
             >
-              <defs>
-                <clipPath id={clipPathId} clipPathUnits="objectBoundingBox">
-                  <polygon points={clipPathPoints} />
-                </clipPath>
-              </defs>
+              {element.fillType === 'gradient' && (
+                <defs>
+                  <clipPath id={clipPathId} clipPathUnits="objectBoundingBox">
+                    <polygon points={clipPathPoints} />
+                  </clipPath>
+                </defs>
+              )}
               <path
                 d={strokePath}
-                fill="none"
+                fill={element.fillType === 'gradient' ? 'none' : (element.fill || '#cbd5e1')}
                 stroke={element.stroke || '#000000'}
                 strokeWidth={element.strokeWidth ?? 2}
               />
@@ -1180,26 +1191,42 @@ const CanvasElement = ({
     );
   } else if (element.type === 'regularPolygon') {
     const sides = element.sides || 6;
-    const centerX = element.width / 2;
-    const centerY = element.height / 2;
-    // Use slightly less than half width to avoid clipping stroke
-    const radius = (Math.min(element.width, element.height) / 2) - ((element.strokeWidth || 0) / 2);
-
-    let path = '';
-    // Start from top (rotate -90deg or -PI/2)
-    // Formula: angle = i * 2PI / sides - PI/2
+    const strokeW = element.strokeWidth || 0;
+    
+    // Calculate raw points to find true bounding box
     const startAngle = -Math.PI / 2;
+    const rawPoints = [];
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
 
     for (let i = 0; i < sides; i++) {
       const angle = startAngle + (Math.PI * 2 * i) / sides;
-      const x = centerX + radius * Math.cos(angle);
-      const y = centerY + radius * Math.sin(angle);
-      path += (i === 0 ? 'M' : 'L') + x + ',' + y;
+      const x = Math.cos(angle);
+      const y = Math.sin(angle);
+      rawPoints.push({ x, y });
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
     }
+
+    const rangeX = maxX - minX;
+    const rangeY = maxY - minY;
+    
+    const pad = strokeW / 2;
+    const innerW = Math.max(0, element.width - strokeW);
+    const innerH = Math.max(0, element.height - strokeW);
+
+    let path = '';
+    rawPoints.forEach((pt, i) => {
+      const nx = (pt.x - minX) / rangeX;
+      const ny = (pt.y - minY) / rangeY;
+      const px = pad + nx * innerW;
+      const py = pad + ny * innerH;
+      path += (i === 0 ? 'M' : 'L') + px + ',' + py;
+    });
     path += 'Z';
 
     const polygonStyle = {
-      ...outerStyle,
       ...innerStyle,
       backgroundColor: 'transparent', // We use SVG fill
       border: 'none',
@@ -1221,14 +1248,11 @@ const CanvasElement = ({
 
     // Generate 0-1 coords for clipPath
     let clipPoints = '';
-    for (let i = 0; i < sides; i++) {
-      const angle = startAngle + (Math.PI * 2 * i) / sides;
-      // Map -1..1 to 0..1
-      // x = 0.5 + 0.5 * cos
-      const xCP = 0.5 + 0.5 * Math.cos(angle);
-      const yCP = 0.5 + 0.5 * Math.sin(angle);
-      clipPoints += xCP + ',' + yCP + ' ';
-    }
+    rawPoints.forEach((pt) => {
+      const nx = (pt.x - minX) / rangeX;
+      const ny = (pt.y - minY) / rangeY;
+      clipPoints += nx + ',' + ny + ' ';
+    });
 
     content = (
       <div
@@ -1249,23 +1273,24 @@ const CanvasElement = ({
             className={`${styles.shapeElement || ''}`}
             style={{ ...innerStyle, ...polygonStyle }}
           >
-            {/* Fill layer */}
-            <div
-              className={element.fillType === 'gradient' ? 'gradient-fix' : ''}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                backgroundColor: (element.fillType === 'solid' || !element.fillType) ? (element.fill || '#cbd5e1') : 'transparent',
-                background: element.fillType === 'gradient' ? getBackgroundStyle(element) : undefined,
-                clipPath: `url(#${clipPathId})`,
-                WebkitClipPath: `url(#${clipPathId})`
-              }}
-            />
+            {/* Fill layer (Only for gradient) */}
+            {element.fillType === 'gradient' && (
+              <div
+                className="gradient-fix"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  background: getBackgroundStyle(element),
+                  clipPath: `url(#${clipPathId})`,
+                  WebkitClipPath: `url(#${clipPathId})`
+                }}
+              />
+            )}
 
-            {/* Stroke layer */}
+            {/* Stroke and Solid Fill layer */}
             <svg
               width="100%"
               height="100%"
@@ -1273,14 +1298,16 @@ const CanvasElement = ({
               viewBox={`0 0 ${element.width} ${element.height}`}
               preserveAspectRatio="none"
             >
-              <defs>
-                <clipPath id={clipPathId} clipPathUnits="objectBoundingBox">
-                  <polygon points={clipPoints} />
-                </clipPath>
-              </defs>
+              {element.fillType === 'gradient' && (
+                <defs>
+                  <clipPath id={clipPathId} clipPathUnits="objectBoundingBox">
+                    <polygon points={clipPoints} />
+                  </clipPath>
+                </defs>
+              )}
               <path
                 d={path}
-                fill="none"
+                fill={element.fillType === 'gradient' ? 'none' : (element.fill || '#cbd5e1')}
                 stroke={element.stroke || '#000000'}
                 strokeWidth={element.strokeWidth ?? 2}
               />

@@ -4,7 +4,7 @@ import {
   Languages, User, LogOut, Settings, HelpCircle, Download,
   UploadCloud, Link as LinkIcon, CheckCircle, WifiOff, RefreshCw,
   FilePlus, FolderOpen, Save, Copy, Printer, Clock, ChevronDown,
-  FileText, Star, ExternalLink, ChevronRight, Check
+  FileText, Star, ExternalLink, ChevronRight, Check, Users
 } from 'lucide-react';
 import ShareButton from '../../../components/common/ShareButton';
 import AddGuidesModal from './AddGuidesModal';
@@ -81,7 +81,9 @@ const TopHeader = ({
   saveStatus,
   getCanvasDataURL,
   isOnline,
-  isSyncing
+  isSyncing,
+  onShareClick,
+  isCollaborative
 }) => {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showFileMenu, setShowFileMenu] = useState(false);
@@ -574,13 +576,26 @@ const TopHeader = ({
             )}
           </div>
 
-          {/* Share Button - Desktop only */}
-          <ShareButton
-            url={window.location.href}
-            title="Check out my design on Sowntra!"
-            text="I created this amazing design on Sowntra. Check it out!"
-            className="px-2 py-1.5 hidden lg:flex"
-          />
+          {/* Share / Invite Button */}
+          {onShareClick && isOnline && (
+            <button
+              onClick={onShareClick}
+              className="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold flex items-center gap-1.5 transition-colors border border-indigo-200"
+              title="Share and Collaborate"
+            >
+              <Users size={16} className="hidden lg:block" />
+              <span className="text-xs">Share</span>
+            </button>
+          )}
+
+          {!onShareClick && (
+            <ShareButton
+              url={window.location.href}
+              title="Check out my design on Sowntra!"
+              text="I created this amazing design on Sowntra. Check it out!"
+              className="px-2 py-1.5 hidden lg:flex"
+            />
+          )}
 
           {/* Export / Download Button */}
           <div className="relative">

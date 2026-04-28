@@ -1213,52 +1213,87 @@ export const drawElementToCanvas = (ctx, element, time, elementIndex, imageEffec
     if (element.strokeWidth > 0) ctx.stroke();
   } else if (element.type === 'star') {
     const points = element.points || 5;
-    const outerRadius = Math.min(element.width, element.height) / 2;
-    // Fix: Match CanvasElement default (0.4) and support prop
-    const innerRadius = outerRadius * (element.innerRadius || 0.4);
-    const centerX = element.x + element.width / 2;
-    const centerY = element.y + element.height / 2;
+    const strokeW = element.strokeWidth || 0;
+    const innerRadiusRatio = element.innerRadius || 0.4;
+    
+    const rawPoints = [];
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+
+    for (let i = 0; i < points * 2; i++) {
+      const radius = i % 2 === 0 ? 1 : innerRadiusRatio;
+      const angle = (Math.PI * 2 * i) / (points * 2) - Math.PI / 2;
+      const x = radius * Math.cos(angle);
+      const y = radius * Math.sin(angle);
+      rawPoints.push({ x, y });
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+
+    const rangeX = maxX - minX;
+    const rangeY = maxY - minY;
+    
+    const pad = strokeW / 2;
+    const innerW = Math.max(0, element.width - strokeW);
+    const innerH = Math.max(0, element.height - strokeW);
 
     ctx.fillStyle = backgroundStyle;
     ctx.strokeStyle = element.stroke;
     ctx.lineWidth = element.strokeWidth;
     ctx.beginPath();
 
-    for (let i = 0; i < points * 2; i++) {
-      const radius = i % 2 === 0 ? outerRadius : innerRadius;
-      const angle = (Math.PI * 2 * i) / (points * 2) - Math.PI / 2;
-      const x = centerX + radius * Math.cos(angle);
-      const y = centerY + radius * Math.sin(angle);
-
-      if (i === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
-      }
-    }
+    rawPoints.forEach((pt, i) => {
+      const nx = (pt.x - minX) / rangeX;
+      const ny = (pt.y - minY) / rangeY;
+      const px = element.x + pad + nx * innerW;
+      const py = element.y + pad + ny * innerH;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    });
 
     ctx.closePath();
     ctx.fill();
     if (element.strokeWidth > 0) ctx.stroke();
   } else if (element.type === 'regularPolygon' || element.type === 'hexagon' || element.type === 'pentagon' || element.type === 'octagon' || element.type === 'decagon') {
     const sides = element.sides || (element.type === 'hexagon' ? 6 : element.type === 'pentagon' ? 5 : element.type === 'octagon' ? 8 : element.type === 'decagon' ? 10 : 6);
-    const centerX = element.x + element.width / 2;
-    const centerY = element.y + element.height / 2;
-    const radius = (Math.min(element.width, element.height) / 2) - ((element.strokeWidth || 0) / 2);
+    const strokeW = element.strokeWidth || 0;
+    
+    const startAngle = -Math.PI / 2;
+    const rawPoints = [];
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+
+    for (let i = 0; i < sides; i++) {
+      const angle = startAngle + (Math.PI * 2 * i) / sides;
+      const x = Math.cos(angle);
+      const y = Math.sin(angle);
+      rawPoints.push({ x, y });
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+
+    const rangeX = maxX - minX;
+    const rangeY = maxY - minY;
+    
+    const pad = strokeW / 2;
+    const innerW = Math.max(0, element.width - strokeW);
+    const innerH = Math.max(0, element.height - strokeW);
 
     ctx.fillStyle = backgroundStyle;
     ctx.strokeStyle = element.stroke;
     ctx.lineWidth = element.strokeWidth;
     ctx.beginPath();
 
-    for (let i = 0; i < sides; i++) {
-      const angle = (Math.PI * 2 * i) / sides - Math.PI / 2;
-      const x = centerX + radius * Math.cos(angle);
-      const y = centerY + radius * Math.sin(angle);
-
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
+    rawPoints.forEach((pt, i) => {
+      const nx = (pt.x - minX) / rangeX;
+      const ny = (pt.y - minY) / rangeY;
+      const px = element.x + pad + nx * innerW;
+      const py = element.y + pad + ny * innerH;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    });
 
     ctx.closePath();
     ctx.fill();
@@ -1679,30 +1714,60 @@ export const exportAsSVG = (elements, canvasSize, filename = 'sowntra-design') =
       let d = '';
       if (element.type === 'star') {
         const pointsCount = element.points || 5;
-        const outerRadius = Math.min(w, h) / 2;
-        const innerRadius = outerRadius * (element.innerRadius || 0.4);
-        const centerX = element.x + w / 2;
-        const centerY = element.y + h / 2;
+        const innerRadiusRatio = element.innerRadius || 0.4;
+        
+        const rawPoints = [];
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
 
         for (let i = 0; i < pointsCount * 2; i++) {
-          const radius = i % 2 === 0 ? outerRadius : innerRadius;
+          const radius = i % 2 === 0 ? 1 : innerRadiusRatio;
           const angle = (Math.PI * 2 * i) / (pointsCount * 2) - Math.PI / 2;
-          const x = centerX + radius * Math.cos(angle);
-          const y = centerY + radius * Math.sin(angle);
-          d += (i === 0 ? 'M' : 'L') + x + ' ' + y;
+          const x = radius * Math.cos(angle);
+          const y = radius * Math.sin(angle);
+          rawPoints.push({ x, y });
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
         }
+
+        const rangeX = maxX - minX;
+        const rangeY = maxY - minY;
+
+        rawPoints.forEach((pt, i) => {
+          const nx = (pt.x - minX) / rangeX;
+          const ny = (pt.y - minY) / rangeY;
+          const px = element.x + nx * w;
+          const py = element.y + ny * h;
+          d += (i === 0 ? 'M' : 'L') + px + ' ' + py;
+        });
       } else {
         const sides = element.sides || (element.type === 'hexagon' ? 6 : element.type === 'pentagon' ? 5 : element.type === 'octagon' ? 8 : element.type === 'decagon' ? 10 : 6);
-        const centerX = element.x + w / 2;
-        const centerY = element.y + h / 2;
-        const radius = Math.min(w, h) / 2;
+        const startAngle = -Math.PI / 2;
+        const rawPoints = [];
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
 
         for (let i = 0; i < sides; i++) {
-          const angle = (Math.PI * 2 * i) / sides - Math.PI / 2;
-          const x = centerX + radius * Math.cos(angle);
-          const y = centerY + radius * Math.sin(angle);
-          d += (i === 0 ? 'M' : 'L') + x + ' ' + y;
+          const angle = startAngle + (Math.PI * 2 * i) / sides;
+          const x = Math.cos(angle);
+          const y = Math.sin(angle);
+          rawPoints.push({ x, y });
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
         }
+
+        const rangeX = maxX - minX;
+        const rangeY = maxY - minY;
+
+        rawPoints.forEach((pt, i) => {
+          const nx = (pt.x - minX) / rangeX;
+          const ny = (pt.y - minY) / rangeY;
+          const px = element.x + nx * w;
+          const py = element.y + ny * h;
+          d += (i === 0 ? 'M' : 'L') + px + ' ' + py;
+        });
       }
       d += 'Z';
       svgContent += `
@@ -1783,27 +1848,49 @@ export const exportAsSVG = (elements, canvasSize, filename = 'sowntra-design') =
              C ${x + w},${y + h * 0.15} ${x + w * 0.9},${y} ${x + w * 0.75},${y} 
              C ${x + w * 0.65},${y} ${x + w * 0.5},${y + h * 0.1} ${x + w * 0.5},${y + h * 0.3} Z`;
       } else if (element.type === 'star') {
-        const pts = element.points || 5;
-        const outR = Math.min(w, h) / 2;
-        const inR = outR * (element.innerRadius || 0.4);
-        const cx = element.x + w / 2, cy = element.y + h / 2;
-        for (let i = 0; i < pts * 2; i++) {
-          const r = i % 2 === 0 ? outR : inR;
-          const angle = (Math.PI * 2 * i) / (pts * 2) - Math.PI / 2;
-          const px = cx + r * Math.cos(angle), py = cy + r * Math.sin(angle);
-          d += (i === 0 ? 'M' : 'L') + px + ',' + py;
+        const pointsCount = element.points || 5;
+        const innerRadiusRatio = element.innerRadius || 0.4;
+        const rawPoints = [];
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        for (let i = 0; i < pointsCount * 2; i++) {
+          const r = i % 2 === 0 ? 1 : innerRadiusRatio;
+          const angle = (Math.PI * 2 * i) / (pointsCount * 2) - Math.PI / 2;
+          const x = r * Math.cos(angle), y = r * Math.sin(angle);
+          rawPoints.push({ x, y });
+          if (x < minX) minX = x; if (x > maxX) maxX = x;
+          if (y < minY) minY = y; if (y > maxY) maxY = y;
         }
+        const rangeX = maxX - minX;
+        const rangeY = maxY - minY;
+        rawPoints.forEach((pt, i) => {
+          const nx = (pt.x - minX) / rangeX;
+          const ny = (pt.y - minY) / rangeY;
+          const px = element.x + nx * w;
+          const py = element.y + ny * h;
+          d += (i === 0 ? 'M' : 'L') + px + ',' + py;
+        });
         d += 'Z';
       } else if (element.type === 'regularPolygon') {
         const sides = element.sides || 6;
-        const cx = element.x + w / 2, cy = element.y + h / 2;
-        const r = Math.min(w, h) / 2;
+        const startAngle = -Math.PI / 2;
+        const rawPoints = [];
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
         for (let i = 0; i < sides; i++) {
-          const angle = (Math.PI * 2 * i) / sides - Math.PI / 2;
-          const px = cx + r * Math.cos(angle);
-          const py = cy + r * Math.sin(angle);
-          d += (i === 0 ? 'M' : 'L') + px + ',' + py;
+          const angle = startAngle + (Math.PI * 2 * i) / sides;
+          const x = Math.cos(angle), y = Math.sin(angle);
+          rawPoints.push({ x, y });
+          if (x < minX) minX = x; if (x > maxX) maxX = x;
+          if (y < minY) minY = y; if (y > maxY) maxY = y;
         }
+        const rangeX = maxX - minX;
+        const rangeY = maxY - minY;
+        rawPoints.forEach((pt, i) => {
+          const nx = (pt.x - minX) / rangeX;
+          const ny = (pt.y - minY) / rangeY;
+          const px = element.x + nx * w;
+          const py = element.y + ny * h;
+          d += (i === 0 ? 'M' : 'L') + px + ',' + py;
+        });
         d += 'Z';
       } else if (element.type === 'trapezoid') {
         d = `M ${element.x + w * 0.2},${element.y} L ${element.x + w * 0.8},${element.y} L ${element.x + w},${element.y + h} L ${element.x},${element.y + h} Z`;

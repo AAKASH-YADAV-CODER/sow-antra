@@ -7,7 +7,8 @@ import FloatingToolbar from '../components/FloatingToolbar';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { projectAPI } from '../services/api';
+import { projectAPI, invitationAPI } from '../services/api';
+import { Users, X, Loader } from 'lucide-react';
 
 // Component imports
 import RecordingStatus from '../features/canvas/components/RecordingStatus';
@@ -140,6 +141,12 @@ const Sowntra = () => {
   const [showPagesStrip, setShowPagesStrip] = useState(false);
   const [showContentPlannerModal, setShowContentPlannerModal] = useState(false);
 
+  // RTC Invite Modal States
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [isInviting, setIsInviting] = useState(false);
+  const [inviteError, setInviteError] = useState('');
+
   // Persistent Timer States
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
@@ -169,6 +176,52 @@ const Sowntra = () => {
   const zoomIndicatorTimeoutRef = useRef(null);
   const templateAppliedRef = useRef(false);
   const lastResizeTriggerRef = useRef(0);
+
+  // --- RTC & Share ---
+  const handleShareClick = () => {
+    setShowInviteModal(true);
+    setInviteEmail('');
+    setInviteError('');
+    setIsInviting(false);
+  };
+
+  const handleSendInvite = async () => {
+    if (!currentProjectId) {
+      setInviteError('Please save the project first before inviting collaborators.');
+      return;
+    }
+
+    if (!inviteEmail.trim()) {
+      setInviteError('Please enter at least one email address to invite.');
+      return;
+    }
+
+    const emails = inviteEmail.split(',').map(e => e.trim()).filter(e => e);
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const invalidEmails = emails.filter(e => !emailRegex.test(e));
+    
+    if (emails.length === 0) {
+       setInviteError('Please enter at least one valid email address.');
+       return;
+    }
+    if (invalidEmails.length > 0) {
+       setInviteError(`Invalid email(s): ${invalidEmails.join(', ')}`);
+       return;
+    }
+    
+    setInviteError('');
+    setIsInviting(true);
+    
+    try {
+      await Promise.all(emails.map(email => invitationAPI.sendInvitation(currentProjectId, email, 'editor')));
+      setShowInviteModal(false);
+    } catch (err) {
+      console.error('Failed to send email invite:', err);
+      setInviteError('Failed to send invites. Please try again.');
+    } finally {
+      setIsInviting(false);
+    }
+  };
 
   // --- Hook Synchronization ---
   // Center canvas function - maximizes canvas size while maintaining aspect ratio
@@ -1103,7 +1156,9 @@ const Sowntra = () => {
     updateElement,
     deleteElement,
     isCollaborative,
-    textEditing
+    textEditing,
+    canvasSize,
+    setCanvasSize
   });
 
   // Enhanced cursor tracking for canvas
@@ -1404,6 +1459,8 @@ const Sowntra = () => {
           getCanvasDataURL={getCanvasDataURL}
           isOnline={isOnline}
           isSyncing={isSyncing}
+          onShareClick={handleShareClick}
+          isCollaborative={isCollaborative}
         />
 
 
@@ -1863,6 +1920,75 @@ const Sowntra = () => {
             canvasOffset={canvasOffset}
             canvasRef={canvasRef}
           />
+        )}
+
+        {/* Invite/Share Modal */}
+        {showInviteModal && (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[100]">
+            <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+              <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                <h3 className="text-xl font-extrabold text-[#0e1217]">
+                  Share & Invite
+                </h3>
+                <button
+                  onClick={() => setShowInviteModal(false)}
+                  className="p-2 hover:bg-gray-200 rounded-full transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-6 bg-white space-y-6">
+                <div className="text-center mb-2">
+                  <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4 text-indigo-600">
+                    <Users size={32} />
+                  </div>
+                  <p className="text-gray-500 font-medium text-sm">
+                    Enter email addresses separated by commas to invite your team to this collaborative design.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-bold text-gray-700">Email Addresses</label>
+                  <input
+                    type="text"
+                    placeholder="colleague1@example.com, colleague2@example.com"
+                    className={`w-full h-12 px-4 bg-gray-50 border ${inviteError ? 'border-red-400 focus:ring-red-500' : 'border-gray-200 focus:ring-indigo-500'} rounded-xl focus:ring-2 outline-none transition-all font-medium`}
+                    value={inviteEmail}
+                    onChange={(e) => {
+                      setInviteEmail(e.target.value);
+                      if (inviteError) setInviteError('');
+                    }}
+                    onKeyDown={(e) => {
+                      e.stopPropagation();
+                      if (e.key === 'Enter' && !isInviting) handleSendInvite();
+                    }}
+                    disabled={isInviting}
+                    autoFocus
+                  />
+                  {inviteError && <p className="text-red-500 text-xs font-bold mt-1">{inviteError}</p>}
+                  {!currentProjectId && !inviteError && (
+                    <p className="text-amber-500 text-xs font-bold mt-1">Please save the project first.</p>
+                  )}
+                </div>
+
+                <button
+                  onClick={handleSendInvite}
+                  disabled={isInviting || !currentProjectId}
+                  className="w-full h-12 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-lg shadow-indigo-100 transition-all transform active:scale-[0.98] flex items-center justify-center gap-2"
+                >
+                  {isInviting ? (
+                    <>
+                      <Loader size={18} className="animate-spin" />
+                      Sending Invites...
+                    </>
+                  ) : (
+                    'Send Invites'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </>
