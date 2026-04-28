@@ -149,7 +149,9 @@ const Sowntra = () => {
 
   const [isProcessingBG, setIsProcessingBG] = useState(false);
   const [bgProcessingStatus, setBgProcessingStatus] = useState('');
+  const [saveStatus, setSaveStatus] = useState('idle'); // 'idle', 'saving', 'saved', 'error'
   const isOnline = useOnlineStatus();
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Video Editor State
   const [isVideoMode, setIsVideoMode] = useState(false);
@@ -295,6 +297,7 @@ const Sowntra = () => {
   // Custom Hooks - Project Management (Save/Load)
   const {
     handleSaveClick,
+    saveProject,
     confirmSave,
     loadProject,
     handleProjectFileLoad
@@ -327,7 +330,28 @@ const Sowntra = () => {
     projectId: currentProjectId // Pass currentProjectId to hook
   });
 
-  // handleSilentSave removed to disable auto-sync
+  // Silent save wrapper for background tasks (Thumbnail generation omitted to prevent memory crashes with large images)
+  const handleSilentSave = useCallback(async () => {
+    if (!pages || pages.length === 0) return;
+
+    setSaveStatus('saving');
+    try {
+      const response = await saveProject({ title: projectName }, true);
+      setSaveStatus('saved');
+
+      const newId = response?.data?.id ||
+        response?.data?.project?.id ||
+        response?.data?.data?.id ||
+        response?.data?._id;
+
+      if (!currentProjectId && newId) {
+        navigate(`?project=${newId}`, { replace: true });
+      }
+    } catch (error) {
+      console.error('Silent save failed:', error);
+      setSaveStatus('error');
+    }
+  }, [saveProject, currentProjectId, navigate, projectName, pages]);
 
   // Comment click handler (declared before useHelpers which references it)
   const handleCommentClick = useCallback((el) => {
@@ -1142,6 +1166,34 @@ const Sowntra = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentLanguage, currentPage]);
 
+  // Debounced Auto-save to backend
+  useEffect(() => {
+    // Only auto-save if there are elements or a non-default name
+    if (pages.some(p => p.elements.length > 0) || (projectName && projectName !== 'Untitled project')) {
+      const timeoutId = setTimeout(async () => {
+        if (isOnline) handleSilentSave();
+      }, 3000); // 3s idle debounce
+      return () => clearTimeout(timeoutId);
+    }
+  }, [pages, projectName, handleSilentSave, isOnline]);
+
+  // Handle page leave - vital for ensuring last changes aren't lost
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      // Trigger a silent save
+      handleSilentSave();
+
+      // Standard message for some browsers
+      if (saveStatus === 'saving') {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [handleSilentSave, saveStatus]);
+
 
   // Custom Hooks - Clipboard
   const {
@@ -1341,17 +1393,17 @@ const Sowntra = () => {
           recordingDuration={recordingDuration}
           setRecordingDuration={setRecordingDuration}
           onSaveProject={handleSaveClick}
-          onSilentSave={() => {}}
+          onSilentSave={handleSilentSave}
           loadProject={loadProject}
           projectName={projectName}
           setProjectName={setProjectName}
           pages={pages}
           canvasSize={canvasSize}
           isCreatorMode={searchParams.get('isCreatorMode') === 'true'}
-          saveStatus={'idle'}
+          saveStatus={saveStatus}
           getCanvasDataURL={getCanvasDataURL}
           isOnline={isOnline}
-          isSyncing={false}
+          isSyncing={isSyncing}
         />
 
 
