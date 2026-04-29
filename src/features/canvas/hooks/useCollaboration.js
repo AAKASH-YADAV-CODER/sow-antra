@@ -147,13 +147,19 @@ const useCollaboration = ({
     const handleSynced = () => {
       console.log('✅ Board synced');
       setIsConnected(true);
-      // Sync local state to Yjs first to ensure first user's changes are visible
+      isInitializedRef.current = true;
+
+      // Always hydrate local state from remote first.
+      // Pushing local state before this can overwrite collaborators' latest board state.
       setTimeout(() => {
-        syncToYjs();
-        // Then sync from Yjs to get any remote changes
-        setTimeout(() => {
-          syncFromYjs();
-        }, 50);
+        syncFromYjs();
+
+        // Seed a brand-new board only when remote doc is empty.
+        // This allows the first collaborator's local board to initialize shared state.
+        const remoteState = yDocRef.current?.getText('pages')?.toString();
+        if (!remoteState) {
+          syncToYjs();
+        }
       }, 100);
     };
 
@@ -194,22 +200,6 @@ const useCollaboration = ({
     collaborationService.on('connected', handleConnected);
     collaborationService.on('disconnected', handleDisconnected);
 
-    // Sync initial state to Yjs after connection is established
-    // This ensures first user's changes are visible to others
-    if (!isInitializedRef.current) {
-      // Wait for connection before initial sync
-      const initSync = () => {
-        if (collaborationService.isConnected()) {
-          syncToYjs();
-          isInitializedRef.current = true;
-        } else {
-          // Retry after connection
-          setTimeout(initSync, 100);
-        }
-      };
-      initSync();
-    }
-
     // Observe Yjs changes - debounce to avoid too many syncs
     // Only sync from Yjs if we're not applying remote changes
     let syncTimeout;
@@ -238,9 +228,12 @@ const useCollaboration = ({
       collaborationService.off('update', handleUpdate);
       collaborationService.off('connected', handleConnected);
       collaborationService.off('disconnected', handleDisconnected);
+      collaborationService.disconnect();
+      setIsConnected(false);
+      isInitializedRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boardId, currentUser, isCollaborative]);
+  }, [boardId, isCollaborative, currentUser?.uid, currentUser?.email, currentUser?.displayName]);
 
   // Sync local state to Yjs
   const syncToYjs = useCallback(() => {

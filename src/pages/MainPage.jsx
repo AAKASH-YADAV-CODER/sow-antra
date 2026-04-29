@@ -176,6 +176,10 @@ const Sowntra = () => {
   const zoomIndicatorTimeoutRef = useRef(null);
   const templateAppliedRef = useRef(false);
   const lastResizeTriggerRef = useRef(0);
+  const handleSilentSaveRef = useRef(null);
+  const previousOnlineStateRef = useRef(isOnline);
+  const syncedProjectIdRef = useRef(currentProjectId);
+  const hasDoneOnlineResyncRef = useRef(false);
 
   // --- RTC & Share ---
   const handleShareClick = () => {
@@ -405,6 +409,10 @@ const Sowntra = () => {
       setSaveStatus('error');
     }
   }, [saveProject, currentProjectId, navigate, projectName, pages]);
+
+  useEffect(() => {
+    handleSilentSaveRef.current = handleSilentSave;
+  }, [handleSilentSave]);
 
   // Comment click handler (declared before useHelpers which references it)
   const handleCommentClick = useCallback((el) => {
@@ -791,7 +799,51 @@ const Sowntra = () => {
     loadProject();
   }, [currentProjectId, currentUser, isOnline, centerCanvas]);
 
-  // Auto-sync removed as per user request
+  // Handle automatic syncing when coming back online
+  useEffect(() => {
+    if (syncedProjectIdRef.current !== currentProjectId) {
+      syncedProjectIdRef.current = currentProjectId;
+      hasDoneOnlineResyncRef.current = false;
+    }
+
+    if (!currentProjectId) {
+      previousOnlineStateRef.current = isOnline;
+      hasDoneOnlineResyncRef.current = false;
+      return;
+    }
+
+    const cameBackOnline = !previousOnlineStateRef.current && isOnline;
+    const shouldRunInitialSync = isOnline && !hasDoneOnlineResyncRef.current;
+    previousOnlineStateRef.current = isOnline;
+
+    if (!cameBackOnline && !shouldRunInitialSync) {
+      return;
+    }
+
+    hasDoneOnlineResyncRef.current = true;
+    let isCancelled = false;
+
+    const syncProject = async () => {
+      setIsSyncing(true);
+      try {
+        // If we have local unsynced changes, projectAPI.updateProject would have been skipped
+        // during offline saving. Trigger a silent save to push latest local state.
+        await handleSilentSaveRef.current?.();
+      } catch (err) {
+        console.error('Auto-sync failed:', err);
+      } finally {
+        if (!isCancelled) {
+          setIsSyncing(false);
+        }
+      }
+    };
+
+    syncProject();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isOnline, currentProjectId]);
 
   // Load transliteration data
   useEffect(() => {

@@ -4,15 +4,33 @@ import * as Y from 'yjs';
 // Extract WebSocket URL from environment or construct from API URL
 const getWebSocketURL = () => {
   if (process.env.REACT_APP_WS_URL) {
-    return process.env.REACT_APP_WS_URL;
+    return process.env.REACT_APP_WS_URL.trim();
   }
+
   // Default to production backend
-  const apiUrl = process.env.REACT_APP_API_URL || 'https://api.sowntra.com';
+  const apiUrl = (process.env.REACT_APP_API_URL || 'https://api.sowntra.com').trim();
   // Convert http:// to ws:// for WebSocket connection
   // Ensure we use ws:// for localhost, wss:// for https
   const wsUrl = apiUrl.replace(/^http/, 'ws');
   console.log('🔌 WebSocket URL:', wsUrl);
   return wsUrl;
+};
+
+const normalizeSocketOrigin = (rawUrl) => {
+  try {
+    const parsed = new URL(rawUrl);
+    const socketProtocol = parsed.protocol === 'https:'
+      ? 'wss:'
+      : parsed.protocol === 'http:'
+        ? 'ws:'
+        : parsed.protocol;
+
+    return `${socketProtocol}//${parsed.host}`;
+  } catch (error) {
+    console.warn('⚠️ Invalid WebSocket URL, using fallback parser:', rawUrl, error);
+    const fallbackUrl = rawUrl.replace(/^http/, 'ws').replace(/\/$/, '');
+    return fallbackUrl.split('/socket.io')[0];
+  }
 };
 
 const WS_URL = getWebSocketURL();
@@ -37,13 +55,9 @@ class CollaborationService {
 
     this.currentBoardId = boardId;
     
-    // Ensure we're using the correct WebSocket URL format
-    // Remove trailing slash and any namespace paths
-    let wsUrl = WS_URL.replace(/\/$/, ''); // Remove trailing slash
-    // Remove any existing socket.io path or namespace from URL
-    // Socket.IO will add /socket.io/ via the path option
-    wsUrl = wsUrl.split('/socket.io')[0];
-    wsUrl = wsUrl.split('/')[0] + '//' + wsUrl.split('//')[1]?.split('/')[0] || wsUrl;
+    // Normalize to protocol + host only.
+    // Socket.IO appends /socket.io/ itself via the path option below.
+    const wsUrl = normalizeSocketOrigin(WS_URL);
     
     console.log('🔗 Connecting to WebSocket:', wsUrl, 'for board:', boardId);
     
