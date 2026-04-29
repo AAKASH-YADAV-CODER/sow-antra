@@ -1,15 +1,9 @@
 import axios from 'axios';
 import { auth } from '../config/firebase';
 
-const isLocalhost = Boolean(
-  window.location.hostname === 'localhost' ||
-  window.location.hostname === '[::1]' ||
-  window.location.hostname.match(/^127(?:\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}$/)
-);
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:4001';
 
-const API_BASE_URL = isLocalhost ? '' : (process.env.REACT_APP_API_URL || 'https://api.sowntra.com');
-
-console.log(`[API] Initializing with baseURL: "${API_BASE_URL}" (Localhost: ${isLocalhost})`);
+console.log(`[API] Initializing with baseURL: "${API_BASE_URL}"`);
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,

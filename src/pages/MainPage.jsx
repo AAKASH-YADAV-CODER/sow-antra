@@ -7,7 +7,8 @@ import FloatingToolbar from '../components/FloatingToolbar';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { projectAPI } from '../services/api';
+import { projectAPI, invitationAPI } from '../services/api';
+import { Users, X, Loader } from 'lucide-react';
 
 // Component imports
 import RecordingStatus from '../features/canvas/components/RecordingStatus';
@@ -50,7 +51,6 @@ import useKeyboardShortcuts from '../features/canvas/hooks/useKeyboardShortcuts'
 import useHelpers from '../features/canvas/hooks/useHelpers';
 import useCollaboration from '../features/canvas/hooks/useCollaboration';
 import useOnlineStatus from '../hooks/useOnlineStatus';
-import { storage } from '../utils/storage';
 // UI Helper Components
 import CollaborationPresence from '../features/collaboration/components/CollaborationPresence';
 import ContentPlannerModal from '../features/canvas/components/modals/ContentPlannerModal';
@@ -141,6 +141,12 @@ const Sowntra = () => {
   const [showPagesStrip, setShowPagesStrip] = useState(false);
   const [showContentPlannerModal, setShowContentPlannerModal] = useState(false);
 
+  // RTC Invite Modal States
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [isInviting, setIsInviting] = useState(false);
+  const [inviteError, setInviteError] = useState('');
+
   // Persistent Timer States
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
@@ -170,6 +176,52 @@ const Sowntra = () => {
   const zoomIndicatorTimeoutRef = useRef(null);
   const templateAppliedRef = useRef(false);
   const lastResizeTriggerRef = useRef(0);
+
+  // --- RTC & Share ---
+  const handleShareClick = () => {
+    setShowInviteModal(true);
+    setInviteEmail('');
+    setInviteError('');
+    setIsInviting(false);
+  };
+
+  const handleSendInvite = async () => {
+    if (!currentProjectId) {
+      setInviteError('Please save the project first before inviting collaborators.');
+      return;
+    }
+
+    if (!inviteEmail.trim()) {
+      setInviteError('Please enter at least one email address to invite.');
+      return;
+    }
+
+    const emails = inviteEmail.split(',').map(e => e.trim()).filter(e => e);
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const invalidEmails = emails.filter(e => !emailRegex.test(e));
+    
+    if (emails.length === 0) {
+       setInviteError('Please enter at least one valid email address.');
+       return;
+    }
+    if (invalidEmails.length > 0) {
+       setInviteError(`Invalid email(s): ${invalidEmails.join(', ')}`);
+       return;
+    }
+    
+    setInviteError('');
+    setIsInviting(true);
+    
+    try {
+      await Promise.all(emails.map(email => invitationAPI.sendInvitation(currentProjectId, email, 'editor')));
+      setShowInviteModal(false);
+    } catch (err) {
+      console.error('Failed to send email invite:', err);
+      setInviteError('Failed to send invites. Please try again.');
+    } finally {
+      setIsInviting(false);
+    }
+  };
 
   // --- Hook Synchronization ---
   // Center canvas function - maximizes canvas size while maintaining aspect ratio
@@ -331,23 +383,15 @@ const Sowntra = () => {
     projectId: currentProjectId // Pass currentProjectId to hook
   });
 
-  // Silent save wrapper for background tasks
+  // Silent save wrapper for background tasks (Thumbnail generation omitted to prevent memory crashes with large images)
   const handleSilentSave = useCallback(async () => {
+    if (!pages || pages.length === 0) return;
+
     setSaveStatus('saving');
     try {
-      // Capture design snapshot before saving
-      let thumbnail = null;
-      try {
-        // Use heavily compressed jpeg at 320px width for silent saves to avoid 1MB/5MB payload limits on the backend API
-        thumbnail = await getCanvasDataURL('jpeg', 320);
-      } catch (snapshotError) {
-        console.warn('Failed to capture silent-save snapshot:', snapshotError);
-      }
-
-      const response = await saveProject({ title: projectName, thumbnail }, true);
+      const response = await saveProject({ title: projectName }, true);
       setSaveStatus('saved');
 
-      // Robust ID capture
       const newId = response?.data?.id ||
         response?.data?.project?.id ||
         response?.data?.data?.id ||
@@ -360,7 +404,7 @@ const Sowntra = () => {
       console.error('Silent save failed:', error);
       setSaveStatus('error');
     }
-  }, [saveProject, currentProjectId, navigate, getCanvasDataURL, projectName]);
+  }, [saveProject, currentProjectId, navigate, projectName, pages]);
 
   // Comment click handler (declared before useHelpers which references it)
   const handleCommentClick = useCallback((el) => {
@@ -708,42 +752,33 @@ const Sowntra = () => {
         return; 
       }
 
-      // 1. Try to load from Local Storage (IndexedDB) first for speed and offline access
-      try {
-        const localProject = await storage.getProject(currentProjectId);
-        if (localProject) {
-          console.log('Loaded project from local storage');
-          if (localProject.pages) setPages(localProject.pages);
-          if (localProject.currentPage) setCurrentPage(localProject.currentPage);
-          if (localProject.canvasSize) setCanvasSize(localProject.canvasSize);
-          if (localProject.projectName) setProjectName(localProject.projectName);
-          if (localProject.currentLanguage) setCurrentLanguage(localProject.currentLanguage);
-          if (localProject.textDirection) setTextDirection(localProject.textDirection);
-          
-          setTimeout(() => centerCanvas(), 100);
-        }
-      } catch (err) {
-        console.warn('Failed to load from local storage:', err);
-      }
-
-      // 2. If online, try to fetch the absolute latest from the cloud
+      // Load directly from the cloud
       if (isOnline && currentUser) {
         try {
           const { auth } = await import('../config/firebase');
           if (!auth.currentUser) return;
 
           const response = await projectAPI.loadProject(currentProjectId);
-          const { projectData } = response.data;
+          
+          // Robust data extraction from various possible response structures
+          const fetchedData = response.data?.projectData || 
+                            response.data?.project || 
+                            response.data?.data || 
+                            response.data;
 
-          if (projectData) {
-            // Only update if cloud version is different or local didn't exist
-            setPages(projectData.pages || []);
-            setCurrentPage(projectData.currentPage || 'page-1');
-            setCanvasSize(projectData.canvasSize || { width: 800, height: 600 });
-            if (projectData.title) setProjectName(projectData.title);
+          if (fetchedData) {
+            // CRITICAL: Only update pages if we actually received non-empty pages
+            // This prevents the "0/0 pages" issue if the API returns a partial or empty object
+            if (fetchedData.pages && Array.isArray(fetchedData.pages) && fetchedData.pages.length > 0) {
+              console.log('Syncing cloud pages to state');
+              setPages(fetchedData.pages);
+            }
             
-            // Save this latest version to local too
-            storage.saveProject({ id: currentProjectId, ...projectData });
+            if (fetchedData.currentPage) setCurrentPage(fetchedData.currentPage);
+            if (fetchedData.canvasSize) setCanvasSize(fetchedData.canvasSize);
+            
+            const fetchedTitle = fetchedData.title || fetchedData.projectName || fetchedData.name;
+            if (fetchedTitle) setProjectName(fetchedTitle);
             
             setTimeout(() => centerCanvas(), 200);
           }
@@ -756,25 +791,7 @@ const Sowntra = () => {
     loadProject();
   }, [currentProjectId, currentUser, isOnline, centerCanvas]);
 
-  // Handle automatic syncing when coming back online
-  useEffect(() => {
-    if (isOnline && currentProjectId) {
-      const syncProject = async () => {
-        setIsSyncing(true);
-        try {
-          // If we have local unsynced changes, projectAPI.updateProject would have been skipped 
-          // during offline saving. Let's trigger a silent save to push the latest local state.
-          await handleSilentSave();
-        } catch (err) {
-          console.error('Auto-sync failed:', err);
-        } finally {
-          setIsSyncing(false);
-        }
-      };
-      
-      syncProject();
-    }
-  }, [isOnline, currentProjectId, handleSilentSave]);
+  // Auto-sync removed as per user request
 
   // Load transliteration data
   useEffect(() => {
@@ -1139,7 +1156,9 @@ const Sowntra = () => {
     updateElement,
     deleteElement,
     isCollaborative,
-    textEditing
+    textEditing,
+    canvasSize,
+    setCanvasSize
   });
 
   // Enhanced cursor tracking for canvas
@@ -1207,11 +1226,11 @@ const Sowntra = () => {
     // Only auto-save if there are elements or a non-default name
     if (pages.some(p => p.elements.length > 0) || (projectName && projectName !== 'Untitled project')) {
       const timeoutId = setTimeout(async () => {
-        handleSilentSave();
-      }, 1500); // 1.5s idle debounce for heavier saving (including thumbnail)
+        if (isOnline) handleSilentSave();
+      }, 3000); // 3s idle debounce
       return () => clearTimeout(timeoutId);
     }
-  }, [pages, projectName, handleSilentSave]);
+  }, [pages, projectName, handleSilentSave, isOnline]);
 
   // Handle page leave - vital for ensuring last changes aren't lost
   useEffect(() => {
@@ -1229,6 +1248,7 @@ const Sowntra = () => {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [handleSilentSave, saveStatus]);
+
 
   // Custom Hooks - Clipboard
   const {
@@ -1439,6 +1459,8 @@ const Sowntra = () => {
           getCanvasDataURL={getCanvasDataURL}
           isOnline={isOnline}
           isSyncing={isSyncing}
+          onShareClick={handleShareClick}
+          isCollaborative={isCollaborative}
         />
 
 
@@ -1898,6 +1920,75 @@ const Sowntra = () => {
             canvasOffset={canvasOffset}
             canvasRef={canvasRef}
           />
+        )}
+
+        {/* Invite/Share Modal */}
+        {showInviteModal && (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[100]">
+            <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+              <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                <h3 className="text-xl font-extrabold text-[#0e1217]">
+                  Share & Invite
+                </h3>
+                <button
+                  onClick={() => setShowInviteModal(false)}
+                  className="p-2 hover:bg-gray-200 rounded-full transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-6 bg-white space-y-6">
+                <div className="text-center mb-2">
+                  <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4 text-indigo-600">
+                    <Users size={32} />
+                  </div>
+                  <p className="text-gray-500 font-medium text-sm">
+                    Enter email addresses separated by commas to invite your team to this collaborative design.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-bold text-gray-700">Email Addresses</label>
+                  <input
+                    type="text"
+                    placeholder="colleague1@example.com, colleague2@example.com"
+                    className={`w-full h-12 px-4 bg-gray-50 border ${inviteError ? 'border-red-400 focus:ring-red-500' : 'border-gray-200 focus:ring-indigo-500'} rounded-xl focus:ring-2 outline-none transition-all font-medium`}
+                    value={inviteEmail}
+                    onChange={(e) => {
+                      setInviteEmail(e.target.value);
+                      if (inviteError) setInviteError('');
+                    }}
+                    onKeyDown={(e) => {
+                      e.stopPropagation();
+                      if (e.key === 'Enter' && !isInviting) handleSendInvite();
+                    }}
+                    disabled={isInviting}
+                    autoFocus
+                  />
+                  {inviteError && <p className="text-red-500 text-xs font-bold mt-1">{inviteError}</p>}
+                  {!currentProjectId && !inviteError && (
+                    <p className="text-amber-500 text-xs font-bold mt-1">Please save the project first.</p>
+                  )}
+                </div>
+
+                <button
+                  onClick={handleSendInvite}
+                  disabled={isInviting || !currentProjectId}
+                  className="w-full h-12 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-lg shadow-indigo-100 transition-all transform active:scale-[0.98] flex items-center justify-center gap-2"
+                >
+                  {isInviting ? (
+                    <>
+                      <Loader size={18} className="animate-spin" />
+                      Sending Invites...
+                    </>
+                  ) : (
+                    'Send Invites'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </>

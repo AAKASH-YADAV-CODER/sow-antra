@@ -15,8 +15,16 @@ const CollaborationPresence = ({
   canvasOffset = { x: 0, y: 0 },
   canvasRef
 }) => {
-  // Get unique users (avoid duplicates)
+  // Get unique users (avoid duplicates and exclude current user)
   const uniqueUsers = activeUsers.reduce((acc, user) => {
+    // Exclude current user from the "collaborators" list
+    if (currentUser && (
+      (user.userId && user.userId === currentUser.uid) ||
+      (user.userEmail && user.userEmail === currentUser.email)
+    )) {
+      return acc;
+    }
+
     if (!acc.find(u => u.userId === user.userId || u.socketId === user.socketId)) {
       acc.push(user);
     }

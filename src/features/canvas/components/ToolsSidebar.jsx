@@ -23,7 +23,7 @@ import {
   Camera,
   Palette,
   Zap,
-  RotateCcw
+  Layers
 } from 'lucide-react';
 import { shapeCategories } from '../../../config/shapesLibrary';
 import { frameCategories } from '../../../config/frameLibrary';
@@ -50,6 +50,7 @@ import { TypeWarpPanel } from './TypeWarpPanel';
 import DuotonePanel from './DuotonePanel';
 import MagicResizePanel from './MagicResizePanel';
 import RGBGlitchPanel from './RGBGlitchPanel';
+import DoubleExposurePanel from './DoubleExposurePanel';
 
 /**
  * ToolsSidebar Component
@@ -1206,6 +1207,23 @@ const ToolsSidebar = ({
 
                   <div
                     onClick={() => {
+                      setActivePanel('doubleExposure');
+                      setActiveSidePanel('doubleExposure');
+                    }}
+                    className="group flex items-center gap-4 p-4 bg-white border border-gray-100 rounded-2xl hover:border-indigo-500 hover:shadow-xl transition-all cursor-pointer overflow-hidden relative"
+                  >
+                    <div className="w-14 h-14 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                      <Layers size={28} className="group-hover:scale-110 transition-transform" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">Double Exposure</h4>
+                      <p className="text-xs text-gray-500">Artistly blend two images for cinematic look</p>
+                    </div>
+                    <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded">PRO</div>
+                  </div>
+
+                  <div
+                    onClick={() => {
                       setActivePanel('meshGradient');
                       setActiveSidePanel('meshGradient');
                     }}
@@ -1546,6 +1564,17 @@ const ToolsSidebar = ({
                 selectedElementData={selectedElementData}
                 updateElement={updateElement}
                 addElement={addElement}
+              />
+            )}
+
+            {activePanel === 'doubleExposure' && (
+              <DoubleExposurePanel
+                isOpen={true}
+                onClose={() => setActivePanel('elements')}
+                selectedElement={selectedElement}
+                selectedElementData={selectedElementData}
+                addElement={addElement}
+                uploads={uploads}
               />
             )}
 

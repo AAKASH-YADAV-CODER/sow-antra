@@ -21,7 +21,7 @@ const SignupPage = () => {
             if (response.data.success) {
               localStorage.removeItem('pending_invitation_token');
               if (response.data.board) {
-                navigate(`/whiteboard/${response.data.board.id}`, { replace: true });
+                navigate(`/main?project=${response.data.board.id}`, { replace: true });
                 return;
               }
             }

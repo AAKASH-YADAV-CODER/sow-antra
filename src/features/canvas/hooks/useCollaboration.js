@@ -18,7 +18,9 @@ const useCollaboration = ({
   updateElement,
   deleteElement,
   isCollaborative = false,
-  textEditing = null
+  textEditing = null,
+  canvasSize,
+  setCanvasSize
 }) => {
   const [activeUsers, setActiveUsers] = useState([]);
   const [cursors, setCursors] = useState(new Map());
@@ -54,6 +56,7 @@ const useCollaboration = ({
 
     // Create Yjs Text for storing page data as JSON
     const pagesText = yDoc.getText('pages');
+    const canvasSizeText = yDoc.getText('canvasSize');
 
     // Listen to collaboration events
     const handleActiveUsers = (users) => {
@@ -221,10 +224,12 @@ const useCollaboration = ({
     };
 
     pagesText.observe(observer);
+    canvasSizeText.observe(observer);
 
     return () => {
       clearTimeout(syncTimeout);
       pagesText.unobserve(observer);
+      canvasSizeText.unobserve(observer);
       collaborationService.off('active-users', handleActiveUsers);
       collaborationService.off('user-joined', handleUserJoined);
       collaborationService.off('user-left', handleUserLeft);
@@ -261,6 +266,8 @@ const useCollaboration = ({
       const pagesText = yDocRef.current.getText('pages');
       const currentData = pagesText.toString();
 
+      let updateNeeded = false;
+
       // Only update if data has changed (avoid infinite loops)
       // But don't check lastSyncRef here - let it update to allow initiator to see changes
       if (currentData !== newData) {
@@ -276,19 +283,35 @@ const useCollaboration = ({
 
         // Clear pending elements since they're now synced
         pendingLocalElementsRef.current.clear();
+        updateNeeded = true;
+      }
 
+      if (canvasSize) {
+        const canvasSizeText = yDocRef.current.getText('canvasSize');
+        const currentSizeStr = canvasSizeText.toString();
+        const newSizeStr = JSON.stringify(canvasSize);
+        if (currentSizeStr !== newSizeStr) {
+          yDocRef.current.transact(() => {
+            canvasSizeText.delete(0, canvasSizeText.length);
+            canvasSizeText.insert(0, newSizeStr);
+          });
+          updateNeeded = true;
+        }
+      }
+
+      if (updateNeeded) {
         // Send update to server
         const update = Y.encodeStateAsUpdate(yDocRef.current);
         collaborationService.sendUpdate(update);
 
-        console.log('✅ Synced to Yjs:', { pageCount: pagesData.length, currentPage, elementCount: pagesData[0]?.elements?.length || 0 });
+        console.log('✅ Synced to Yjs:', { pageCount: pagesData.length, currentPage, elementCount: pagesData[0]?.elements?.length || 0, canvasSize });
       }
     } catch (error) {
       console.error('Error syncing to Yjs:', error);
       // Reset flag on error
       isApplyingRemoteChangeRef.current = false;
     }
-  }, [pages, currentPage, isCollaborative]);
+  }, [pages, currentPage, isCollaborative, canvasSize]);
 
   // Sync from Yjs to local state
   const syncFromYjs = useCallback(() => {
@@ -305,6 +328,35 @@ const useCollaboration = ({
     try {
       const pagesText = yDocRef.current.getText('pages');
       const pagesDataStr = pagesText.toString();
+
+      const canvasSizeText = yDocRef.current.getText('canvasSize');
+      const canvasSizeStr = canvasSizeText.toString();
+
+      let isApplyingRemoteChangeLocal = false;
+
+      if (canvasSizeStr && canvasSizeStr !== 'undefined' && setCanvasSize) {
+        try {
+          const remoteCanvasSize = JSON.parse(canvasSizeStr);
+          setCanvasSize(prev => {
+            if (JSON.stringify(prev) !== canvasSizeStr) {
+              console.log('🔄 Updating canvas size from remote', remoteCanvasSize);
+              // Set the ref to true so the effect doesn't immediately send it back
+              isApplyingRemoteChangeRef.current = true;
+              isApplyingRemoteChangeLocal = true;
+              
+              // Reset it after state has a chance to update
+              setTimeout(() => {
+                isApplyingRemoteChangeRef.current = false;
+              }, 150);
+              
+              return remoteCanvasSize;
+            }
+            return prev;
+          });
+        } catch(e) {
+          console.error('Error parsing collaborative canvas size:', e);
+        }
+      }
 
       // Skip if this is the same data we already processed
       if (pagesDataStr === lastSyncRef.current && lastSyncRef.current) {
@@ -553,6 +605,24 @@ const useCollaboration = ({
     return () => clearTimeout(timeoutId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, isCollaborative]);
+
+  // Sync when canvas size changes
+  useEffect(() => {
+    if (!isCollaborative || !isInitializedRef.current) return;
+
+    // Only sync if we're not currently applying a remote change
+    // This prevents the infinite loop: remote sync -> local state update -> sync back to remote
+    if (isApplyingRemoteChangeRef.current) {
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      syncToYjs();
+    }, 150);
+
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvasSize, isCollaborative]);
 
   return {
     activeUsers,

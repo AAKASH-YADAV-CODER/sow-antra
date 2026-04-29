@@ -86,10 +86,10 @@ const InviteAcceptPage = () => {
       if (response.data.success) {
         setStatus('accepted');
 
-        // Redirect to whiteboard after a short delay
+        // Redirect to main design editor after a short delay
         setTimeout(() => {
           if (response.data.board) {
-            navigate(`/whiteboard/${response.data.board.id}`);
+            navigate(`/main?project=${response.data.board.id}`);
           } else {
             navigate('/home');
           }

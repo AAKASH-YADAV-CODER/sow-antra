@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ArrowRight, FolderOpen, Trash2, Plus, Search, X, Layout, Monitor, Smartphone, Palette, FileText, ChevronLeft } from 'lucide-react';
 import { socialMediaTemplates } from '../utils/constants';
-import { projectAPI, boardAPI } from '../services/api';
+import { projectAPI, boardAPI, invitationAPI } from '../services/api';
 import { editableTemplates, templateCategories } from '../config/editableTemplates';
-import { LayoutTemplate, Home, Settings, Award, Users } from 'lucide-react';
+import { LayoutTemplate, Home, Settings, Award, Users, Loader } from 'lucide-react';
 
 const HomePage = () => {
   const { currentUser, logout } = useAuth();
@@ -13,6 +13,10 @@ const HomePage = () => {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreatePopup, setShowCreatePopup] = useState(false);
+  const [showRTCPopup, setShowRTCPopup] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [isInviting, setIsInviting] = useState(false);
+  const [inviteError, setInviteError] = useState('');
   const [isCustomSizeView, setIsCustomSizeView] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [customDimensions, setCustomDimensions] = useState({
@@ -284,7 +288,68 @@ const HomePage = () => {
     }
   };
 
-  // Unused handleTeamCollaboration removed for ESLint
+  const handleTeamCollaborationClick = () => {
+    setShowRTCPopup(true);
+    setInviteEmail('');
+    setInviteError('');
+    setIsInviting(false);
+  };
+
+  const handleSendInviteAndCreate = async () => {
+    if (!inviteEmail.trim()) {
+      setInviteError('Please enter at least one email address to invite.');
+      return;
+    }
+    
+    const emails = inviteEmail.split(',').map(e => e.trim()).filter(e => e);
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const invalidEmails = emails.filter(e => !emailRegex.test(e));
+    
+    if (emails.length === 0) {
+       setInviteError('Please enter at least one valid email address.');
+       return;
+    }
+    if (invalidEmails.length > 0) {
+       setInviteError(`Invalid email(s): ${invalidEmails.join(', ')}`);
+       return;
+    }
+    
+    setInviteError('');
+    setIsInviting(true);
+    
+    try {
+      // 1. Create a new board/workspace for collaboration
+      const response = await boardAPI.createBoard({
+        title: `${currentUser?.displayName || 'My'} Workspace`,
+        description: `Collaborative workspace with ${emails.length > 1 ? 'team' : emails[0]}`,
+        isPublic: false
+      });
+      const boardId = response.data?.id || response.data?._id;
+      
+      if (boardId) {
+         // 2. Send the actual email invite(s) using the backend API
+         try {
+           await Promise.all(emails.map(email => invitationAPI.sendInvitation(boardId, email, 'editor')));
+         } catch (inviteErr) {
+           console.error('Failed to send email invite:', inviteErr);
+           // We silently fail the email sending to ensure the workspace still opens without ugly alerts.
+         }
+         
+         // 3. Open in Main Design editor
+         setShowRTCPopup(false);
+         window.open(`/main?project=${boardId}`, '_blank');
+      } else {
+         setShowRTCPopup(false);
+         window.open(`/main?project=local_${Date.now()}`, '_blank');
+      }
+    } catch (err) {
+      console.error('Failed to create collaboration board:', err);
+      setShowRTCPopup(false);
+      window.open(`/main?project=local_${Date.now()}`, '_blank');
+    } finally {
+      setIsInviting(false);
+    }
+  };
 
   const getUserInitial = () => {
     if (currentUser?.displayName) {
@@ -323,7 +388,7 @@ const HomePage = () => {
             </button>
             <nav className="hidden md:flex items-center gap-6">
               <button onClick={handleMyProjects} className="text-sm font-semibold text-gray-600 hover:text-[#8b3dff] transition-colors">Projects</button>
-              <button className="text-sm font-semibold text-gray-600 hover:text-[#8b3dff] transition-colors">RTC</button>
+              <button onClick={handleTeamCollaborationClick} className="text-sm font-semibold text-gray-600 hover:text-[#8b3dff] transition-colors">RTC</button>
             </nav>
             <div className="w-px h-6 bg-gray-200 mx-2 hidden md:block" />
             <div className="flex items-center gap-3 cursor-pointer group">
@@ -852,7 +917,70 @@ const HomePage = () => {
         </div>
       )}
 
-      {/* Modal removed to use Tab-only interface */}
+      {/* RTC Invite Popup */}
+      {showRTCPopup && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[100]">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <h3 className="text-xl font-extrabold text-[#0e1217]">
+                Invite to Collaborate
+              </h3>
+              <button
+                onClick={() => setShowRTCPopup(false)}
+                className="p-2 hover:bg-gray-200 rounded-full transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 bg-white space-y-6">
+              <div className="text-center mb-2">
+                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 text-[#8b3dff]">
+                  <Users size={32} />
+                </div>
+                <p className="text-gray-500 font-medium text-sm">
+                  Enter email addresses separated by commas to invite your team to a real-time collaborative design session.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-bold text-gray-700">Email Addresses</label>
+                <input
+                  type="text"
+                  placeholder="colleague1@example.com, colleague2@example.com"
+                  className={`w-full h-12 px-4 bg-gray-50 border ${inviteError ? 'border-red-400 focus:ring-red-500' : 'border-gray-200 focus:ring-purple-500'} rounded-xl focus:ring-2 outline-none transition-all font-medium`}
+                  value={inviteEmail}
+                  onChange={(e) => {
+                    setInviteEmail(e.target.value);
+                    if (inviteError) setInviteError('');
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !isInviting) handleSendInviteAndCreate();
+                  }}
+                  disabled={isInviting}
+                  autoFocus
+                />
+                {inviteError && <p className="text-red-500 text-xs font-bold mt-1">{inviteError}</p>}
+              </div>
+
+              <button
+                onClick={handleSendInviteAndCreate}
+                disabled={isInviting}
+                className="w-full h-12 bg-[#8b3dff] hover:bg-[#7a34e5] disabled:bg-purple-300 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-lg shadow-purple-100 transition-all transform active:scale-[0.98] flex items-center justify-center gap-2"
+              >
+                {isInviting ? (
+                  <>
+                    <Loader size={18} className="animate-spin" />
+                    Sending Invite...
+                  </>
+                ) : (
+                  'Send Invite & Start Session'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
