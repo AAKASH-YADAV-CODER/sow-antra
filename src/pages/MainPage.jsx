@@ -348,7 +348,8 @@ const Sowntra = () => {
     canvasSize,
     imageEffects,
     backgroundColor: pages.find(p => p.id === currentPage)?.backgroundGradient || canvasBackgroundColor,
-    projectName
+    projectName,
+    pages  // pass all pages for multi-page video export
   });
 
   // Custom Hooks - Project Management (Save/Load)

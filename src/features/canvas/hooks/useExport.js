@@ -8,15 +8,17 @@ import {
 
 /**
  * Custom hook for handling canvas export functionality
- * Provides methods to export canvas as SVG, Image (PNG/JPG), or PDF
- * 
+ * Provides methods to export canvas as SVG, Image (PNG/JPG), PDF, and Video
+ *
  * @param {Function} getCurrentPageElements - Function to get current page elements
  * @param {Object} canvasSize - Canvas dimensions {width, height}
  * @param {Object} imageEffects - Image effects configuration
  * @param {string} backgroundColor - Canvas background color
+ * @param {string} projectName - Project name used for file naming
+ * @param {Array} pages - All pages array for multi-page video export
  * @returns {Object} Export functions
  */
-const useExport = ({ getCurrentPageElements, canvasSize, imageEffects, backgroundColor, projectName }) => {
+const useExport = ({ getCurrentPageElements, canvasSize, imageEffects, backgroundColor, projectName, pages }) => {
 
   // Sanitize project name for filename
   const getSanitizedFilename = useCallback(() => {
@@ -48,34 +50,80 @@ const useExport = ({ getCurrentPageElements, canvasSize, imageEffects, backgroun
   // Get export-ready elements with proper filtering
   const getExportReadyElements = useCallback(() => {
     const currentElements = getCurrentPageElements();
-
     return [...currentElements]
       .sort((a, b) => {
-        // First, sort by zIndex
-        if (a.zIndex !== b.zIndex) {
-          return a.zIndex - b.zIndex;
-        }
-
-        // If same zIndex, maintain original order
+        if (a.zIndex !== b.zIndex) return a.zIndex - b.zIndex;
         return currentElements.indexOf(a) - currentElements.indexOf(b);
       })
-      .filter(element => {
-        // Include all elements except temporary ones
-        return !element.isTemporary;
-      });
+      .filter(element => !element.isTemporary);
   }, [getCurrentPageElements]);
+
+  // Export as Video — passes ALL pages so multi-page timelines render correctly
+  const exportAsVideo = useCallback((duration, onProgress, format = 'video/webm', videoQuality = 'medium') => {
+    const filename = getSanitizedFilename();
+
+    // Build a flat list of elements tagged with their page's time offset.
+    // This allows the renderer to know WHEN each element should appear.
+    let allElements = [];
+    if (pages && pages.length > 0) {
+      let pageStartTime = 0;
+      pages.forEach(page => {
+        const pageDuration = page.duration || 5;
+        const pageElements = (page.elements || []).filter(el => !el.isTemporary);
+        pageElements.forEach(el => {
+          allElements.push({
+            ...el,
+            // Absolute start/end times in the full video timeline
+            _pageStartTime: pageStartTime,
+            _pageEndTime: pageStartTime + pageDuration,
+            _pageDuration: pageDuration,
+            _pageBg: page.backgroundGradient || page.backgroundColor || '#ffffff'
+          });
+        });
+        pageStartTime += pageDuration;
+      });
+    } else {
+      // Fallback: single page
+      allElements = getCurrentPageElements().filter(el => !el.isTemporary);
+    }
+
+    // Collect audio elements across ALL pages
+    const audioElements = [];
+    if (pages && pages.length > 0) {
+      let pageStartTime = 0;
+      pages.forEach(page => {
+        const pageDuration = page.duration || 5;
+        (page.elements || []).forEach(el => {
+          if (el.type === 'audio' && el.src) {
+            audioElements.push({ ...el, startTime: (el.startTime || 0) + pageStartTime });
+          }
+        });
+        pageStartTime += pageDuration;
+      });
+    }
+
+    return import('../../../utils/canvasExport').then(module => {
+      return module.exportAsVideo(
+        allElements,
+        canvasSize,
+        imageEffects,
+        duration,
+        onProgress,
+        format,
+        backgroundColor,
+        videoQuality,
+        filename,
+        pages || [],        // pass pages for per-page background colors
+        audioElements       // explicit global audio list
+      );
+    });
+  }, [pages, getCurrentPageElements, canvasSize, imageEffects, backgroundColor, getSanitizedFilename]);
 
   return {
     exportAsSVG,
     exportAsImage,
     exportAsPDF,
-    exportAsVideo: useCallback((duration, onProgress, format = 'video/webm', videoQuality = 'medium') => {
-      const currentElements = getCurrentPageElements();
-      const filename = getSanitizedFilename();
-      return import('../../../utils/canvasExport').then(module => {
-        return module.exportAsVideo(currentElements, canvasSize, imageEffects, duration, onProgress, format, backgroundColor, videoQuality, filename);
-      });
-    }, [getCurrentPageElements, canvasSize, imageEffects, backgroundColor, getSanitizedFilename]),
+    exportAsVideo,
     getExportReadyElements,
     getCanvasDataURL: useCallback(async (format = 'png', maxWidth = 480) => {
       const currentElements = getCurrentPageElements();

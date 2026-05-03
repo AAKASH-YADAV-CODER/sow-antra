@@ -2311,7 +2311,7 @@ export const exportAsPDF = async (elements, canvasSize, imageEffects = {}, backg
 /**
  * Export canvas as Video (WebM)
  */
-export const exportAsVideo = async (elements, canvasSize, imageEffects = {}, duration = 5000, onProgress, mimeType = 'video/webm', backgroundColor = '#ffffff', videoQuality = 'medium', filename = 'sowntra-design') => {
+export const exportAsVideo = async (elements, canvasSize, imageEffects = {}, duration = 5000, onProgress, mimeType = 'video/webm', backgroundColor = '#ffffff', videoQuality = 'medium', filename = 'sowntra-design', pages = [], audioElements = []) => {
   // Determine target resolution
   let videoWidth = canvasSize.width;
   let videoHeight = canvasSize.height;
@@ -2339,8 +2339,31 @@ export const exportAsVideo = async (elements, canvasSize, imageEffects = {}, dur
   canvas.height = videoHeight;
   const ctx = canvas.getContext('2d');
 
+  // Build per-page background lookup from pages array
+  const pageBackgrounds = [];
+  if (pages && pages.length > 0) {
+    let t = 0;
+    pages.forEach(page => {
+      pageBackgrounds.push({
+        start: t,
+        end: t + (page.duration || 5),
+        bg: page.backgroundGradient || page.backgroundColor || '#ffffff'
+      });
+      t += (page.duration || 5);
+    });
+  }
+
+  const getBgForTime = (elapsedSec) => {
+    for (const pb of pageBackgrounds) {
+      if (elapsedSec >= pb.start && elapsedSec < pb.end) return pb.bg;
+    }
+    return backgroundColor;
+  };
+
   // Helper to draw a single frame
   const drawFrame = (elapsed) => {
+    const elapsedSec = elapsed / 1000;
+
     // Reset context state to absolute defaults to prevent state leakage between frames
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
@@ -2350,11 +2373,12 @@ export const exportAsVideo = async (elements, canvasSize, imageEffects = {}, dur
     const scale = videoWidth / canvasSize.width;
     ctx.scale(scale, scale);
 
-    // Clear and draw background (in original coordinates because of scale)
-    if (typeof backgroundColor === 'object' && backgroundColor !== null) {
+    // Draw per-page background
+    const currentBg = getBgForTime(elapsedSec);
+    if (typeof currentBg === 'object' && currentBg !== null) {
       const bgGradient = getCanvasGradient(ctx, {
         fillType: 'gradient',
-        gradient: backgroundColor,
+        gradient: currentBg,
         width: canvasSize.width,
         height: canvasSize.height,
         x: 0,
@@ -2362,14 +2386,29 @@ export const exportAsVideo = async (elements, canvasSize, imageEffects = {}, dur
       });
       ctx.fillStyle = bgGradient;
     } else {
-      ctx.fillStyle = backgroundColor || '#ffffff';
+      ctx.fillStyle = currentBg || '#ffffff';
     }
     ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
 
-    const sortedElements = getSortedElementsForExport(elements);
+    // Filter only elements visible at this time
+    // Elements with _pageStartTime are multi-page tagged elements from useExport
+    const visibleElements = elements.filter(element => {
+      if (element.type === 'audio') return false;
+      if (element._pageStartTime !== undefined && element._pageEndTime !== undefined) {
+        return elapsedSec >= element._pageStartTime && elapsedSec < element._pageEndTime;
+      }
+      return true; // single-page fallback
+    });
+
+    const sortedElements = getSortedElementsForExport(visibleElements);
     sortedElements.forEach((element, idx) => {
       if (element) {
-        drawElementToCanvas(ctx, element, elapsed / 1000, idx, imageEffects);
+        // Use local page time for animation so animations always play from 0 within each page
+        let localTime = elapsedSec;
+        if (element._pageStartTime !== undefined) {
+          localTime = elapsedSec - element._pageStartTime;
+        }
+        drawElementToCanvas(ctx, element, localTime, idx, imageEffects);
       }
     });
   };
@@ -2381,10 +2420,43 @@ export const exportAsVideo = async (elements, canvasSize, imageEffects = {}, dur
   // MP4 Export using VideoEncoder + mp4-muxer
   if (mimeType === 'video/mp4' && 'VideoEncoder' in window) {
     try {
+      // Extract and mix audio if present
+      let mixedAudioBuffer = null;
+      // Use pre-collected audioElements from useExport, or fall back to filtering from elements
+      const effectiveAudioElsMP4 = (audioElements && audioElements.length > 0)
+        ? audioElements
+        : elements.filter(el => el.type === 'audio' && el.src);
+      if (effectiveAudioElsMP4.length > 0 && window.OfflineAudioContext) {
+        try {
+          const sampleRate = 44100;
+          const durationSec = duration / 1000;
+          const offlineCtx = new window.OfflineAudioContext(2, Math.ceil(sampleRate * durationSec), sampleRate);
+          
+          const fetchPromises = effectiveAudioElsMP4.map(async (el) => {
+            try {
+              const res = await fetch(el.src);
+              const arr = await res.arrayBuffer();
+              const buf = await offlineCtx.decodeAudioData(arr);
+              const srcNode = offlineCtx.createBufferSource();
+              srcNode.buffer = buf;
+              srcNode.connect(offlineCtx.destination);
+              srcNode.start(el.startTime || 0);
+            } catch (err) {
+              console.error("Audio decode error for", el.src, err);
+            }
+          });
+          
+          await Promise.all(fetchPromises);
+          mixedAudioBuffer = await offlineCtx.startRendering();
+        } catch (err) {
+          console.error("Audio mixing failed:", err);
+        }
+      }
+
       const fps = 30;
       const totalFrames = Math.ceil((duration / 1000) * fps);
 
-      let muxer = new Mp4Muxer.Muxer({
+      let muxerOptions = {
         target: new Mp4Muxer.ArrayBufferTarget(),
         video: {
           codec: 'avc',
@@ -2392,7 +2464,17 @@ export const exportAsVideo = async (elements, canvasSize, imageEffects = {}, dur
           height: videoHeight
         },
         fastStart: 'in-memory'
-      });
+      };
+
+      if (mixedAudioBuffer) {
+        muxerOptions.audio = {
+          codec: 'aac',
+          sampleRate: mixedAudioBuffer.sampleRate,
+          numberOfChannels: mixedAudioBuffer.numberOfChannels
+        };
+      }
+
+      let muxer = new Mp4Muxer.Muxer(muxerOptions);
 
       let videoEncoder = new window.VideoEncoder({
         output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
@@ -2405,6 +2487,20 @@ export const exportAsVideo = async (elements, canvasSize, imageEffects = {}, dur
         height: videoHeight,
         bitrate: (videoQuality === 'high' || videoQuality === '1080p') ? 10_000_000 : 4_000_000
       });
+
+      let audioEncoder = null;
+      if (mixedAudioBuffer && 'AudioEncoder' in window) {
+        audioEncoder = new window.AudioEncoder({
+          output: (chunk, meta) => muxer.addAudioChunk(chunk, meta),
+          error: (e) => console.error("AudioEncoder error:", e)
+        });
+        audioEncoder.configure({
+          codec: 'mp4a.40.2',
+          sampleRate: mixedAudioBuffer.sampleRate,
+          numberOfChannels: mixedAudioBuffer.numberOfChannels,
+          bitrate: 128000
+        });
+      }
 
       for (let i = 0; i < totalFrames; i++) {
         const elapsed = (i / fps) * 1000;
@@ -2420,6 +2516,33 @@ export const exportAsVideo = async (elements, canvasSize, imageEffects = {}, dur
 
         // Yield to event loop to prevent freezing - less frequently for speed
         if (i % 5 === 0) await new Promise(r => setTimeout(r, 0));
+      }
+
+      if (audioEncoder && mixedAudioBuffer && 'AudioData' in window) {
+        const sampleRate = mixedAudioBuffer.sampleRate;
+        const numChannels = mixedAudioBuffer.numberOfChannels;
+        const length = mixedAudioBuffer.length;
+        const framesPerChunk = 1024;
+
+        for (let i = 0; i < length; i += framesPerChunk) {
+          const frames = Math.min(framesPerChunk, length - i);
+          const planarData = new Float32Array(frames * numChannels);
+          for (let c = 0; c < numChannels; c++) {
+            const channelData = mixedAudioBuffer.getChannelData(c);
+            planarData.set(channelData.subarray(i, i + frames), c * frames);
+          }
+          const audioData = new window.AudioData({
+            format: 'f32-planar',
+            sampleRate: sampleRate,
+            numberOfFrames: frames,
+            numberOfChannels: numChannels,
+            timestamp: (i / sampleRate) * 1000000,
+            data: planarData
+          });
+          audioEncoder.encode(audioData);
+          audioData.close();
+        }
+        await audioEncoder.flush();
       }
 
       await videoEncoder.flush();
@@ -2443,14 +2566,43 @@ export const exportAsVideo = async (elements, canvasSize, imageEffects = {}, dur
 
   // --- Fallback / WebM Logic (MediaRecorder) ---
 
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     if (!window.MediaRecorder) {
       alert("Video export is not supported in this browser.");
       reject("MediaRecorder not supported");
       return;
     }
 
-    const stream = canvas.captureStream(30); // 30 FPS
+    const videoStream = canvas.captureStream(30); // 30 FPS
+
+    let audioCtx = null;
+    let audioDest = null;
+    let audioSources = [];
+
+    const effectiveAudioElsWebM = (audioElements && audioElements.length > 0)
+      ? audioElements
+      : elements.filter(el => el.type === 'audio' && el.src);
+    if (effectiveAudioElsWebM.length > 0) {
+      try {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        audioDest = audioCtx.createMediaStreamDestination();
+        
+        for (const el of effectiveAudioElsWebM) {
+          const audioEl = new window.Audio(el.src);
+          audioEl.crossOrigin = 'anonymous';
+          const source = audioCtx.createMediaElementSource(audioEl);
+          source.connect(audioDest);
+          audioSources.push(audioEl);
+        }
+      } catch (err) {
+        console.error("Failed to setup MediaRecorder audio:", err);
+      }
+    }
+
+    const stream = audioDest ? new MediaStream([
+      ...videoStream.getVideoTracks(),
+      ...audioDest.stream.getAudioTracks()
+    ]) : videoStream;
 
     // Helper logic for MIME type selection (same as before)
     let options = { mimeType: 'video/webm;codecs=vp9' };
@@ -2501,6 +2653,7 @@ export const exportAsVideo = async (elements, canvasSize, imageEffects = {}, dur
     };
 
     recorder.start();
+    audioSources.forEach(a => a.play().catch(e => console.error("Audio play error", e)));
     let startTime = null;
     const animate = (timestamp) => {
       if (!startTime) startTime = timestamp;
@@ -2515,6 +2668,10 @@ export const exportAsVideo = async (elements, canvasSize, imageEffects = {}, dur
         requestAnimationFrame(animate);
       } else {
         recorder.stop();
+        audioSources.forEach(a => {
+            a.pause();
+            a.currentTime = 0;
+        });
       }
     };
 
