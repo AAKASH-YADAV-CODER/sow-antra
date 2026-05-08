@@ -10,6 +10,23 @@ import {
 import { auth, googleProvider } from '../config/firebase';
 
 const AuthContext = createContext();
+const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:4001').trim();
+
+const fetchUserRole = async (token) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/users/me`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data?.role || null;
+  } catch (error) {
+    console.error('Failed to fetch user role:', error);
+    return null;
+  }
+};
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -43,12 +60,14 @@ export const AuthProvider = ({ children }) => {
       if (user) {
         try {
           const token = await user.getIdToken();
+          const role = await fetchUserRole(token);
           const userData = {
             uid: user.uid,
             email: user.email,
             displayName: user.displayName,
             photoURL: user.photoURL,
-            emailVerified: user.emailVerified
+            emailVerified: user.emailVerified,
+            role
           };
 
           setCurrentUser(userData);
@@ -80,12 +99,14 @@ export const AuthProvider = ({ children }) => {
       }
 
       const token = await userCredential.user.getIdToken();
+      const role = await fetchUserRole(token);
       const userData = {
         uid: userCredential.user.uid,
         email: userCredential.user.email,
         displayName: displayName || userCredential.user.displayName,
         photoURL: userCredential.user.photoURL,
-        emailVerified: userCredential.user.emailVerified
+        emailVerified: userCredential.user.emailVerified,
+        role
       };
 
       setCurrentUser(userData);
@@ -104,12 +125,14 @@ export const AuthProvider = ({ children }) => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const token = await userCredential.user.getIdToken();
+      const role = await fetchUserRole(token);
       const userData = {
         uid: userCredential.user.uid,
         email: userCredential.user.email,
         displayName: userCredential.user.displayName,
         photoURL: userCredential.user.photoURL,
-        emailVerified: userCredential.user.emailVerified
+        emailVerified: userCredential.user.emailVerified,
+        role
       };
 
       setCurrentUser(userData);
@@ -128,12 +151,14 @@ export const AuthProvider = ({ children }) => {
     try {
       const userCredential = await signInWithPopup(auth, googleProvider);
       const token = await userCredential.user.getIdToken();
+      const role = await fetchUserRole(token);
       const userData = {
         uid: userCredential.user.uid,
         email: userCredential.user.email,
         displayName: userCredential.user.displayName,
         photoURL: userCredential.user.photoURL,
-        emailVerified: userCredential.user.emailVerified
+        emailVerified: userCredential.user.emailVerified,
+        role
       };
 
       setCurrentUser(userData);

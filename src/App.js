@@ -31,7 +31,7 @@ function App() {
               <Route
                 path="/home"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute requiredRole="CREATOR">
                     <HomePage />
                   </ProtectedRoute>
                 }
@@ -39,7 +39,7 @@ function App() {
               <Route
                 path="/main"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute requiredRole="CREATOR">
                     <MainPage />
                   </ProtectedRoute>
                 }
@@ -47,7 +47,7 @@ function App() {
               <Route
                 path="/whiteboard/:boardId"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute requiredRole="CREATOR">
                     <WhiteboardPage />
                   </ProtectedRoute>
                 }
@@ -59,7 +59,7 @@ function App() {
               <Route
                 path="/brand-kit"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute requiredRole="CREATOR">
                     <BrandKitPage />
                   </ProtectedRoute>
                 }
@@ -67,7 +67,7 @@ function App() {
               <Route
                 path="/brand-kit/:id"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute requiredRole="CREATOR">
                     <BrandKitDetailPage />
                   </ProtectedRoute>
                 }
@@ -75,7 +75,7 @@ function App() {
               <Route
                 path="/creators"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute requiredRole="CREATOR">
                     <CreatorsDiscoveryPage />
                   </ProtectedRoute>
                 }
@@ -83,7 +83,7 @@ function App() {
               <Route
                 path="/creators/dashboard"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute requiredRole="CREATOR">
                     <CreatorsDashboard />
                   </ProtectedRoute>
                 }
@@ -91,7 +91,7 @@ function App() {
               <Route
                 path="/creators/profile/:id"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute requiredRole="CREATOR">
                     <CreatorProfilePage />
                   </ProtectedRoute>
                 }

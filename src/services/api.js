@@ -79,6 +79,7 @@ export const userAPI = {
   updateProfile: (data) => apiClient.put('/api/users/me', data),
   getUserStats: () => apiClient.get('/api/users/me/stats'),
   searchUsers: (query) => apiClient.get(`/api/users/search?query=${query}`),
+  getRole: () => apiClient.get('/api/users/me'),
 };
 
 export const boardAPI = {
