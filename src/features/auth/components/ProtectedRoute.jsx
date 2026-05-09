@@ -22,6 +22,9 @@ const ProtectedRoute = ({ children, requiredRole }) => {
   }
 
   if (requiredRole && currentUser?.role !== requiredRole) {
+    if (requiredRole === 'CREATOR' && (!currentUser?.role || currentUser?.role === 'NORMAL')) {
+      return <Navigate to="/creator-application" replace />;
+    }
     return <Navigate to="/" replace />;
   }
 

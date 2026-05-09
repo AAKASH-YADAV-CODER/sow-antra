@@ -8,6 +8,7 @@ import ErrorBoundary from "./components/common/ErrorBoundary";
 import CreatorsDiscoveryPage from "./pages/CreatorsDiscoveryPage.jsx";
 import CreatorsDashboard from "./pages/CreatorsDashboard.jsx";
 import CreatorProfilePage from "./pages/CreatorProfilePage.jsx";
+import CreatorApplicationPage from "./pages/CreatorApplicationPage.jsx";
 
 console.log('--- Sowntra MP v1.1 - Refined Pen Tool Loaded ---');
 
@@ -31,7 +32,7 @@ function App() {
               <Route
                 path="/home"
                 element={
-                  <ProtectedRoute requiredRole="CREATOR">
+                  <ProtectedRoute>
                     <HomePage />
                   </ProtectedRoute>
                 }
@@ -55,6 +56,14 @@ function App() {
               <Route
                 path="/invite/:token"
                 element={<InviteAcceptPage />}
+              />
+              <Route
+                path="/creator-application"
+                element={
+                  <ProtectedRoute>
+                    <CreatorApplicationPage />
+                  </ProtectedRoute>
+                }
               />
               <Route
                 path="/brand-kit"

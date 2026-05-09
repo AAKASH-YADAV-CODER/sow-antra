@@ -1,41 +1,58 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Heart, Eye, ArrowLeft } from 'lucide-react';
-import { editableTemplates, templateCategories } from '../config/editableTemplates';
+import { creatorAPI } from '../services/api';
 
 const CreatorsDiscoveryPage = () => {
     const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState('');
     const [activeCategory, setActiveCategory] = useState('All');
     const [likedTemplates, setLikedTemplates] = useState({});
-    const [communityTemplates, setCommunityTemplates] = useState([]);
+    const [marketplaceTemplates, setMarketplaceTemplates] = useState([]);
+    const [marketplaceCreators, setMarketplaceCreators] = useState([]);
+    const [loading, setLoading] = useState(true);
 
     React.useEffect(() => {
-        // Load community templates from localStorage
-        const stored = JSON.parse(localStorage.getItem('community_templates') || '[]');
-        setCommunityTemplates(stored);
+        const loadMarketplace = async () => {
+            setLoading(true);
+            try {
+                const response = await creatorAPI.getMarketplaceData();
+                setMarketplaceTemplates(response?.data?.templates || []);
+                setMarketplaceCreators(response?.data?.creators || []);
+            } catch (error) {
+                console.error('Failed to load marketplace data:', error);
+                setMarketplaceTemplates([]);
+                setMarketplaceCreators([]);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadMarketplace();
     }, []);
 
-    // Merge static and community templates
-    const allTemplates = [...communityTemplates, ...Object.values(editableTemplates)];
+    const categories = [
+        'All',
+        ...Array.from(new Set(marketplaceTemplates.map((template) => template.category || 'general')))
+    ];
 
     const toggleLike = (id, e) => {
         e.stopPropagation();
         setLikedTemplates(prev => ({ ...prev, [id]: !prev[id] }));
     };
 
-    const trendingCreators = [
-        { id: 'sarah_design', name: 'Sarah Ahmed', avatar: 'S', color: 'bg-pink-500' },
-        { id: 'alex_ux', name: 'Alex Rivera', avatar: 'A', color: 'bg-blue-500' },
-        { id: 'priya_creative', name: 'Priya K.', avatar: 'P', color: 'bg-green-500' },
-        { id: 'mike_minimal', name: 'Mike Ross', avatar: 'M', color: 'bg-orange-500' },
-    ];
+    const trendingCreators = marketplaceCreators.slice(0, 12).map((creator) => ({
+        id: creator.id,
+        name: creator.name,
+        avatar: (creator.name || 'C').charAt(0).toUpperCase(),
+        color: 'bg-purple-600'
+    }));
 
     // Filter and Search Logic
-    const filteredTemplates = allTemplates.filter(template => {
+    const filteredTemplates = marketplaceTemplates.filter(template => {
         const matchesSearch = template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             (template.author && template.author.toLowerCase().includes(searchQuery.toLowerCase()));
-        const matchesCategory = activeCategory === 'All' || template.category === activeCategory;
+        const matchesCategory = activeCategory === 'All' || (template.category || 'general') === activeCategory;
         return matchesSearch && matchesCategory;
     });
 
@@ -103,22 +120,25 @@ const CreatorsDiscoveryPage = () => {
                                 <span className="text-xs font-black text-gray-800">{creator.name}</span>
                             </div>
                         ))}
+                        {!loading && trendingCreators.length === 0 && (
+                            <p className="text-sm font-bold text-gray-400">No approved creators yet.</p>
+                        )}
                     </div>
                 </section>
 
                 {/* Filters / Categories */}
                 <div className="flex items-center gap-3 mb-10 overflow-x-auto pb-4 no-scrollbar">
-                    {templateCategories.map(cat => (
+                    {categories.map(cat => (
                         <button
-                            key={cat.id}
-                            onClick={() => setActiveCategory(cat.id)}
+                            key={cat}
+                            onClick={() => setActiveCategory(cat)}
                             className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold text-sm transition-all whitespace-nowrap border
-                                ${activeCategory === cat.id
+                                ${activeCategory === cat
                                     ? 'bg-purple-600 text-white border-purple-600 shadow-lg shadow-purple-100'
                                     : 'bg-white text-gray-600 border-gray-200 hover:border-purple-300 hover:text-purple-600'}
                             `}
                         >
-                            {cat.icon} {cat.name}
+                            {cat}
                         </button>
                     ))}
                 </div>
@@ -170,7 +190,7 @@ const CreatorsDiscoveryPage = () => {
                                     </span>
                                     <div className="flex items-center gap-1 text-gray-400 text-[10px] font-black uppercase tracking-tighter">
                                         <Eye size={10} />
-                                        {template.views || '0'}
+                                        {template.views || 0}
                                     </div>
                                 </div>
                             </div>
@@ -178,6 +198,9 @@ const CreatorsDiscoveryPage = () => {
                     ))}
                 </div>
 
+                {loading && (
+                    <div className="text-center py-12 text-sm font-bold text-gray-400">Loading marketplace...</div>
+                )}
                 {filteredTemplates.length === 0 && (
                     <div className="text-center py-20 flex flex-col items-center">
                         <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center text-gray-300 mb-4 text-3xl">🏜️</div>

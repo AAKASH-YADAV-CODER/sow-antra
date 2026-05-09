@@ -17,12 +17,26 @@ import {
     X,
 } from 'lucide-react';
 import { socialMediaTemplates } from '../utils/constants';
+import { creatorAPI } from '../services/api';
 
 const CreatorsDashboard = () => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('overview');
     const [showSizeModal, setShowSizeModal] = useState(false);
     const [customSize, setCustomSize] = useState({ width: 1080, height: 1080 });
+    const [dashboardData, setDashboardData] = useState({
+        stats: {
+            totalUses: 0,
+            publishedItems: 0,
+            totalSubmissions: 0,
+            pendingSubmissions: 0,
+            rejectedSubmissions: 0,
+            estimatedEarnings: 0
+        },
+        submissions: [],
+        recentActivity: []
+    });
+    const [loading, setLoading] = useState(true);
 
     const sizePresets = Object.entries(socialMediaTemplates).map(([key, template]) => ({
         id: key,
@@ -38,19 +52,43 @@ const CreatorsDashboard = () => {
         setShowSizeModal(false);
     };
 
-    // Mock Analytics Data
-    const stats = [
-        { label: 'Total Uses', value: '12,450', change: '+12%', icon: <TrendingUp className="text-green-500" size={20} />, trend: 'up' },
-        { label: 'Followers', value: '2,891', change: '+5%', icon: <Users className="text-blue-500" size={20} />, trend: 'up' },
-        { label: 'Published Items', value: '24', change: '0%', icon: <Layers className="text-purple-500" size={20} />, trend: 'neutral' },
-        { label: 'Est. Earnings', value: '$1,240.50', change: '+18%', icon: <DollarSign className="text-orange-500" size={20} />, trend: 'up' },
-    ];
+    React.useEffect(() => {
+        const loadDashboard = async () => {
+            setLoading(true);
+            try {
+                const response = await creatorAPI.getDashboardData();
+                setDashboardData(response?.data || {
+                    stats: {},
+                    submissions: [],
+                    recentActivity: []
+                });
+            } catch (error) {
+                console.error('Failed to load creator dashboard:', error);
+                setDashboardData({
+                    stats: {
+                        totalUses: 0,
+                        publishedItems: 0,
+                        totalSubmissions: 0,
+                        pendingSubmissions: 0,
+                        rejectedSubmissions: 0,
+                        estimatedEarnings: 0
+                    },
+                    submissions: [],
+                    recentActivity: []
+                });
+            } finally {
+                setLoading(false);
+            }
+        };
 
-    const mockSubmissions = [
-        { id: 1, title: 'Minimalist Instagram Story', status: 'Published', uses: '4.2k', rating: 4.8, date: '2024-02-15' },
-        { id: 2, title: 'Modern Business Card', status: 'Published', uses: '1.1k', rating: 4.5, date: '2024-02-10' },
-        { id: 3, title: 'Artistic Poster A2', status: 'Under Review', uses: '0', rating: 0, date: '2024-02-18' },
-        { id: 4, title: 'Flat Design Logo Set', status: 'Published', uses: '890', rating: 4.9, date: '2024-01-25' },
+        loadDashboard();
+    }, []);
+
+    const stats = [
+        { label: 'Total Uses', value: dashboardData.stats.totalUses || 0, helper: 'Live', icon: <TrendingUp className="text-green-500" size={20} /> },
+        { label: 'Published Items', value: dashboardData.stats.publishedItems || 0, helper: 'Live', icon: <Layers className="text-purple-500" size={20} /> },
+        { label: 'Pending Review', value: dashboardData.stats.pendingSubmissions || 0, helper: 'Live', icon: <Users className="text-blue-500" size={20} /> },
+        { label: 'Est. Earnings', value: `$${(dashboardData.stats.estimatedEarnings || 0).toLocaleString()}`, helper: 'Derived', icon: <DollarSign className="text-orange-500" size={20} /> },
     ];
 
     return (
@@ -107,7 +145,7 @@ const CreatorsDashboard = () => {
                 <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
                     <div>
                         <h2 className="text-3xl font-extrabold text-gray-900">Welcome back, Creator!</h2>
-                        <p className="text-gray-500 font-medium">Your designs reached over 1,200 new users this week.</p>
+                        <p className="text-gray-500 font-medium">All numbers below are loaded from your real creator data.</p>
                     </div>
                     <button
                         onClick={() => setShowSizeModal(true)}
@@ -195,8 +233,8 @@ const CreatorsDashboard = () => {
                                 <div className="p-2 bg-gray-50 rounded-lg">
                                     {stat.icon}
                                 </div>
-                                <span className={`text-xs font-bold px-2 py-1 rounded-full ${stat.trend === 'up' ? 'bg-green-50 text-green-600' : 'bg-gray-50 text-gray-500'}`}>
-                                    {stat.change}
+                                <span className="text-xs font-bold px-2 py-1 rounded-full bg-gray-50 text-gray-500">
+                                    {stat.helper}
                                 </span>
                             </div>
                             <p className="text-sm font-bold text-gray-400 mb-1">{stat.label}</p>
@@ -227,13 +265,13 @@ const CreatorsDashboard = () => {
                                         <th className="px-6 py-4">Template Title</th>
                                         <th className="px-6 py-4">Status</th>
                                         <th className="px-6 py-4">Total Uses</th>
-                                        <th className="px-6 py-4">Rating</th>
+                                        <th className="px-6 py-4">Assets</th>
                                         <th className="px-6 py-4">Date</th>
                                         <th className="px-6 py-4 text-right">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-50">
-                                    {mockSubmissions.map(item => (
+                                    {dashboardData.submissions.map(item => (
                                         <tr key={item.id} className="hover:bg-gray-50/50 transition-colors group">
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
@@ -249,8 +287,8 @@ const CreatorsDashboard = () => {
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-sm font-bold text-gray-600">{item.uses}</td>
-                                            <td className="px-6 py-4 text-sm font-bold text-gray-600">⭐ {item.rating > 0 ? item.rating : 'N/A'}</td>
-                                            <td className="px-6 py-4 text-xs font-bold text-gray-400">{item.date}</td>
+                                            <td className="px-6 py-4 text-sm font-bold text-gray-600">{item.assets}</td>
+                                            <td className="px-6 py-4 text-xs font-bold text-gray-400">{new Date(item.date).toLocaleDateString()}</td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <button className="p-2 hover:bg-white rounded-lg text-gray-400 hover:text-purple-600 shadow-sm border border-transparent hover:border-gray-100">
@@ -266,6 +304,9 @@ const CreatorsDashboard = () => {
                                 </tbody>
                             </table>
                         </div>
+                        {!loading && dashboardData.submissions.length === 0 && (
+                            <div className="p-8 text-sm font-bold text-gray-400">No submissions found yet.</div>
+                        )}
                         <button className="w-full py-4 text-sm font-bold text-purple-600 hover:bg-purple-50 transition-colors border-t border-gray-50">
                             View All Submissions
                         </button>
@@ -292,10 +333,12 @@ const CreatorsDashboard = () => {
                             <h4 className="font-extrabold text-gray-900 mb-6">Recent Activity</h4>
                             <div className="space-y-6">
                                 {[
-                                    { title: 'Payment processed', time: '2 hours ago', icon: '💰' },
-                                    { title: 'New review on Poster A2', time: '5 hours ago', icon: '📝' },
-                                    { title: 'Review approved', time: '1 day ago', icon: '✅' },
-                                ].map((act, i) => (
+                                    ...dashboardData.recentActivity.map((act) => ({
+                                        title: `${act.title} (${act.status})`,
+                                        time: new Date(act.date).toLocaleString(),
+                                        icon: act.status === 'Published' ? '✅' : act.status === 'Rejected' ? '❌' : '🕒'
+                                    }))
+                                ].slice(0, 5).map((act, i) => (
                                     <div key={i} className="flex gap-4">
                                         <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-lg">{act.icon}</div>
                                         <div>
@@ -304,6 +347,9 @@ const CreatorsDashboard = () => {
                                         </div>
                                     </div>
                                 ))}
+                                {!loading && dashboardData.recentActivity.length === 0 && (
+                                    <p className="text-sm font-bold text-gray-400">No recent activity yet.</p>
+                                )}
                             </div>
                         </div>
                     </div>

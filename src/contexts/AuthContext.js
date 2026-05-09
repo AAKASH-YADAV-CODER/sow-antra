@@ -12,20 +12,44 @@ import { auth, googleProvider } from '../config/firebase';
 const AuthContext = createContext();
 const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:4001').trim();
 
-const fetchUserRole = async (token) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/users/me`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    if (!response.ok) return null;
-    const data = await response.json();
-    return data?.role || null;
-  } catch (error) {
-    console.error('Failed to fetch user role:', error);
-    return null;
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const syncUserWithBackend = async (token, { strict = false } = {}) => {
+  const maxAttempts = strict ? 12 : 8;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/users/sync`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        return {
+          role: data?.role || 'NORMAL',
+          dbUserId: data?.dbUserId || null,
+          synced: true
+        };
+      }
+      const errBody = await response.text().catch(() => '');
+      console.warn(`[sync] attempt ${attempt}/${maxAttempts} failed`, response.status, errBody);
+    } catch (error) {
+      if (attempt === maxAttempts) {
+        console.error('Failed to sync user with backend:', error);
+      }
+    }
+    if (attempt < maxAttempts) {
+      await wait(Math.min(350 * attempt, 2800));
+    }
   }
+
+  if (strict) {
+    throw new Error('Unable to sync your account with server. Please try again.');
+  }
+
+  return { role: 'NORMAL', dbUserId: null, synced: false };
 };
 
 export const useAuth = () => {
@@ -59,24 +83,39 @@ export const AuthProvider = ({ children }) => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         try {
-          const token = await user.getIdToken();
-          const role = await fetchUserRole(token);
-          const userData = {
-            uid: user.uid,
-            email: user.email,
-            displayName: user.displayName,
-            photoURL: user.photoURL,
-            emailVerified: user.emailVerified,
-            role
-          };
+          const token = await user.getIdToken(true);
+          const synced = await syncUserWithBackend(token, { strict: false });
+          if (!synced.synced) {
+            console.error(
+              'Could not persist your account on the server. Check backend is running and migrations are applied.'
+            );
+            setCurrentUser(null);
+            setAuthToken(null);
+            localStorage.removeItem('sowntra_auth_token');
+            localStorage.removeItem('sowntra_user');
+          } else {
+            const userData = {
+              uid: user.uid,
+              email: user.email,
+              displayName: user.displayName,
+              photoURL: user.photoURL,
+              emailVerified: user.emailVerified,
+              role: synced.role,
+              dbUserId: synced.dbUserId
+            };
 
-          setCurrentUser(userData);
-          setAuthToken(token);
+            setCurrentUser(userData);
+            setAuthToken(token);
 
-          localStorage.setItem('sowntra_auth_token', token);
-          localStorage.setItem('sowntra_user', JSON.stringify(userData));
+            localStorage.setItem('sowntra_auth_token', token);
+            localStorage.setItem('sowntra_user', JSON.stringify(userData));
+          }
         } catch (error) {
           console.error('Error getting token:', error);
+          setCurrentUser(null);
+          setAuthToken(null);
+          localStorage.removeItem('sowntra_auth_token');
+          localStorage.removeItem('sowntra_user');
         }
       } else {
         setCurrentUser(null);
@@ -98,15 +137,17 @@ export const AuthProvider = ({ children }) => {
         await updateProfile(userCredential.user, { displayName });
       }
 
-      const token = await userCredential.user.getIdToken();
-      const role = await fetchUserRole(token);
+      await userCredential.user.reload();
+      const token = await userCredential.user.getIdToken(true);
+      const synced = await syncUserWithBackend(token, { strict: true });
       const userData = {
         uid: userCredential.user.uid,
         email: userCredential.user.email,
         displayName: displayName || userCredential.user.displayName,
         photoURL: userCredential.user.photoURL,
         emailVerified: userCredential.user.emailVerified,
-        role
+        role: synced.role,
+        dbUserId: synced.dbUserId
       };
 
       setCurrentUser(userData);
@@ -124,15 +165,16 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const token = await userCredential.user.getIdToken();
-      const role = await fetchUserRole(token);
+      const token = await userCredential.user.getIdToken(true);
+      const synced = await syncUserWithBackend(token, { strict: true });
       const userData = {
         uid: userCredential.user.uid,
         email: userCredential.user.email,
         displayName: userCredential.user.displayName,
         photoURL: userCredential.user.photoURL,
         emailVerified: userCredential.user.emailVerified,
-        role
+        role: synced.role,
+        dbUserId: synced.dbUserId
       };
 
       setCurrentUser(userData);
@@ -150,15 +192,16 @@ export const AuthProvider = ({ children }) => {
   const loginWithGoogle = async () => {
     try {
       const userCredential = await signInWithPopup(auth, googleProvider);
-      const token = await userCredential.user.getIdToken();
-      const role = await fetchUserRole(token);
+      const token = await userCredential.user.getIdToken(true);
+      const synced = await syncUserWithBackend(token, { strict: true });
       const userData = {
         uid: userCredential.user.uid,
         email: userCredential.user.email,
         displayName: userCredential.user.displayName,
         photoURL: userCredential.user.photoURL,
         emailVerified: userCredential.user.emailVerified,
-        role
+        role: synced.role,
+        dbUserId: synced.dbUserId
       };
 
       setCurrentUser(userData);

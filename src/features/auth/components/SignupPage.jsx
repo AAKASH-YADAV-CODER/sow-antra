@@ -7,7 +7,7 @@ import { invitationAPI } from '../../../services/api';
 const SignupPage = () => {
   const [currentPage, setCurrentPage] = useState('login');
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, currentUser } = useAuth();
 
   useEffect(() => {
     const handlePendingInvitation = async () => {
@@ -36,7 +36,7 @@ const SignupPage = () => {
     };
 
     handlePendingInvitation();
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, currentUser?.role, navigate]);
 
   return (
     <div className="min-h-screen flex">

@@ -365,6 +365,8 @@ const HomePage = () => {
     return currentUser?.displayName || currentUser?.email || 'User';
   };
 
+  const isCreator = currentUser?.role === 'CREATOR';
+
   return (
     <div className="min-h-screen bg-white text-[#0e1217]">
       {/* Premium Header */}
@@ -382,13 +384,24 @@ const HomePage = () => {
           <div className="flex items-center gap-6">
             <button
               onClick={() => setShowCreatePopup(true)}
+              disabled={!isCreator}
               className="px-5 h-10 bg-[#8b3dff] hover:bg-[#7a34e5] text-white font-semibold rounded-lg transition-all shadow-md shadow-purple-100 flex items-center gap-2"
             >
               Create
             </button>
             <nav className="hidden md:flex items-center gap-6">
-              <button onClick={handleMyProjects} className="text-sm font-semibold text-gray-600 hover:text-[#8b3dff] transition-colors">Projects</button>
-              <button onClick={handleTeamCollaborationClick} className="text-sm font-semibold text-gray-600 hover:text-[#8b3dff] transition-colors">RTC</button>
+              <button
+                onClick={() => (isCreator ? handleMyProjects() : navigate('/creator-application'))}
+                className="text-sm font-semibold text-gray-600 hover:text-[#8b3dff] transition-colors"
+              >
+                Projects
+              </button>
+              <button
+                onClick={() => (isCreator ? handleTeamCollaborationClick() : navigate('/creator-application'))}
+                className="text-sm font-semibold text-gray-600 hover:text-[#8b3dff] transition-colors"
+              >
+                RTC
+              </button>
             </nav>
             <div className="w-px h-6 bg-gray-200 mx-2 hidden md:block" />
             <div className="flex items-center gap-3 cursor-pointer group">
@@ -452,6 +465,20 @@ const HomePage = () => {
                 </div>
 
                 <div className="relative z-10 max-w-4xl mx-auto">
+                  {!isCreator && (
+                    <div className="mb-8 bg-white/15 border border-white/25 rounded-2xl px-6 py-4 text-left flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-black uppercase tracking-wider">Creator access required for publishing and advanced tools</p>
+                        <p className="text-sm text-purple-100">Apply from inside app and get reviewed by admin.</p>
+                      </div>
+                      <button
+                        onClick={() => navigate('/creator-application')}
+                        className="px-5 py-2.5 bg-white text-[#6a11cb] rounded-xl font-black hover:bg-purple-50 transition-colors"
+                      >
+                        Apply for Creator
+                      </button>
+                    </div>
+                  )}
                   <h1 className="text-4xl md:text-5xl font-extrabold mb-8 tracking-tight">What will you design today?</h1>
 
                   {/* Massive Search Bar */}
@@ -480,12 +507,24 @@ const HomePage = () => {
                         className="flex flex-col items-center gap-3 group cursor-pointer"
                         onClick={() => {
                           if (cat.name === 'Custom Size') {
-                            setShowCreatePopup(true);
-                            setIsCustomSizeView(true);
+                            if (isCreator) {
+                              setShowCreatePopup(true);
+                              setIsCustomSizeView(true);
+                            } else {
+                              navigate('/creator-application');
+                            }
                           } else if (cat.name === 'Whiteboard') {
-                            handleCreateWhiteboard();
+                            if (isCreator) {
+                              handleCreateWhiteboard();
+                            } else {
+                              navigate('/creator-application');
+                            }
                           } else {
-                            setActiveTab('templates');
+                            if (isCreator) {
+                              setActiveTab('templates');
+                            } else {
+                              navigate('/creator-application');
+                            }
                           }
                         }}
                       >

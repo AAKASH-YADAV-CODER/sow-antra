@@ -128,6 +128,13 @@ export const healthAPI = {
   getStats: () => apiClient.get('/api/health/stats'),
 };
 
+export const creatorAPI = {
+  submitApplication: (payload) => apiClient.post('/api/users/creator-application', payload),
+  getMyApplication: () => apiClient.get('/api/users/creator-application/me'),
+  getMarketplaceData: () => apiClient.get('/api/users/creators/marketplace'),
+  getDashboardData: () => apiClient.get('/api/users/creators/dashboard'),
+};
+
 // Create a separate client for public endpoints (no auth required)
 const publicApiClient = axios.create({
   baseURL: API_BASE_URL,
