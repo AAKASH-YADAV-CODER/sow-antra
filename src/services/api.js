@@ -133,6 +133,11 @@ export const creatorAPI = {
   getMyApplication: () => apiClient.get('/api/users/creator-application/me'),
   getMarketplaceData: () => apiClient.get('/api/users/creators/marketplace'),
   getDashboardData: () => apiClient.get('/api/users/creators/dashboard'),
+  publishTemplate: (payload) => apiClient.post('/api/users/creators/templates/publish', payload),
+  getMyTemplateSubmissions: () => apiClient.get('/api/users/creators/templates/my-submissions'),
+  getTemplateForUse: (templateId) => apiClient.get(`/api/users/creators/templates/${templateId}/use`),
+  purchaseTemplate: (templateId, paymentReference) =>
+    apiClient.post(`/api/users/creators/templates/${templateId}/purchase`, { paymentReference }),
 };
 
 // Create a separate client for public endpoints (no auth required)

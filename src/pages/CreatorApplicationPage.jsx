@@ -2,11 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, Clock3, XCircle } from 'lucide-react';
 import { creatorAPI } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
+import CreatorHubPage from './CreatorHubPage';
 
 const CreatorApplicationPage = () => {
   const navigate = useNavigate();
+  const { currentUser, syncCurrentUserRole } = useAuth();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [syncingRole, setSyncingRole] = useState(false);
   const [application, setApplication] = useState(null);
   const [form, setForm] = useState({
     experience: '',
@@ -34,6 +38,23 @@ const CreatorApplicationPage = () => {
     loadApplication();
   }, []);
 
+  useEffect(() => {
+    const refreshApprovedRole = async () => {
+      if (application?.status !== 'APPROVED') return;
+      if (currentUser?.role === 'CREATOR' || currentUser?.role === 'ADMIN') return;
+      try {
+        setSyncingRole(true);
+        await syncCurrentUserRole({ strict: false });
+      } catch (error) {
+        console.error('Failed to refresh creator role from backend:', error);
+      } finally {
+        setSyncingRole(false);
+      }
+    };
+
+    refreshApprovedRole();
+  }, [application?.status, currentUser?.role, syncCurrentUserRole]);
+
   const submit = async (event) => {
     event.preventDefault();
     setSubmitting(true);
@@ -50,6 +71,11 @@ const CreatorApplicationPage = () => {
   };
 
   const status = application?.status || null;
+  const isCreator = currentUser?.role === 'CREATOR' || currentUser?.role === 'ADMIN';
+
+  if (isCreator) {
+    return <CreatorHubPage />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-10 px-4">
@@ -90,6 +116,12 @@ const CreatorApplicationPage = () => {
                   {status === 'APPROVED' && (
                     <p className="mt-2 text-xs">Your account is now a Creator. Please login again if needed.</p>
                   )}
+                </div>
+              )}
+
+              {syncingRole && status === 'APPROVED' && (
+                <div className="mt-6 p-3 rounded-xl bg-blue-50 border border-blue-100 text-blue-700 text-sm font-bold">
+                  Updating your creator access...
                 </div>
               )}
 

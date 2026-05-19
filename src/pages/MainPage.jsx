@@ -7,7 +7,7 @@ import FloatingToolbar from '../components/FloatingToolbar';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { projectAPI, invitationAPI } from '../services/api';
+import { projectAPI, invitationAPI, creatorAPI } from '../services/api';
 import { Users, X, Loader } from 'lucide-react';
 
 // Component imports
@@ -1378,9 +1378,89 @@ const Sowntra = () => {
   useEffect(() => {
     if (templateAppliedRef.current) return;
 
+    const marketplaceTemplateId = searchParams.get('marketplaceTemplate');
     const templateKey = searchParams.get('template');
     const customWidth = searchParams.get('width');
     const customHeight = searchParams.get('height');
+
+    if (marketplaceTemplateId) {
+      templateAppliedRef.current = true;
+      let isMounted = true;
+
+      const applyRemoteTemplate = async () => {
+        try {
+          const response = await creatorAPI.getTemplateForUse(marketplaceTemplateId);
+          if (!isMounted) return;
+          const remoteTemplate = response?.data?.template || {};
+          const remoteProject = response?.data?.projectData || {};
+
+          const remotePages = Array.isArray(remoteProject?.pages) && remoteProject.pages.length > 0
+            ? remoteProject.pages
+            : [{ id: 'page-1', name: 'Page 1', elements: remoteTemplate.elements || [] }];
+
+          const initialPageId = remoteProject?.currentPage || remotePages[0]?.id || 'page-1';
+          const size = remoteProject?.canvasSize || {
+            width: remoteTemplate.width || 1080,
+            height: remoteTemplate.height || 1080
+          };
+
+          setCanvasSize(size);
+          setPages(remotePages);
+          setCurrentPage(initialPageId);
+          if (remoteTemplate?.title) {
+            setProjectName(remoteTemplate.title);
+          }
+
+          setTimeout(() => centerCanvas(size), 400);
+        } catch (error) {
+          if (!isMounted) return;
+          if (error?.response?.status === 402) {
+            const info = error?.response?.data?.template || {};
+            const shouldBuy = window.confirm(
+              `${info.title || 'This template'} is Premium ($${info.price || 0}). Buy now to unlock?`
+            );
+            if (shouldBuy) {
+              try {
+                await creatorAPI.purchaseTemplate(marketplaceTemplateId, `manual-${Date.now()}`);
+                const retryResponse = await creatorAPI.getTemplateForUse(marketplaceTemplateId);
+                if (!isMounted) return;
+                const remoteTemplate = retryResponse?.data?.template || {};
+                const remoteProject = retryResponse?.data?.projectData || {};
+                const remotePages = Array.isArray(remoteProject?.pages) && remoteProject.pages.length > 0
+                  ? remoteProject.pages
+                  : [{ id: 'page-1', name: 'Page 1', elements: remoteTemplate.elements || [] }];
+                const initialPageId = remoteProject?.currentPage || remotePages[0]?.id || 'page-1';
+                const size = remoteProject?.canvasSize || {
+                  width: remoteTemplate.width || 1080,
+                  height: remoteTemplate.height || 1080
+                };
+                setCanvasSize(size);
+                setPages(remotePages);
+                setCurrentPage(initialPageId);
+                if (remoteTemplate?.title) {
+                  setProjectName(remoteTemplate.title);
+                }
+                setTimeout(() => centerCanvas(size), 400);
+                return;
+              } catch (purchaseError) {
+                console.error('Premium purchase failed:', purchaseError);
+                alert('Could not unlock premium template right now. Please try again.');
+              }
+            }
+            navigate('/creators');
+            return;
+          }
+
+          console.error('Failed to load marketplace template:', error);
+          alert('Failed to load template from marketplace.');
+        }
+      };
+
+      applyRemoteTemplate();
+      return () => {
+        isMounted = false;
+      };
+    }
 
     if (templateKey) {
       templateAppliedRef.current = true;
@@ -1414,7 +1494,7 @@ const Sowntra = () => {
         setCanvasSize({ width: w, height: h });
       }
     }
-  }, [searchParams, applyEditableTemplate, centerCanvas]);
+  }, [searchParams, applyEditableTemplate, centerCanvas, navigate, setProjectName]);
 
   // Handle clicking outside the canvas paper (the gray area)
   const handleContainerMouseDown = useCallback((e) => {
@@ -1508,6 +1588,7 @@ const Sowntra = () => {
           pages={pages}
           canvasSize={canvasSize}
           isCreatorMode={searchParams.get('isCreatorMode') === 'true'}
+          projectId={currentProjectId}
           saveStatus={saveStatus}
           getCanvasDataURL={getCanvasDataURL}
           isOnline={isOnline}

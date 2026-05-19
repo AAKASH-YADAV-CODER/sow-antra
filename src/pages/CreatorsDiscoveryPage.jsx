@@ -159,10 +159,10 @@ const CreatorsDiscoveryPage = () => {
                                 )}
                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                     <button
-                                        onClick={() => window.open(`/main?template=${template.id}`, '_blank')}
+                                        onClick={() => window.open(`/main?marketplaceTemplate=${template.id}`, '_blank')}
                                         className="bg-purple-600 text-white px-6 py-2 rounded-xl font-black transform translate-y-4 group-hover:translate-y-0 transition-all hover:bg-purple-700"
                                     >
-                                        Use Template
+                                        {template.isPremium ? 'Unlock Premium' : 'Use Template'}
                                     </button>
                                 </div>
                                 <div className="absolute top-3 right-3 flex flex-col gap-2">
@@ -188,10 +188,16 @@ const CreatorsDiscoveryPage = () => {
                                     <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded-full text-gray-500 font-bold tracking-tight">
                                         {template.category}
                                     </span>
-                                    <div className="flex items-center gap-1 text-gray-400 text-[10px] font-black uppercase tracking-tighter">
-                                        <Eye size={10} />
-                                        {template.views || 0}
-                                    </div>
+                                    {template.isPremium ? (
+                                        <span className="text-[10px] bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full font-black uppercase tracking-wider">
+                                            Premium ${template.price || 0}
+                                        </span>
+                                    ) : (
+                                        <div className="flex items-center gap-1 text-gray-400 text-[10px] font-black uppercase tracking-tighter">
+                                            <Eye size={10} />
+                                            {template.views || 0}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>

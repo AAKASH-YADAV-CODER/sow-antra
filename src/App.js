@@ -9,6 +9,7 @@ import CreatorsDiscoveryPage from "./pages/CreatorsDiscoveryPage.jsx";
 import CreatorsDashboard from "./pages/CreatorsDashboard.jsx";
 import CreatorProfilePage from "./pages/CreatorProfilePage.jsx";
 import CreatorApplicationPage from "./pages/CreatorApplicationPage.jsx";
+import CreatorHubPage from "./pages/CreatorHubPage.jsx";
 
 console.log('--- Sowntra MP v1.1 - Refined Pen Tool Loaded ---');
 
@@ -40,7 +41,7 @@ function App() {
               <Route
                 path="/main"
                 element={
-                  <ProtectedRoute requiredRole="CREATOR">
+                  <ProtectedRoute>
                     <MainPage />
                   </ProtectedRoute>
                 }
@@ -48,7 +49,7 @@ function App() {
               <Route
                 path="/whiteboard/:boardId"
                 element={
-                  <ProtectedRoute requiredRole="CREATOR">
+                  <ProtectedRoute>
                     <WhiteboardPage />
                   </ProtectedRoute>
                 }
@@ -62,6 +63,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <CreatorApplicationPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/creator-hub"
+                element={
+                  <ProtectedRoute requiredRole="CREATOR">
+                    <CreatorHubPage />
                   </ProtectedRoute>
                 }
               />
@@ -84,7 +93,7 @@ function App() {
               <Route
                 path="/creators"
                 element={
-                  <ProtectedRoute requiredRole="CREATOR">
+                  <ProtectedRoute>
                     <CreatorsDiscoveryPage />
                   </ProtectedRoute>
                 }
@@ -100,7 +109,7 @@ function App() {
               <Route
                 path="/creators/profile/:id"
                 element={
-                  <ProtectedRoute requiredRole="CREATOR">
+                  <ProtectedRoute>
                     <CreatorProfilePage />
                   </ProtectedRoute>
                 }

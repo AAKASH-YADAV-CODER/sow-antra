@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ArrowRight, FolderOpen, Trash2, Plus, Search, X, Layout, Monitor, Smartphone, Palette, FileText, ChevronLeft } from 'lucide-react';
 import { socialMediaTemplates } from '../utils/constants';
-import { projectAPI, boardAPI, invitationAPI } from '../services/api';
+import { projectAPI, boardAPI, invitationAPI, creatorAPI } from '../services/api';
 import { editableTemplates, templateCategories } from '../config/editableTemplates';
 import { LayoutTemplate, Home, Settings, Award, Users, Loader } from 'lucide-react';
 
@@ -29,9 +29,23 @@ const HomePage = () => {
   const [communityTemplates, setCommunityTemplates] = useState([]);
 
   useEffect(() => {
-    // Load community templates from localStorage
-    const stored = JSON.parse(localStorage.getItem('community_templates') || '[]');
-    setCommunityTemplates(stored);
+    const loadMarketplaceTemplates = async () => {
+      try {
+        const response = await creatorAPI.getMarketplaceData();
+        const templates = response?.data?.templates || [];
+        setCommunityTemplates(
+          templates.map((template) => ({
+            ...template,
+            isMarketplace: true
+          }))
+        );
+      } catch (error) {
+        console.error('Failed to load marketplace templates:', error);
+        setCommunityTemplates([]);
+      }
+    };
+
+    loadMarketplaceTemplates();
   }, []);
 
   const [editingProjectId, setEditingProjectId] = useState(null);
@@ -236,8 +250,14 @@ const HomePage = () => {
     window.open(`/main?project=${projectId}`, '_blank');
   };
 
-  const handleCreateWithTemplate = (templateKey) => {
-    window.open(`/main?template=${templateKey}`, '_blank');
+  const handleCreateWithTemplate = (template) => {
+    if (typeof template === 'string') {
+      window.open(`/main?template=${template}`, '_blank');
+    } else if (template?.isMarketplace) {
+      window.open(`/main?marketplaceTemplate=${template.id}`, '_blank');
+    } else if (template?.id) {
+      window.open(`/main?template=${template.id}`, '_blank');
+    }
     setShowCreatePopup(false);
     setIsCustomSizeView(false);
   };
@@ -659,7 +679,7 @@ const HomePage = () => {
                     {[...communityTemplates, ...Object.values(editableTemplates).slice(0, 10)].map((template) => (
                       <div
                         key={template.id}
-                        onClick={() => handleCreateWithTemplate(template.id)}
+                        onClick={() => handleCreateWithTemplate(template)}
                         className="flex-shrink-0 w-[220px] group cursor-pointer"
                       >
                         <div className="w-full aspect-[4/5] bg-gray-50 rounded-2xl mb-3 overflow-hidden border border-gray-100 transition-all group-hover:shadow-md relative flex items-center justify-center">
@@ -719,7 +739,7 @@ const HomePage = () => {
                     .map(template => (
                       <div
                         key={template.id}
-                        onClick={() => handleCreateWithTemplate(template.id)}
+                        onClick={() => handleCreateWithTemplate(template)}
                         className="group cursor-pointer"
                       >
                         <div className="aspect-[4/5] bg-gray-50 rounded-2xl mb-4 overflow-hidden border border-gray-100 shadow-sm transition-all group-hover:shadow-xl group-hover:-translate-y-1 relative flex items-center justify-center">

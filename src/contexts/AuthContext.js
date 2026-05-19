@@ -242,6 +242,27 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const syncCurrentUserRole = async ({ strict = false } = {}) => {
+    if (!auth.currentUser) return null;
+    const token = await auth.currentUser.getIdToken(true);
+    const synced = await syncUserWithBackend(token, { strict });
+    const userData = {
+      uid: auth.currentUser.uid,
+      email: auth.currentUser.email,
+      displayName: auth.currentUser.displayName,
+      photoURL: auth.currentUser.photoURL,
+      emailVerified: auth.currentUser.emailVerified,
+      role: synced.role,
+      dbUserId: synced.dbUserId
+    };
+
+    setCurrentUser(userData);
+    setAuthToken(token);
+    localStorage.setItem('sowntra_auth_token', token);
+    localStorage.setItem('sowntra_user', JSON.stringify(userData));
+    return userData;
+  };
+
   const value = {
     currentUser,
     authToken,
@@ -251,6 +272,7 @@ export const AuthProvider = ({ children }) => {
     loginWithGoogle,
     logout,
     refreshToken,
+    syncCurrentUserRole,
     isAuthenticated: !!currentUser
   };
 

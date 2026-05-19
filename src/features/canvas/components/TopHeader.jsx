@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import ShareButton from '../../../components/common/ShareButton';
 import AddGuidesModal from './AddGuidesModal';
+import { creatorAPI } from '../../../services/api';
 
 /**
  * TopHeader Component
@@ -78,6 +79,7 @@ const TopHeader = ({
   pages,
   canvasSize,
   isCreatorMode,
+  projectId,
   saveStatus,
   getCanvasDataURL,
   isOnline,
@@ -92,41 +94,67 @@ const TopHeader = ({
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [showPublishSuccess, setShowPublishSuccess] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState('');
+  const [isPublishing, setIsPublishing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [publishForm, setPublishForm] = useState({
     title: projectName || 'Untitled Template',
     category: 'Social Media',
+    summary: '',
+    tier: 'FREEMIUM',
+    price: '',
     previewImage: null
   });
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const canPublishTemplate = currentUser?.role === 'CREATOR' || currentUser?.role === 'ADMIN';
 
-  const handlePublish = () => {
-    const templateId = `temp_${Date.now()} `;
-    const authorName = currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Creator';
+  const handlePublish = async () => {
+    try {
+      if (!canPublishTemplate) {
+        alert('Only creators can publish templates.');
+        return;
+      }
 
-    const newTemplate = {
-      id: templateId,
-      name: publishForm.title,
-      author: authorName,
-      authorId: currentUser?.uid || 'anonymous',
-      pages: pages,
-      canvasSize: canvasSize,
-      category: publishForm.category,
-      thumbnail: '🎨',
-      previewImage: publishForm.previewImage,
-      views: 0,
-      createdAt: new Date().toISOString()
-    };
+      const title = publishForm.title.trim();
+      if (!title) {
+        alert('Template title is required.');
+        return;
+      }
 
-    // Save to LocalStorage to simulate global marketplace
-    const existing = JSON.parse(localStorage.getItem('community_templates') || '[]');
-    localStorage.setItem('community_templates', JSON.stringify([newTemplate, ...existing]));
+      const tier = publishForm.tier === 'PREMIUM' ? 'PREMIUM' : 'FREEMIUM';
+      const price = tier === 'PREMIUM' ? Number(publishForm.price || 0) : 0;
+      if (tier === 'PREMIUM' && (!Number.isFinite(price) || price <= 0)) {
+        alert('Premium templates require a valid price.');
+        return;
+      }
 
-    setPublishedUrl(`${window.location.origin}/main?template=${templateId}`);
-    setShowPublishSuccess(true);
-    setShowPublishModal(false);
-    setShowExportMenu(false);
+      if (!projectId) {
+        alert('Please save this design first so we can submit it for review.');
+        return;
+      }
+
+      setIsPublishing(true);
+      const response = await creatorAPI.publishTemplate({
+        boardId: projectId,
+        title,
+        category: publishForm.category,
+        summary: publishForm.summary,
+        tier,
+        price,
+        previewImage: publishForm.previewImage
+      });
+
+      const submissionId = response?.data?.submission?.id;
+      setPublishedUrl(submissionId ? `Submission ID: ${submissionId}` : 'Submitted for admin review');
+      setShowPublishSuccess(true);
+      setShowPublishModal(false);
+      setShowExportMenu(false);
+    } catch (error) {
+      const message = error?.response?.data?.error || 'Failed to submit template for review.';
+      alert(message);
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   return (
@@ -700,28 +728,34 @@ const TopHeader = ({
                     <Download size={14} /> Download PDF
                   </button>
 
-                  <div className="border-t border-gray-100 my-2 pt-2">
-                    <button
-                      onClick={async () => {
-                        setIsPreviewLoading(true);
-                        setPublishForm({ ...publishForm, title: projectName, previewImage: null });
-                        setShowPublishModal(true);
-                        setShowExportMenu(false);
+                  {canPublishTemplate && (
+                    <div className="border-t border-gray-100 my-2 pt-2">
+                      <button
+                        onClick={async () => {
+                          setIsPreviewLoading(true);
+                          setPublishForm((prev) => ({
+                            ...prev,
+                            title: projectName,
+                            previewImage: null
+                          }));
+                          setShowPublishModal(true);
+                          setShowExportMenu(false);
 
-                        try {
-                          const dataUrl = await getCanvasDataURL('png');
-                          setPublishForm(prev => ({ ...prev, previewImage: dataUrl }));
-                        } catch (err) {
-                          console.error("Failed to capture preview:", err);
-                        } finally {
-                          setIsPreviewLoading(false);
-                        }
-                      }}
-                      className="w-full p-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700 rounded text-sm font-extrabold shadow-md transition-all flex items-center justify-center gap-2"
-                    >
-                      <UploadCloud size={16} /> Publish as Template
-                    </button>
-                  </div>
+                          try {
+                            const dataUrl = await getCanvasDataURL('png');
+                            setPublishForm(prev => ({ ...prev, previewImage: dataUrl }));
+                          } catch (err) {
+                            console.error("Failed to capture preview:", err);
+                          } finally {
+                            setIsPreviewLoading(false);
+                          }
+                        }}
+                        className="w-full p-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700 rounded text-sm font-extrabold shadow-md transition-all flex items-center justify-center gap-2"
+                      >
+                        <UploadCloud size={16} /> Publish Design
+                      </button>
+                    </div>
+                  )}
                 </div>
               </>
             )}
@@ -797,9 +831,48 @@ const TopHeader = ({
                       </select>
                     </div>
 
+                    <div>
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block px-1">Template Access</label>
+                      <select
+                        value={publishForm.tier}
+                        onChange={(e) => setPublishForm({ ...publishForm, tier: e.target.value })}
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-200 outline-none font-bold text-gray-800 appearance-none cursor-pointer"
+                      >
+                        <option value="FREEMIUM">Freemium</option>
+                        <option value="PREMIUM">Premium</option>
+                      </select>
+                    </div>
+
+                    {publishForm.tier === 'PREMIUM' && (
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block px-1">Price (USD)</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={publishForm.price}
+                          onChange={(e) => setPublishForm({ ...publishForm, price: e.target.value })}
+                          placeholder="e.g. 9.99"
+                          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-200 outline-none font-bold text-gray-800"
+                        />
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block px-1">Template Summary</label>
+                      <textarea
+                        value={publishForm.summary}
+                        onChange={(e) => setPublishForm({ ...publishForm, summary: e.target.value })}
+                        placeholder="Tell users what this template is best for..."
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-200 outline-none font-semibold text-gray-800 min-h-[90px]"
+                      />
+                    </div>
+
                     <div className="bg-purple-50 p-4 rounded-2xl flex gap-3 items-start border border-purple-100">
                       <div className="p-1.5 bg-purple-100 text-purple-600 rounded-lg"><UploadCloud size={16} /></div>
-                      <p className="text-xs font-medium text-purple-800 leading-relaxed">By publishing, your design becomes a template for the community. Credits and usage will be tracked on your profile.</p>
+                      <p className="text-xs font-medium text-purple-800 leading-relaxed">
+                        Your template goes to admin review first. It appears in Template Library and Global Templates only after approval.
+                      </p>
                     </div>
                   </div>
 
@@ -812,9 +885,10 @@ const TopHeader = ({
                     </button>
                     <button
                       onClick={handlePublish}
+                      disabled={isPublishing}
                       className="flex-1 py-4 bg-purple-600 text-white rounded-2xl font-black shadow-lg shadow-purple-100 hover:bg-purple-700 transition-all active:scale-95"
                     >
-                      Go Live
+                      {isPublishing ? 'Submitting...' : 'Go Live'}
                     </button>
                   </div>
                 </div>
@@ -903,13 +977,13 @@ const TopHeader = ({
             <div className="w-20 h-20 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
               <CheckCircle size={40} fill="currentColor" className="text-white" />
             </div>
-            <h3 className="text-2xl font-black text-gray-900 mb-2">Live in Marketplace!</h3>
-            <p className="text-gray-500 font-medium mb-8">Your masterpiece is now available for the entire Sowntra community.</p>
+            <h3 className="text-2xl font-black text-gray-900 mb-2">Submitted for Review!</h3>
+            <p className="text-gray-500 font-medium mb-8">Your template is now in the admin queue. It will go live after approval.</p>
 
             <div className="bg-gray-50 p-4 rounded-2xl flex items-center gap-3 mb-8 text-left border border-gray-100">
               <div className="p-2 bg-white rounded-lg shadow-sm"><LinkIcon size={18} className="text-gray-400" /></div>
               <div className="flex-1 overflow-hidden">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Template Link</p>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Tracking</p>
                 <p className="text-sm font-bold text-gray-900 truncate">{publishedUrl}</p>
               </div>
             </div>
